@@ -1172,30 +1172,32 @@
 
         .main-submit-btn {
             flex: 1;
-            height: 48px;
-            /* 디자인 통일 (기존 44px) */
-            line-height: 48px;
+            height: 55px;
+            /* 15% 확대 (기존 48px) */
+            line-height: 55px;
             padding: 0;
             background: var(--moket-green);
             color: var(--white);
             border: none;
             border-radius: var(--common-radius);
-            font-size: 18px;
-            /* 디자인 통일 (기존 15px) */
+            font-size: 21px;
+            /* 15% 확대 (기존 18px) */
             font-weight: 800;
             cursor: pointer;
         }
 
         .main-reset-btn {
             flex: 1;
-            height: 48px;
-            line-height: 48px;
+            height: 55px;
+            /* 15% 확대 (기존 48px) */
+            line-height: 55px;
             padding: 0;
             background: #eff2f5;
             color: #455464;
             border: none;
             border-radius: var(--common-radius);
-            font-size: 18px;
+            font-size: 21px;
+            /* 15% 확대 (기존 18px) */
             font-weight: 900;
             cursor: pointer;
         }
@@ -1713,7 +1715,7 @@
             15,000원 이상 주문시 무료배달
         </div>
         <div
-            style="display:flex; justify-content:center; align-items:center; padding-bottom:12px; font-weight:800; font-size: 17px;">
+            style="display:flex; justify-content:center; align-items:center; padding-bottom:12px; font-weight:800; font-size: 20px;">
             <span id="total-qty-text">총 0개 선택</span>
         </div>
         <div style="display:flex; gap:10px;">
@@ -4369,7 +4371,15 @@
                         
                         // [신규] Firebase published_products 로부터 상품업로드 도구가 편집한 최신 기본재고(stock) 값을 동적 동기화
                         let baseStock = p.stock;
-                        const pubMatch = publishedProducts.find(pub => pub.name === p.name && (pub.matchKey || pub.date || "").trim() === mKey);
+                        // [개선] 당일구매(상시판매) 상품은 이름만으로 매칭하고, 예약구매 상품은 이름과 날짜를 대조하여 최신 재고(stock) 연동 결함 완벽 해결
+                        const pubMatch = publishedProducts.find(pub => {
+                            if (pub.name !== p.name) return false;
+                            const isReserve = pub.date && pub.date.trim() !== "" && (pub.date.includes("월") || pub.date.includes("일") || pub.date.includes("-"));
+                            if (isReserve) {
+                                return (pub.matchKey || pub.date || "").trim() === mKey;
+                            }
+                            return true; // 당일구매는 이름만 일치하면 매칭 성공
+                        });
                         if (pubMatch && pubMatch.stock !== undefined) {
                             baseStock = pubMatch.stock;
                         }
@@ -5552,7 +5562,7 @@
                 footer.classList.remove('visible');
                 if (notice) notice.style.display = 'none';
             }
-            document.getElementById('total-qty-text').innerHTML = `총 <span onclick="openCartDetailModal()" style="display:inline-block; cursor:pointer; background:var(--nego-orange); color:#fff; padding:2px 10px; border-radius:20px; font-size:14px; font-weight:900; margin:0 4px; box-shadow:0 2px 4px rgba(255, 77, 0, 0.2); transform:translateY(-1px); transition: all 0.2s;">${tQ}개</span> 선택 <span style="color:#ddd; margin:0 8px; font-weight:normal;">|</span> 합계 <span style="color:var(--nego-orange);">${tP.toLocaleString()}</span>원`;
+            document.getElementById('total-qty-text').innerHTML = `총 <span onclick="openCartDetailModal()" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer; background:var(--nego-orange); color:#fff; padding:4px 14px; border-radius:20px; font-size:16px; font-weight:900; margin:0 6px; box-shadow:0 2.5px 6px rgba(255, 77, 0, 0.25); transform:translateY(-2px); transition: all 0.2s; line-height: 1; vertical-align: middle;">${tQ}개</span> 선택 <span style="color:#ddd; margin:0 8px; font-weight:normal;">|</span> 합계 <span style="color:var(--nego-orange);">${tP.toLocaleString()}</span>원`;
         }
 
         function resetCart() {
@@ -5583,12 +5593,20 @@
                     const subTotal = price * cart[name];
                     totalSum += subTotal;
 
+                    const itemType = cartDeliveryType[name] || 'today';
+                    const typeBadge = itemType === 'today' 
+                        ? `<span style="font-size:10px; font-weight:800; background:#e6fbf2; color:#059669; padding:2px 6px; border-radius:4px; margin-left:6px; vertical-align:middle; display:inline-block; transform:translateY(-1px);">🚚 당일구매</span>`
+                        : `<span style="font-size:10px; font-weight:800; background:#fffbeb; color:#d97706; padding:2px 6px; border-radius:4px; margin-left:6px; vertical-align:middle; display:inline-block; transform:translateY(-1px);">📅 예약구매</span>`;
+
                     const itemDiv = document.createElement('div');
                     itemDiv.style = "display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f2f2f2;";
                     itemDiv.innerHTML = `
                         <div style="flex:1; padding-right:10px;">
                             <span style="font-weight:800; color:var(--item-black); font-size:14.5px; display:block; word-break:keep-all; line-height:1.2; margin-bottom:4px;">${name}</span>
-                            <span style="font-size:12px; color:#888; font-weight:600;">${price.toLocaleString()}원</span>
+                            <div style="display:flex; align-items:center; gap:2px;">
+                                <span style="font-size:12px; color:#888; font-weight:600;">${price.toLocaleString()}원</span>
+                                ${typeBadge}
+                            </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
                             <span style="font-weight:900; color:var(--nego-orange); font-size:14px; min-width:35px; text-align:right;">${cart[name]}개</span>
