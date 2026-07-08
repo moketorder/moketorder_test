@@ -1485,12 +1485,6 @@
                 style="display:none; margin-top:8px; background:white; border:1.5px solid #ff4d4d; color:#ff4d4d; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🚫
                 배달 기능 비활성화</button>
 
-            <button id="ADMIN_DELIVERY_FEE_ON" onclick="adminToggleDeliveryFee(true)"
-                style="display:none; margin-top:15px; background:white; border:1.5px solid var(--moket-green); color:var(--moket-green); font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">💰
-                배달비(3000원) 부과 활성화</button>
-            <button id="ADMIN_DELIVERY_FEE_OFF" onclick="adminToggleDeliveryFee(false)"
-                style="display:none; margin-top:8px; background:white; border:1.5px solid #ff4d4d; color:#ff4d4d; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">💸
-                배달비 부과 끄기 (무료배달)</button>
 
             <button id="ADMIN_HOLIDAY_MANAGE" onclick="adminManageHolidays()"
                 style="display:none; margin-top:15px; background:white; border:1.5px solid #9C27B0; color:#9C27B0; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🗓️
@@ -1724,7 +1718,8 @@
         </div>
     </div>
     <div id="system-modal" class="modal-overlay" style="z-index: 9999;">
-        <div class="modal-content" style="text-align: center; width: 85%; max-width: 350px;">
+        <!-- 시스템 모달 가로폭 확장 (배달비 안내 등 텍스트가 줄바꿈 없이 한 줄에 매끄럽게 들어가도록 보정) -->
+        <div class="modal-content" style="text-align: center; width: 90%; max-width: 440px;">
             <div id="sys-modal-msg" style="font-weight: 700; color: var(--item-black);">
             </div>
             <div id="sys-modal-btns" style="display: flex; gap: 10px; justify-content: center;"></div>
@@ -1858,7 +1853,7 @@
                 
                 // 2. 평일 13시 이후 당일구매 마감 차단
                 if (hour >= 13) {
-                    showSystemModal("당일구매 주문 가능한 시간은 평일 오전 00시부터 13시까지입니다.", 'alert');
+                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 00시(자정)부터 13시(오후 1시)까지만 가능합니다.`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -2311,67 +2306,6 @@
             updateFooter();
         }
 
-        // [신규] 배달비 부과 끄기/켜기 로직
-        let isDeliveryFeeEnabled = true;
-
-        async function fetchDeliveryFeeStatus() {
-            try {
-                const res = await fetch(FIREBASE_DB_URL + "delivery_fee_enabled.json?t=" + Date.now());
-                const status = await res.json();
-                if (status !== null) isDeliveryFeeEnabled = (status === true);
-                updateDeliveryFeeUI();
-            } catch (e) {
-                console.error("배달비 설정 로드 실패:", e);
-                updateDeliveryFeeUI();
-            }
-        }
-
-        function updateDeliveryFeeUI() {
-            const onBtn = document.getElementById('ADMIN_DELIVERY_FEE_ON');
-            const offBtn = document.getElementById('ADMIN_DELIVERY_FEE_OFF');
-
-            if (onBtn && offBtn) {
-                if (isDeliveryFeeEnabled) {
-                    onBtn.innerHTML = '💰 배달비(3천원) 부과 활성화 [현재 적용중]';
-                    onBtn.style.background = '#e1f5fe';
-                    onBtn.style.border = '1.5px solid #2196F3';
-                    onBtn.style.color = '#2196F3';
-                    onBtn.style.opacity = '1';
-
-                    offBtn.innerHTML = '💸 배달비 부과 비활성화 (무료배달)';
-                    offBtn.style.background = 'white';
-                    offBtn.style.border = '1.5px solid #ff4d4d';
-                    offBtn.style.color = '#ff4d4d';
-                    offBtn.style.opacity = '0.5';
-                } else {
-                    offBtn.innerHTML = '💸 배달비 부과 비활성화 [무료배달 적용중]';
-                    offBtn.style.background = '#eceff1';
-                    offBtn.style.border = '1.5px solid #607D8B';
-                    offBtn.style.color = '#607D8B';
-                    offBtn.style.opacity = '1';
-
-                    onBtn.innerHTML = '💰 배달비(3천원) 부과 활성화';
-                    onBtn.style.background = 'white';
-                    onBtn.style.border = '1.5px solid var(--moket-green)';
-                    onBtn.style.color = 'var(--moket-green)';
-                    onBtn.style.opacity = '0.5';
-                }
-            }
-        }
-
-        async function adminToggleDeliveryFee(status) {
-            try {
-                await fetch(FIREBASE_DB_URL + "delivery_fee_enabled.json", {
-                    method: 'PUT',
-                    body: JSON.stringify(status)
-                });
-                isDeliveryFeeEnabled = status;
-                updateDeliveryFeeUI();
-                showSystemModal(`배달비 부과가 ${status ? '활성화' : '비활성화'}되었습니다.`, "alert");
-            } catch (e) {
-                showSystemModal("배달비 설정 변경 실패.", "alert");
-            }
-        }
 
         let isLoginEntryEnabled = true; // 기본값은 로그인 강제
         async function fetchLoginEntryStatus() {
@@ -2625,9 +2559,21 @@
                 }
             }
  
-            if (currentTotal < 15000) {
-                showSystemModal(`배달 최소주문금액이 미달되었습니다.<br><br>배달 주문은 <span style="color:var(--nego-orange); font-weight:800;">15,000원 이상</span>부터 가능합니다.<br>(현재 주문금액: ${currentTotal.toLocaleString()}원)`, 'alert');
-                return; // 배달 진행 차단
+            if (currentTotal < 15000 && !window.isDeliveryFeeAddedUnder15000) {
+                // 사장님 요청 문구: '이상' 은 빼주고 '배달 주문은' 앞에 '배달' 넣어주고 한줄에 들어가게
+                // 현재 금액 밑에 한줄 띄고 배달비 3,000원을 추가하여 주문하시겠습니까? 하고 확인 취소 버튼 만들기
+                showSystemModal(
+                    `배달 최소주문금액이 미달되었습니다.<br><br><b>배달 배달 주문은 <span style="color:var(--nego-orange); font-weight:800;">15,000원</span>부터 가능합니다.</b><br>(현재 주문금액: ${currentTotal.toLocaleString()}원)<br><br>배달비 3,000원을 추가하여 주문하시겠습니까?`,
+                    'confirm',
+                    () => {
+                        window.isDeliveryFeeAddedUnder15000 = true;
+                        handleDeliveryOrderClick(); // 우회(재귀) 재검증 진행
+                    },
+                    () => {
+                        window.isDeliveryFeeAddedUnder15000 = false; // 취소 시 초기화
+                    }
+                );
+                return; // 배달 진행 차단 후 컨펌 결과 대기
             }
  
             // 1. 배달 안내 및 11시 마감 체크
@@ -2947,7 +2893,6 @@
         // 페이지 로드 시 상태 확인
         window.addEventListener('load', () => {
             fetchDeliveryStatus();
-            fetchDeliveryFeeStatus();
             fetchLoginEntryStatus();
             fetchHolidays();
             fetchSaturdayWeekdayStatus();
@@ -5829,7 +5774,21 @@
                 }
             }
 
-            const sortedDates = Object.keys(grouped).sort((a, b) => {
+            if (window.isDeliveryFeeAddedUnder15000 && selectedShippingMethod === '배달주문') {
+                const feeDate = "배달비";
+                if (!grouped[feeDate]) grouped[feeDate] = [];
+                grouped[feeDate].push({
+                    name: "배달비",
+                    price: 3000,
+                    qty: 1,
+                    displayDate: "배달비",
+                    matchKey: "배달비"
+                });
+                totalSum += 3000;
+                totalQty += 1;
+            }
+
+            const sortedDates = Object.keys(grouped).filter(d => d !== "배달비").sort((a, b) => {
                 const ka = grouped[a][0].matchKey;
                 const kb = grouped[b][0].matchKey;
                 const da = new Date(ka.replace(/\./g, '-')).getTime();
@@ -5837,6 +5796,9 @@
                 if (!isNaN(da) && !isNaN(db)) return da - db;
                 return ka.localeCompare(kb);
             });
+            if (grouped["배달비"]) {
+                sortedDates.push("배달비"); // 배달비 항목은 항상 정렬 맨 마지막에 깔끔하게 배치
+            }
 
             sortedDates.forEach(date => {
                 let groupHtml = `
@@ -5951,7 +5913,7 @@
                     return;
                 }
                 if (currentHour >= 13) {
-                    showSystemModal("당일배송 주문 가능한 시간은 평일 오전 00시부터 13시까지입니다.", 'alert');
+                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 00시(자정)부터 13시(오후 1시)까지만 가능합니다.`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
@@ -6168,6 +6130,26 @@
                     }
                 }
 
+                // [신규] 15,000원 미만 배달비 3,000원 추가 수락 시 최종 주문 항목(allItems)에 배달비 품목 주입
+                if (window.isDeliveryFeeAddedUnder15000 && shippingMethod === '배달주문') {
+                    let feeDate = todayStr;
+                    if (allItems.length > 0) {
+                        feeDate = allItems[0].date;
+                    }
+                    allItems.push({
+                        name: "배달비",
+                        qty: 1,
+                        price: 3000,
+                        subtotal: 3000,
+                        date: feeDate,
+                        matchKey: "배달비",
+                        isCategorized: false,
+                        isFV: false,
+                        isOnSite: false,
+                        isPushedByCutoff: false
+                    });
+                }
+
                 if (shippingMethod === '배달주문' && extraItems && extraItems.length > 0) {
                     const usedNames = {};
                     extraItems.forEach(it => {
@@ -6217,7 +6199,8 @@
                         }
                     });
 
-                    if (isDeliveryFeeEnabled && uniqueDates.size > 1) {
+                    // 배달 날짜가 서로 다른 상품들이 하나의 장바구니에 섞여 결제되는 혼선 방지 (필수 차단 필터)
+                    if (uniqueDates.size > 1) {
                         showSystemModal(`배달 날짜가 서로 다른 상품들은 함께 배달할 수 없습니다.\n같은 날짜의 상품끼리 묶어서 따로 주문해 주세요.`, 'alert');
                         throw new Error("MIXED_DELIVERY_DATES");
                     }
@@ -6716,9 +6699,14 @@
                 }
 
                 setTimeout(() => loadData(), 2000);
+                
+                // 주문 전송 완료 후 배달비 주입 플래그 리셋
+                window.isDeliveryFeeAddedUnder15000 = false;
 
             } catch (err) {
                 console.error(err);
+                // 주문 전송 실패 시 배달비 주입 플래그 리셋
+                window.isDeliveryFeeAddedUnder15000 = false;
                 document.getElementById('system-modal').style.display = 'none';
                 alert("주문 처리 중 오류가 발생했습니다.\n내용: " + err.message);
                 isHistoryProcessing = false;
@@ -6750,7 +6738,6 @@
 
             // 설정 상태 동기화 및 UI 반영
             fetchDeliveryStatus();
-            fetchDeliveryFeeStatus();
             fetchLoginEntryStatus();
             fetchProductListStatus();
             fetchSaturdayWeekdayStatus();
