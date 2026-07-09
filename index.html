@@ -2617,12 +2617,6 @@
             }
  
             // 1. 배달 안내 및 11시 마감 체크
-            const now = new Date();
-            const currentHour = now.getHours();
-            const currentDay = now.getDay();
-            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
-
             
 
             let hasReserve = false;
@@ -2706,7 +2700,7 @@
             // [신규] 예약배송 모드일 때는 마감 시각 조건 없이 예약배송용 배달안내 팝업을 우선 활성화
             if (currentDeliveryType === 'reserve') {
                 showModal = true;
-                msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 안내]</span>구매상품 중 가장 늦은 입고일에 맞춰 합배송 됩니다.`;
+                msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 안내]</span>구매상품중 가장 늦은 입고일에 맞춰 합배송 됩니다.`;
             } else if (currentHour >= 13) {
                 if (hasAnyRegular) {
                     showModal = true;
