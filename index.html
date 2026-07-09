@@ -2517,11 +2517,17 @@
         fetchSaturdayWeekdayStatus();
 
 
-        function handleDeliveryOrderClick() {
+                        function handleDeliveryOrderClick() {
             if (!isDeliveryEnabled) {
                 showSystemModal("배달주문은 추후 제공 예정입니다.", "alert");
                 return;
             }
+
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentDay = now.getDay();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
 
             // [추가] 사다드림 상품 포함 여부 체크
             const sadaItems = Object.keys(cart).filter(name => name.includes("[사다드림]") && cart[name] > 0);
@@ -2547,8 +2553,42 @@
                 });
                 return;
             }
+
+            // [신규] 장바구니 상품의 배달 기준일 계산하여 해당 일자에 기존 주문이 있는지 확인
+            let targetDateObj = new Date(now);
+            if (currentHour >= 13) targetDateObj.setDate(targetDateObj.getDate() + 1);
+
+            while (true) {
+                const chkDay = targetDateObj.getDay();
+                const dStr = `${targetDateObj.getFullYear()}-${String(targetDateObj.getMonth() + 1).padStart(2, '0')}-${String(targetDateObj.getDate()).padStart(2, '0')}`;
+                let isOff = (chkDay === 0 || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
+                if (isOff) targetDateObj.setDate(targetDateObj.getDate() + 1);
+                else break;
+            }
+
+            const targetPickupDate = `${targetDateObj.getFullYear()}-${String(targetDateObj.getMonth() + 1).padStart(2, '0')}-${String(targetDateObj.getDate()).padStart(2, '0')}`;
+            let deliveryDate = targetPickupDate;
+            
+            for (const itemName in cart) {
+                if (cart[itemName] > 0) {
+                    const pData = productsData.find(p => p.name === itemName);
+                    if (pData && pData.matchKey) {
+                        const mKey = pData.matchKey;
+                        if (/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey)) {
+                            let dStr = String(mKey).replace(/\./g, '-').trim();
+                            if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
+                            const pt = dStr.split('-');
+                            if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+                            if (dStr > targetPickupDate) deliveryDate = dStr;
+                        }
+                    }
+                }
+            }
+
+            const pendingItemsForDate = getPendingItemsByDate(deliveryDate);
+            const hasExistingOrderForDate = (pendingItemsForDate.length > 0);
  
-            // [신규] 배달주문 시 최소 주문금액(15,000원) 검증 및 차단 (USER 요청)
+            // [신규] 배달주문 시 최소 주문금액(15,000원) 검증 및 차단 (기존 주문이 없는 경우에만 적용)
             let currentTotal = 0;
             for (const name in cart) {
                 if (cart[name] > 0) {
@@ -2558,8 +2598,8 @@
                     }
                 }
             }
- 
-            if (currentTotal < 15000 && !window.isDeliveryFeeAddedUnder15000) {
+
+            if (currentTotal < 15000 && !window.isDeliveryFeeAddedUnder15000 && !hasExistingOrderForDate) {
                 // 사장님 요청 문구: '이상' 은 빼주고 '배달 주문은' 앞에 '배달' 넣어주고 한줄에 들어가게
                 // 현재 금액 밑에 한줄 띄고 배달비 3,000원을 추가하여 주문하시겠습니까? 하고 확인 취소 버튼 만들기
                 showSystemModal(
@@ -2582,6 +2622,8 @@
             const currentDay = now.getDay();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
+
+            
 
             let hasReserve = false;
             let hasFV = false;
@@ -6822,3 +6864,4 @@
 </body>
 
 </html>
+
