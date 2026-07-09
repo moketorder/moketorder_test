@@ -2679,7 +2679,7 @@
 
             // [추가] 공동구매 상품과 일반(상시/과일) 상품 혼합 주문 시 안내 (최우선순위)
             if (hasReserve && hasAnyRegular) {
-                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 안내]</span>구매 상품중 가장 늦은 입고일에 맞춰 합배송 됩니다.`;
+                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 안내]</span>구매상품중 가장 늦은 입고일에 맞춰 합배송 됩니다.`;
                 showSystemModal(msg + "<br><br>주문하시겠습니까?", 'confirm', () => {
                     holidayConfirmedStatus = true;
                     cutoffConfirmedStatus = true;
@@ -2828,7 +2828,7 @@
             // [수정] 13시 마감 보정 팝업(과일, 야채, 기타 한정 경고) 전면 제거로 즉시 주문 확인으로 직진
             // 단, 예약배송 모드일 때는 픽업 서비스 안내 팝업을 우선 활성화
             if (currentDeliveryType === 'reserve') {
-                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[픽업 서비스 안내]</span>구매상품 입고일에 맞춰 픽업이 가능합니다.<br><br>주문하시겠습니까?`;
+                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[픽업 서비스 안내]</span>각 구매상품 입고일에 맞춰 픽업이 가능합니다.<br><br>주문하시겠습니까?`;
                 showSystemModal(msg, 'confirm', () => {
                     cutoffConfirmedStatus = true;
                     proceedToConfirm();
@@ -5780,22 +5780,21 @@
                     <div style="font-size: 12px; line-height: 1.5;">
                         <div style="font-weight: 800; color: var(--nego-orange); margin-bottom: 6px; font-size: 13px; display: flex; align-items: center; gap: 4px;">🚚 배달 주문 시 유의사항</div>
                         <div style="display: flex; flex-direction: column; gap: 2px; color: #4b5563;">
-                            <div>• 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
-                            <div>• 주문량에 따라 배달코스가 달라져 개별 도착안내가 어렵습니다.</div>
-                            <div>• 냉장/냉동제품은 보냉백에 넣어드리나 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인 바랍니다.</div>
-                            <div>• 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
+                            <div>✅ 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
+                            <div>✅ 주문량에 따라 배달코스가 달라져 개별 도착안내가 어렵습니다.</div>
+                            <div>✅ 냉장/냉동제품은 보냉백에 넣어드리나 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인 바랍니다.</div>
+                            <div>✅ 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
                         </div>
                     </div>
                 `;
             } else {
                 noticeArea.innerHTML = `
                     <div style="font-size: 12px; line-height: 1.5;">
-                        <div style="font-weight: 800; color: var(--moket-green); margin-bottom: 6px; font-size: 13px; display: flex; align-items: center; gap: 4px;">🏪 방문 픽업 시 유의사항</div>
                         <div style="display: flex; flex-direction: column; gap: 2px; color: #4b5563;">
-                            <div>• 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
-                            <div>• 픽업기간(과일, 야채 등 신선식품)은 입고 당일까지이며, 이외 제품은 입고일 포함 3일(휴무일 제외) 가능합니다.</div>
-                            <div>• 픽업기간 이후에는 상시판매로 전환되어 픽업이 불가능합니다.</div>
-                            <div>• 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
+                            <div>✅ 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
+                            <div>✅ 픽업기간(과일, 야채 등 신선식품)은 입고 당일까지이며, 이외 제품은 입고일 포함 3일(휴무일 제외) 가능합니다.</div>
+                            <div>✅ 픽업기간 이후에는 상시판매로 전환되어 픽업이 불가능합니다.</div>
+                            <div>✅ 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
                         </div>
                     </div>
                 `;
@@ -6479,38 +6478,81 @@
                     }
                 });
             } else if (currentDeliveryType === 'reserve') {
-                // 2. 예약배송 모드: 공동구매 상품 중 가장 늦은 날짜(최대 날짜)를 추출
-                let maxReserveDate = null;
-                
-                allItems.forEach(it => {
-                    if (it.name === "배달비") return;
-                    // 공동구매 상품인지 검증 (date가 날짜 형식이거나 matchKey가 날짜 형식인 경우)
-                    const d = it.date || "";
-                    const m = it.matchKey || "";
-                    const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
-                                       /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
-                    if (isDateItem) {
-                        // 날짜 형태 정규화 (YYYY-MM-DD)
-                        let dStr = (d.includes('.') || d.includes('-')) ? d : m;
-                        dStr = dStr.replace(/\./g, '-').trim();
-                        if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
-                        const pt = dStr.split('-');
-                        if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
-                        
-                        if (!maxReserveDate || dStr > maxReserveDate) {
-                            maxReserveDate = dStr;
-                        }
-                    }
-                });
-
-                // 만약 공동구매 날짜가 존재한다면, 배달비 제외한 모든 상품(상시판매, 과일 포함)의 날짜를 이 최대 날짜로 덮어씀
-                if (maxReserveDate) {
+                if (shippingMethod === '배달주문') {
+                    // 2. 예약배송 모드 (배달): 공동구매 상품 중 가장 늦은 날짜(최대 날짜)를 추출
+                    let maxReserveDate = null;
+                    
                     allItems.forEach(it => {
-                        if (it.name !== "배달비") {
-                            it.date = maxReserveDate;
-                            it.isCategorized = false;
+                        if (it.name === "배달비") return;
+                        // 공동구매 상품인지 검증 (date가 날짜 형식이거나 matchKey가 날짜 형식인 경우)
+                        const d = String(it.date || "");
+                        const m = String(it.matchKey || "");
+                        const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
+                                           /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
+                        if (isDateItem) {
+                            // 날짜 형태 정규화 (YYYY-MM-DD)
+                            let dStr = (d.includes('.') || d.includes('-')) ? d : m;
+                            dStr = dStr.replace(/\./g, '-').trim();
+                            if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
+                            const pt = dStr.split('-');
+                            if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+                            
+                            if (!maxReserveDate || dStr > maxReserveDate) {
+                                maxReserveDate = dStr;
+                            }
                         }
                     });
+
+                    // 만약 공동구매 날짜가 존재한다면, 모든 상품(배달비 포함)의 날짜를 이 최대 날짜로 덮어씀
+                    if (maxReserveDate) {
+                        allItems.forEach(it => {
+                            it.date = maxReserveDate;
+                            it.isCategorized = false;
+                        });
+                    }
+                } else if (shippingMethod === '매장픽업') {
+                    // 2. 예약배송 모드 (매장픽업):
+                    // 공동구매 상품은 각각 본인의 원래 입고일을 그대로 유지하여 개별 기록되게 하고,
+                    // 상시판매나 과일이 혼합되었을 때는 공동구매 상품 중 가장 빠른 날짜(최소 날짜)에 매칭되게 합니다.
+                    let minReserveDate = null;
+                    const reserveDates = [];
+
+                    allItems.forEach(it => {
+                        if (it.name === "배달비") return;
+                        const d = String(it.date || "");
+                        const m = String(it.matchKey || "");
+                        const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
+                                           /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
+                        if (isDateItem) {
+                            // 날짜 형태 정규화 (YYYY-MM-DD)
+                            let dStr = (d.includes('.') || d.includes('-')) ? d : m;
+                            dStr = dStr.replace(/\./g, '-').trim();
+                            if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
+                            const pt = dStr.split('-');
+                            if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+                            
+                            it.date = dStr;
+                            it.isCategorized = false;
+                            reserveDates.push(dStr);
+                        }
+                    });
+
+                    if (reserveDates.length > 0) {
+                        reserveDates.sort();
+                        minReserveDate = reserveDates[0];
+
+                        // 상시판매나 과일(공동구매가 아닌 상품)은 공동구매 상품 중 가장 빠른 날짜로 기록되도록 설정
+                        allItems.forEach(it => {
+                            const d = String(it.date || "");
+                            const m = String(it.matchKey || "");
+                            const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
+                                               /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
+                            if (!isDateItem && it.name !== "배달비") {
+                                it.date = minReserveDate;
+                                it.isCategorized = false;
+                            }
+                        });
+                    }
                 }
             }
 
