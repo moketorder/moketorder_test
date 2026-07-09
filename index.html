@@ -1862,9 +1862,9 @@
                     return;
                 }
                 
-                // 2. 평일 13시 이후 당일구매 마감 차단
-                if (hour >= 13) {
-                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 00시부터 13시까지만 가능합니다.`, 'alert');
+                // 2. 평일 13시 이후 및 06시 이전 당일구매 마감 차단
+                if (hour < 6 || hour >= 13) {
+                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 06시부터 13시까지만 가능합니다.`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -1901,12 +1901,12 @@
             
             // 1. 첫 페이지 로드 시에만 기본 탭 설정
             if (isInitialPageLoad) {
-                if (hour >= 13 || isHoliday) {
+                if (hour < 8 || hour >= 13 || isHoliday) {
                     currentDeliveryType = 'reserve';
-                    currentMainTab = 'reserve'; // 13시 이후나 휴무일에는 예약배송으로 유도
+                    currentMainTab = 'reserve'; // 13시 이후, 8시 이전, 휴무일에는 예약배송으로 유도
                 } else {
                     currentDeliveryType = 'today';
-                    currentMainTab = 'today-fruit'; // 평일 13시 이전에는 당일배송으로 기본 시작
+                    currentMainTab = 'today-fruit'; // 평일 8시 ~ 13시 사이에는 당일배송으로 기본 시작
                 }
             }
             
@@ -5783,7 +5783,6 @@
             if (selectedShippingMethod === '배달주문') {
                 noticeArea.innerHTML = `
                     <div style="font-size: 12px; line-height: 1.5;">
-                        <div style="font-weight: 800; color: var(--nego-orange); margin-bottom: 6px; font-size: 13px; display: flex; align-items: center; gap: 4px;">🚚 배달 주문 시 유의사항</div>
                         <div style="display: flex; flex-direction: column; gap: 2px; color: #4b5563;">
                             <div>✅ 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
                             <div>✅ 주문량에 따라 배달코스가 달라져 개별 도착안내가 어렵습니다.</div>
@@ -5954,7 +5953,7 @@
             
             const submitBtn = document.getElementById('btn-submit-order');
 
-            // [신규] 당일배송 주말/공휴일 및 평일 13시 마감 시간 차단
+            // [신규] 당일배송 주말/공휴일 및 평일 13시 마감 및 06시 시작 제한 시간 차단
             if (currentDeliveryType === 'today') {
                 if (isHoliday) {
                     showSystemModal("주말 및 공휴일에는 당일배송 주문이 불가능합니다.<br><br><b>[📅 예약배송]</b>을 이용해 주세요!", 'alert');
@@ -5965,8 +5964,8 @@
                     }
                     return;
                 }
-                if (currentHour >= 13) {
-                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 00시부터 13시까지만 가능합니다.`, 'alert');
+                if (currentHour < 6 || currentHour >= 13) {
+                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 06시부터 13시까지만 가능합니다.`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
