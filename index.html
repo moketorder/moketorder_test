@@ -1853,7 +1853,7 @@
                 
                 // 2. 평일 13시 이후 당일구매 마감 차단
                 if (hour >= 13) {
-                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 00시(자정)부터 13시(오후 1시)까지만 가능합니다.`, 'alert');
+                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 00시부터 13시까지만 가능합니다.`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -2563,7 +2563,7 @@
                 // 사장님 요청 문구: '이상' 은 빼주고 '배달 주문은' 앞에 '배달' 넣어주고 한줄에 들어가게
                 // 현재 금액 밑에 한줄 띄고 배달비 3,000원을 추가하여 주문하시겠습니까? 하고 확인 취소 버튼 만들기
                 showSystemModal(
-                    `배달 최소주문금액이 미달되었습니다.<br><br><b>배달 배달 주문은 <span style="color:var(--nego-orange); font-weight:800;">15,000원</span>부터 가능합니다.</b><br>(현재 주문금액: ${currentTotal.toLocaleString()}원)<br><br>배달비 3,000원을 추가하여 주문하시겠습니까?`,
+                    `배달 최소주문금액이 미달되었습니다.<br><br><b>배달 주문은 <span style="color:var(--nego-orange); font-weight:800;">15,000원</span>부터 가능합니다.</b><br>(현재 주문금액: ${currentTotal.toLocaleString()}원)<br><br>배달비 3,000원을 추가하여 주문하시겠습니까?`,
                     'confirm',
                     () => {
                         window.isDeliveryFeeAddedUnder15000 = true;
@@ -2664,7 +2664,7 @@
             // [신규] 예약배송 모드일 때는 마감 시각 조건 없이 예약배송용 배달안내 팝업을 우선 활성화
             if (currentDeliveryType === 'reserve') {
                 showModal = true;
-                msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 안내]</span>예약배송 상품은 가장 늦은 공동구매상품 입고날짜에 맞춰 한번에 배달됩니다.`;
+                msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 안내]</span>구매상품 중 가장 늦은 입고일에 맞춰 합배송 됩니다.`;
             } else if (currentHour >= 13) {
                 if (hasAnyRegular) {
                     showModal = true;
@@ -2685,7 +2685,7 @@
             }
  
             if (showModal) {
-                showSystemModal(msg + "<br><br>배달주문 하시겠습니까?", 'confirm', () => {
+                showSystemModal(msg + "<br><br>주문하시겠습니까?", 'confirm', () => {
                     cutoffConfirmedStatus = true;
                     checkCombinedDelivery();
                 });
@@ -2786,7 +2786,7 @@
             // [수정] 13시 마감 보정 팝업(과일, 야채, 기타 한정 경고) 전면 제거로 즉시 주문 확인으로 직진
             // 단, 예약배송 모드일 때는 픽업 서비스 안내 팝업을 우선 활성화
             if (currentDeliveryType === 'reserve') {
-                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[픽업 서비스 안내]</span>예약배송 상품은 구매상품 중 가장 늦은 공동구매상품 입고날짜에 맞춰 한번에 픽업이 가능합니다.<br><br>픽업주문 하시겠습니까?`;
+                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[픽업 서비스 안내]</span>구매상품 입고일에 맞춰 픽업이 가능합니다.<br><br>주문하시겠습니까?`;
                 showSystemModal(msg, 'confirm', () => {
                     cutoffConfirmedStatus = true;
                     proceedToConfirm();
@@ -5920,7 +5920,7 @@
                     return;
                 }
                 if (currentHour >= 13) {
-                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 00시(자정)부터 13시(오후 1시)까지만 가능합니다.`, 'alert');
+                    showSystemModal(`당일구매 주문은 ${isSaturdayAsWeekday ? '월요일 ~ 토요일' : '월요일 ~ 금요일'} 00시부터 13시까지만 가능합니다.`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
