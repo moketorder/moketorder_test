@@ -1625,7 +1625,7 @@
     <div id="cart-detail-overlay" class="modal-overlay" style="display: none; z-index: 1100;">
         <div class="modal-content" style="padding: 20px; display: flex; flex-direction: column; max-height: 80vh; box-sizing: border-box; width: 90%; max-width: 450px;">
             <div style="border-bottom: 2px solid var(--nego-orange); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="font-size: 18px; font-weight: 900; color: var(--item-black); margin: 0; display: flex; align-items: center; gap: 6px;">🛒 장바구니 담은 목록</h3>
+                <h3 id="cart-detail-title" style="font-size: 18px; font-weight: 900; color: var(--item-black); margin: 0; display: flex; align-items: center; gap: 6px;">🛒 장바구니 담은 목록</h3>
                 <span style="font-size: 24px; font-weight: 800; cursor: pointer; color: #aaa; line-height: 1;" onclick="closeCartDetailModal()">&times;</span>
             </div>
             <div id="cart-detail-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 5px 0; margin-bottom: 15px;">
@@ -3064,12 +3064,11 @@
                 btnYes.innerText = '확인';
 
                 btnYes.onclick = async () => {
-                    if (yesCallback) {
-                        const preventClose = await yesCallback(btnYes, btnNo);
-                        if (preventClose === true) return;
-                    }
                     modal.style.display = 'none';
                     checkScrollLock();
+                    if (yesCallback) {
+                        await yesCallback(btnYes, btnNo);
+                    }
                 };
 
                 btnDiv.appendChild(btnNo);
@@ -5529,6 +5528,7 @@
             listContainer.innerHTML = '';
             let totalSum = 0;
             let hasItems = false;
+            let cartType = 'today';
 
             for (const name in cart) {
                 if (cart[name] > 0) {
@@ -5538,10 +5538,7 @@
                     const subTotal = price * cart[name];
                     totalSum += subTotal;
 
-                    const itemType = cartDeliveryType[name] || 'today';
-                    const typeBadge = itemType === 'today' 
-                        ? `<span style="font-size:10px; font-weight:800; background:#e6fbf2; color:#059669; padding:2px 6px; border-radius:4px; margin-left:6px; vertical-align:middle; display:inline-block; transform:translateY(-1px);">🚚 당일구매</span>`
-                        : `<span style="font-size:10px; font-weight:800; background:#fffbeb; color:#d97706; padding:2px 6px; border-radius:4px; margin-left:6px; vertical-align:middle; display:inline-block; transform:translateY(-1px);">📅 예약구매</span>`;
+                    cartType = cartDeliveryType[name] || 'today';
 
                     const itemDiv = document.createElement('div');
                     itemDiv.style = "display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f2f2f2;";
@@ -5550,7 +5547,6 @@
                             <span style="font-weight:800; color:var(--item-black); font-size:14.5px; display:block; word-break:keep-all; line-height:1.2; margin-bottom:4px;">${name}</span>
                             <div style="display:flex; align-items:center; gap:2px;">
                                 <span style="font-size:12px; color:#888; font-weight:600;">${price.toLocaleString()}원</span>
-                                ${typeBadge}
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
@@ -5559,6 +5555,17 @@
                         </div>
                     `;
                     listContainer.appendChild(itemDiv);
+                }
+            }
+
+            const titleEl = document.getElementById('cart-detail-title');
+            if (titleEl) {
+                if (!hasItems) {
+                    titleEl.innerHTML = `🛒 장바구니 담은 목록`;
+                } else if (cartType === 'today') {
+                    titleEl.innerHTML = `🚚 당일구매 장바구니 목록`;
+                } else {
+                    titleEl.innerHTML = `📅 예약구매 장바구니 목록`;
                 }
             }
 
