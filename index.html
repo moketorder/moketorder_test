@@ -953,7 +953,11 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.2s ease-in-out;
+            opacity: 0;
+        }
+        .thumb img.loaded {
+            opacity: 1;
         }
 
         .slider-no-img {
@@ -5388,7 +5392,7 @@
 
                 card.innerHTML = `<div class="card-top">` +
                     `<div class="thumb">` +
-                    (imgId ? `<img src="${getImgUrl(imgId, 300)}" loading="lazy" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain;" onerror="this.onerror=null; this.src=getImgUrl('${imgId}', 300, true);">` : 'No Image') +
+                    (imgId ? `<img src="${getImgUrl(imgId, 300)}" loading="lazy" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain;" onload="this.classList.add('loaded')" onerror="this.onerror=null; this.src=getImgUrl('${imgId}', 300, true); this.classList.add('loaded');">` : 'No Image') +
                     `<div class="thumb-notice">예시이미지입니다.</div>` +
                     `</div>` +
                     `<div class="item-info-top">` +
@@ -6121,8 +6125,8 @@
 
                         // 2. [주말] 카테고리별 월요일 보정 (토요일 차별화 / 일요일 전체)
                         const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey);
-                        const isDaily = ["과일", "야채", "기타"].includes(mKey) || isFV;
-                        const isOnSite = ['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || (!isDateItem && !isDaily);
+                        const isDaily = !isDateItem && (["과일", "야채", "기타"].includes(mKey) || isFV);
+                        const isOnSite = !isDateItem && (['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(mKey) || !isDaily);
 
                         // 1-2. [신규] 상시판매: 20시(토요일은 18시) 이후 내일로 보정
                         const isOnSiteThreshold = (now.getDay() === 6 && !isSaturdayAsWeekday) ? 18 : 20;
@@ -6216,6 +6220,83 @@
 
                 if (allItems.length === 0) { showSystemModal("주문할 상품이 없습니다.", 'alert'); throw new Error("EMPTY_CART"); }
 
+                // [신규] 배송 유형 대분류에 따른 주문 기록 날짜(픽업일/배송일) 일괄 보정 및 통폐합 (검증 전 선 반영)
+
+                if (currentDeliveryType === 'today') {
+                    allItems.forEach(it => {
+                        if (it.name !== "배달비") {
+                            it.date = todayStr;
+                            it.isCategorized = false;
+                        }
+                    });
+                } else if (currentDeliveryType === 'reserve') {
+                    if (shippingMethod === '배달주문') {
+                        let maxReserveDate = null;
+                        allItems.forEach(it => {
+                            if (it.name === "배달비") return;
+                            const d = String(it.date || "");
+                            const m = String(it.matchKey || "");
+                            const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
+                                               /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
+                            if (isDateItem) {
+                                let dStr = (d.includes('.') || d.includes('-')) ? d : m;
+                                dStr = dStr.replace(/\./g, '-').trim();
+                                if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
+                                const pt = dStr.split('-');
+                                if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+                                
+                                if (!maxReserveDate || dStr > maxReserveDate) {
+                                    maxReserveDate = dStr;
+                                }
+                            }
+                        });
+
+                        if (maxReserveDate) {
+                            allItems.forEach(it => {
+                                it.date = maxReserveDate;
+                                it.isCategorized = false;
+                            });
+                        }
+                    } else if (shippingMethod === '매장픽업') {
+                        let minReserveDate = null;
+                        const reserveDates = [];
+                        allItems.forEach(it => {
+                            if (it.name === "배달비") return;
+                            const d = String(it.date || "");
+                            const m = String(it.matchKey || "");
+                            const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
+                                               /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
+                            if (isDateItem) {
+                                let dStr = (d.includes('.') || d.includes('-')) ? d : m;
+                                dStr = dStr.replace(/\./g, '-').trim();
+                                if (dStr.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) dStr = "20" + dStr;
+                                const pt = dStr.split('-');
+                                if (pt.length === 3) dStr = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+                                
+                                it.date = dStr;
+                                it.isCategorized = false;
+                                reserveDates.push(dStr);
+                            }
+                        });
+
+                        if (reserveDates.length > 0) {
+                            reserveDates.sort();
+                            minReserveDate = reserveDates[0];
+
+                            allItems.forEach(it => {
+                                const d = String(it.date || "");
+                                const m = String(it.matchKey || "");
+                                const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
+                                                   /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
+                                if (!isDateItem && it.name !== "배달비") {
+                                    it.date = minReserveDate;
+                                    it.isCategorized = false;
+                                }
+                            });
+                        }
+                    }
+                }
+
                 // 2. [배달전용] 날짜 검증 (USER 요청: 배달 날짜가 다른 상품 혼합 방지, 공휴일 스킵 적용)
                 if (shippingMethod === '배달주문') {
                     let targetDateObj = new Date(now);
@@ -6308,8 +6389,8 @@
                     submitBtn.innerText = "주문확정";
                     submitBtn.style.opacity = "1";
                 }
-                if (err.message !== "EMPTY_CART" && err.message !== "INVALID_DATE" && err.message !== "MISSING_ADDRESS") {
-                    showSystemModal("주문 처리 중 오류가 발생했습니다.\n다시 시도해 주세요.", 'alert');
+                if (err.message !== "EMPTY_CART" && err.message !== "INVALID_DATE" && err.message !== "MISSING_ADDRESS" && err.message !== "MIXED_DELIVERY_DATES") {
+                    showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
                 }
             }
         }
@@ -6803,7 +6884,7 @@
                 // 주문 전송 실패 시 배달비 주입 플래그 리셋
                 window.isDeliveryFeeAddedUnder15000 = false;
                 document.getElementById('system-modal').style.display = 'none';
-                alert("주문 처리 중 오류가 발생했습니다.\n내용: " + err.message);
+                showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
                 isHistoryProcessing = false;
                 if (submitBtn) {
                     submitBtn.disabled = false;
