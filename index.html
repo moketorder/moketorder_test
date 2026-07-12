@@ -1499,6 +1499,9 @@
             <button id="ADMIN_DELIVERY_OFF" onclick="adminToggleDelivery(false)"
                 style="display:none; margin-top:8px; background:white; border:1.5px solid #ff4d4d; color:#ff4d4d; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🚫
                 배달 기능 비활성화</button>
+            <button id="ADMIN_DELIVERY_FEE_ON" onclick="adminManageDeliveryFee()"
+                style="display:none; margin-top:15px; background:white; border:1.5px solid #FF9800; color:#FF9800; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">💸
+                배달비 금액 설정</button>
 
 
             <button id="ADMIN_HOLIDAY_MANAGE" onclick="adminManageHolidays()"
@@ -1506,10 +1509,10 @@
                 임시 휴무일(공휴일) 관리</button>
 
             <button id="ADMIN_SATURDAY_WEEKDAY_ON" onclick="adminToggleSaturdayWeekday(true)"
-                style="display:none; margin-top:15px; background:white; border:1.5px solid var(--moket-green); color:var(--moket-green); font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">📅
+                style="display:none; margin-top:15px; background:white; border:1.5px solid var(--moket-green); color:var(--moket-green); font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🗓️
                 토요일 평일 작동 활성화 (주문 가동)</button>
             <button id="ADMIN_SATURDAY_WEEKDAY_OFF" onclick="adminToggleSaturdayWeekday(false)"
-                style="display:none; margin-top:8px; background:white; border:1.5px solid #ff4d4d; color:#ff4d4d; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">📅
+                style="display:none; margin-top:8px; background:white; border:1.5px solid #ff4d4d; color:#ff4d4d; font-size:14px; padding:12px; border-radius:var(--btn-radius); font-weight:900; cursor:pointer; width:100%;">🗓️
                 토요일 주말 작동 (배달 휴무)</button>
 
             <button id="ADMIN_LOGIN_ON" onclick="adminToggleLoginEntry(true)"
@@ -1584,7 +1587,7 @@
         <!-- [신규] 배송 유형 대분류 탭 영역 -->
         <div class="delivery-type-tabs">
             <button class="delivery-type-btn active" data-type="today" onclick="switchDeliveryType('today')">🚚 당일구매</button>
-            <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">📅 예약구매</button>
+            <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">🗓️ 예약구매</button>
         </div>
         <!-- [신규] 대분류 탭 영역 -->
         <div class="main-tabs" id="main-tabs-container">
@@ -1861,7 +1864,15 @@
             if (type === 'today') {
                 // 1. 주말 및 공휴일 당일구매 차단
                 if (isHoliday) {
-                    showSystemModal("주말 및 공휴일에는 당일구매 주문이 불가능합니다.<br><br><b>[📅 예약구매]</b>를 이용해 주세요!", 'alert');
+                    let holidayMsg = "";
+                    if (publicHolidays.includes(todayStr)) {
+                        holidayMsg = "임시휴무일에는 당일구매 주문이 불가능합니다.";
+                    } else if (isSaturdayAsWeekday) {
+                        holidayMsg = "일요일에는 당일구매 주문이 불가능합니다.";
+                    } else {
+                        holidayMsg = "주말에는 당일구매 주문이 불가능합니다.";
+                    }
+                    showSystemModal(`${holidayMsg}<br><br><b>[🗓️ 예약구매]</b>를 이용해 주세요!`, 'alert');
                     restoreTabActiveState();
                     return;
                 }
@@ -2257,6 +2268,19 @@
 
         // [신규] 배달 기능 실시간 로드 및 제어 로직
         let isDeliveryEnabled = false;
+        let deliveryFee = 3000;
+
+        async function fetchDeliveryFee() {
+            try {
+                const res = await fetch(FIREBASE_DB_URL + "delivery_fee.json?t=" + Date.now());
+                const fee = await res.json();
+                if (fee !== null && !isNaN(fee)) {
+                    deliveryFee = parseInt(fee);
+                }
+            } catch (e) {
+                console.error("배달비 로드 실패:", e);
+            }
+        }
 
         async function fetchDeliveryStatus() {
             // 초기 UI 반영 (로딩 중이거나 값이 아직 안왔을 때 기본값으로)
@@ -2479,25 +2503,25 @@
 
             if (onBtn && offBtn) {
                 if (isSaturdayAsWeekday) {
-                    onBtn.innerHTML = '📅 토요일 평일 작동 활성화 [현재 적용중]';
+                    onBtn.innerHTML = '🗓️ 토요일 평일 작동 활성화 [현재 적용중]';
                     onBtn.style.background = '#e1f5fe';
                     onBtn.style.border = '1.5px solid #2196F3';
                     onBtn.style.color = '#2196F3';
                     onBtn.style.opacity = '1';
 
-                    offBtn.innerHTML = '📅 토요일 주말 작동 (배달 휴무)';
+                    offBtn.innerHTML = '🗓️ 토요일 주말 작동 (배달 휴무)';
                     offBtn.style.background = 'white';
                     offBtn.style.border = '1.5px solid #ff4d4d';
                     offBtn.style.color = '#ff4d4d';
                     offBtn.style.opacity = '0.5';
                 } else {
-                    offBtn.innerHTML = '📅 토요일 주말 작동 [현재 적용중]';
+                    offBtn.innerHTML = '🗓️ 토요일 주말 작동 [현재 적용중]';
                     offBtn.style.background = '#eceff1';
                     offBtn.style.border = '1.5px solid #607D8B';
                     offBtn.style.color = '#607D8B';
                     offBtn.style.opacity = '1';
 
-                    onBtn.innerHTML = '📅 토요일 평일 작동 활성화';
+                    onBtn.innerHTML = '🗓️ 토요일 평일 작동 활성화';
                     onBtn.style.background = 'white';
                     onBtn.style.border = '1.5px solid var(--moket-green)';
                     onBtn.style.color = 'var(--moket-green)';
@@ -2532,7 +2556,7 @@
         fetchSaturdayWeekdayStatus();
 
 
-                        function handleDeliveryOrderClick() {
+                        async function handleDeliveryOrderClick() {
             if (!isDeliveryEnabled) {
                 showSystemModal("배달주문은 추후 제공 예정입니다.", "alert");
                 return;
@@ -2544,12 +2568,7 @@
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
 
-            // [추가] 사다드림 상품 포함 여부 체크
-            const sadaItems = Object.keys(cart).filter(name => name.includes("[사다드림]") && cart[name] > 0);
-            if (sadaItems.length > 0) {
-                showSystemModal("<span style='color:var(--nego-orange); font-weight:800;'>[사다드림]</span> 상품은 현재 위생상의 이유로 매장픽업만 가능합니다.<br><br>배달 주문을 원하시면 해당 상품을 장바구니에서 제외해 주세요.", "alert");
-                return;
-            }
+            // [사다드림] 상품 배달 가능하도록 배달 불가 체크 로직 삭제
 
             const addr = document.getElementById('input-address').value;
             if (!addr || addr.trim() === "") {
@@ -2600,10 +2619,37 @@
                 }
             }
 
+            const nameVal = document.getElementById('input-name')?.value || "";
+            const phoneVal = document.getElementById('input-phone')?.value || "";
+            if (nameVal && phoneVal) {
+                showSystemModal("주문 내역 확인 중입니다...", 'loading');
+                try {
+                    await openHistoryModal(true, true);
+                } catch (e) {
+                    console.error("History fetch error:", e);
+                }
+                document.getElementById('system-modal').style.display = 'none';
+                checkScrollLock();
+            }
+
             const pendingItemsForDate = getPendingItemsByDate(deliveryDate);
-            const hasExistingOrderForDate = (pendingItemsForDate.length > 0);
- 
-            // [신규] 배달주문 시 최소 주문금액(15,000원) 검증 및 차단 (기존 주문이 없는 경우에만 적용)
+            
+            let existingTotalExcludingFee = 0;
+            let hasExistingDeliveryFee = false;
+            let existingFeeItem = null;
+
+            pendingItemsForDate.forEach(item => {
+                const isFee = (item.item === "배달비");
+                if (isFee) {
+                    hasExistingDeliveryFee = true;
+                    existingFeeItem = item;
+                } else {
+                    const price = parseInt(item.price || 0);
+                    const qty = parseInt(item.qty || 0);
+                    existingTotalExcludingFee += price * qty;
+                }
+            });
+
             let currentTotal = 0;
             for (const name in cart) {
                 if (cart[name] > 0) {
@@ -2614,15 +2660,49 @@
                 }
             }
 
-            if (currentTotal < 15000 && !window.isDeliveryFeeAddedUnder15000 && !hasExistingOrderForDate) {
+            let skipDeliveryFeePrompt = false;
+
+            if (existingTotalExcludingFee >= 15000) {
+                // 1. 이미 15000원 넘는 주문이 있는 경우 배달비 부과 건너뜀
+                skipDeliveryFeePrompt = true;
+                window.isDeliveryFeeAddedUnder15000 = false;
+            } else if (hasExistingDeliveryFee) {
+                // 2. 이전에 배달비가 추가된 주문이 있는 경우
+                const combinedTotal = existingTotalExcludingFee + currentTotal;
+                if (combinedTotal >= 15000) {
+                    // 합산액이 15000원 이상이면 기존 배달비 삭제 후 배달비 없이 진행
+                    const cleanPhone = phoneVal.replace(/\D/g, "");
+                    const orderKey = fSafeKey(existingFeeItem.timestamp) + "_" + fSafeKey(existingFeeItem.item);
+                    const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+                    
+                    showSystemModal("기존 주문 배달비 조정 중입니다...", 'loading');
+                    try {
+                        await fetch(fbItemUrl, { method: 'DELETE' });
+                        // 로컬 캐시에서도 삭제하여 UI 싱크 맞춤
+                        fullHistoryData = fullHistoryData.filter(it => it.timestamp !== existingFeeItem.timestamp || it.item !== existingFeeItem.item);
+                        localStorage.setItem(`history_cache_${nameVal}_${cleanPhone}`, JSON.stringify(fullHistoryData));
+                    } catch (e) {
+                        console.error("Existing fee deletion failed:", e);
+                    }
+                    document.getElementById('system-modal').style.display = 'none';
+                    checkScrollLock();
+                }
+                // 합산액과 관계없이 기존 배달비가 있었으므로 이번 주문에는 추가하지 않음
+                skipDeliveryFeePrompt = true;
+                window.isDeliveryFeeAddedUnder15000 = false;
+            }
+
+            const hasExistingOrderForDate = (pendingItemsForDate.length > 0);
+
+            if (!skipDeliveryFeePrompt && currentTotal < 15000 && !window.isDeliveryFeeAddedUnder15000 && !hasExistingOrderForDate) {
                 // 사장님 요청 문구: '이상' 은 빼주고 '배달 주문은' 앞에 '배달' 넣어주고 한줄에 들어가게
                 // 현재 금액 밑에 한줄 띄고 배달비 3,000원을 추가하여 주문하시겠습니까? 하고 확인 취소 버튼 만들기
                 showSystemModal(
-                    `배달 최소주문금액이 미달되었습니다.<br><br><b>배달 주문은 <span style="color:var(--nego-orange); font-weight:800;">15,000원</span>부터 가능합니다.</b><br>(현재 주문금액: ${currentTotal.toLocaleString()}원)<br><br>배달비 3,000원을 추가하여 주문하시겠습니까?`,
+                    `배달 최소주문금액이 미달되었습니다.<br><br><b>배달 주문은 <span style="color:var(--nego-orange); font-weight:800;">15,000원</span>부터 가능합니다.</b><br>(현재 주문금액: ${currentTotal.toLocaleString()}원)<br><br>배달비 ${deliveryFee.toLocaleString()}원을 추가하여 주문하시겠습니까?`,
                     'confirm',
-                    () => {
+                    async () => {
                         window.isDeliveryFeeAddedUnder15000 = true;
-                        handleDeliveryOrderClick(); // 우회(재귀) 재검증 진행
+                        await handleDeliveryOrderClick(); // 우회(재귀) 재검증 진행
                     },
                     () => {
                         window.isDeliveryFeeAddedUnder15000 = false; // 취소 시 초기화
@@ -2699,7 +2779,15 @@
 
             // [추가] 주말 및 공휴일 안내 모달 (USER 요청: 일반 상품이 포함된 경우에만 주말 안내 표시)
             if (isHoliday && hasAnyRegular) {
-                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>주말 및 공휴일에 주문하신 상품은 <span style="color:var(--nego-orange);">\n다음 평일</span>에 배달됩니다.`;
+                let holidayTerm = "주말 및 공휴일";
+                if (publicHolidays.includes(todayStr)) {
+                    holidayTerm = "임시휴무일";
+                } else if (isSaturdayAsWeekday) {
+                    holidayTerm = "일요일";
+                } else {
+                    holidayTerm = "주말";
+                }
+                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>${holidayTerm}에 주문하신 상품은 <span style="color:var(--nego-orange);">\n다음 평일</span>에 배달됩니다.`;
 
                 showSystemModal(holidayMsg + "<br><br>배달주문 하시겠습니까?", 'confirm', () => {
                     holidayConfirmedStatus = true;
@@ -2825,7 +2913,15 @@
 
             // [추가] 코스트코 상품 주말/공휴일 픽업 제한 안내
             if (isHoliday && hasCostco) {
-                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[코스트코 상품 안내]</span>코스트코 상품은 주말 및 공휴일에 픽업이 불가능하며, <span style="color:var(--nego-orange);">다음 평일</span>부터 픽업 가능합니다.`;
+                let holidayTerm = "주말 및 공휴일";
+                if (publicHolidays.includes(todayStr)) {
+                    holidayTerm = "임시휴무일";
+                } else if (isSaturdayAsWeekday) {
+                    holidayTerm = "일요일";
+                } else {
+                    holidayTerm = "주말";
+                }
+                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[코스트코 상품 안내]</span>코스트코 상품은 ${holidayTerm}에 픽업이 불가능하며, <span style="color:var(--nego-orange);">다음 평일</span>부터 픽업 가능합니다.`;
                 showSystemModal(holidayMsg + "<br><br>주문하시겠습니까?", 'confirm', () => {
                     holidayConfirmedStatus = true;
                     cutoffConfirmedStatus = true;
@@ -2910,6 +3006,42 @@
                 updateDeliveryUI();
                 showSystemModal(`배달 기능이 ${status ? '활성화' : '비활성'}되었습니다.`, "alert");
             } catch (e) { showSystemModal("실패: " + e.toString(), "alert"); }
+        }
+
+        async function adminManageDeliveryFee() {
+            if (!isAdminMode) return;
+            const currentFeeVal = deliveryFee;
+            const inputHtml = `
+                <div style="text-align: left; padding: 0 10px;">
+                    <div style="font-size: 15px; font-weight: 800; color: var(--item-black); margin-bottom: 8px;">배달비 금액 수정 (원)</div>
+                    <input type="number" id="input-admin-delivery-fee" value="${currentFeeVal}" style="width: 100%; padding: 12px; border: 1.5px solid #ddd; border-radius: var(--btn-radius); font-size: 16px; font-weight: 700; outline: none; box-sizing: border-box;" placeholder="예: 3000" />
+                </div>
+            `;
+            showSystemModal(inputHtml, 'confirm', async () => {
+                const input = document.getElementById('input-admin-delivery-fee');
+                if (!input) return;
+                const newFee = parseInt(input.value);
+                if (isNaN(newFee) || newFee < 0) {
+                    showSystemModal("올바른 금액을 입력해 주세요.", 'alert');
+                    return;
+                }
+                
+                try {
+                    showSystemModal("저장 중입니다...", 'loading');
+                    const res = await fetch(FIREBASE_DB_URL + "delivery_fee.json", {
+                        method: 'PUT',
+                        body: JSON.stringify(newFee)
+                    });
+                    if (res.ok) {
+                        deliveryFee = newFee;
+                        showSystemModal("배달비가 정상적으로 수정되었습니다.", 'alert');
+                    } else {
+                        throw new Error();
+                    }
+                } catch (e) {
+                    showSystemModal("저장에 실패했습니다.", 'alert');
+                }
+            });
         }
 
         // [신규] 공휴일/휴무일 관리 로직
@@ -5303,7 +5435,20 @@
             if (filteredData.length === 0) {
                 const emptyMsg = document.createElement('div');
                 emptyMsg.style = "text-align:center; padding:80px 20px; color:#999; font-weight:700;";
-                if (targetKey === '과일_예약') {
+                if (targetKey === 'today-fruit') {
+                    emptyMsg.style = "text-align:center; padding:80px 20px; color:#999; font-weight:700; font-size:18px; line-height:1.5;";
+                    const now = new Date();
+                    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                    let subText = "";
+                    if (publicHolidays.includes(todayStr)) {
+                        subText = "오늘은 모켓의 임시휴일입니다.";
+                    } else if (isSaturdayAsWeekday) {
+                        subText = "과일은 월요일 ~ 토요일 오전에 올라옵니다.";
+                    } else {
+                        subText = "과일은 평일 오전에 올라옵니다.";
+                    }
+                    emptyMsg.innerHTML = `현재 주문 가능한 상품이 없습니다.<br><span style="font-size:16px; font-weight:normal; color:#bbb; display:block; margin-top:8px;">(${subText})</span>`;
+                } else if (targetKey === '과일_예약') {
                     emptyMsg.innerHTML = `현재 주문 가능한 상품이 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#bbb; display:block; margin-top:8px;">(평일 오전에 상품이 올라옵니다.)</span>`;
                 } else {
                     emptyMsg.innerHTML = "현재 주문 가능한 상품이 없습니다.";
@@ -5603,6 +5748,7 @@
                         <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
                             <span style="font-weight:900; color:var(--nego-orange); font-size:14px; min-width:35px; text-align:right;">${cart[name]}개</span>
                             <span style="font-weight:900; color:var(--item-black); font-size:14px; min-width:80px; text-align:right;">${subTotal.toLocaleString()}원</span>
+                            <button onclick="removeFromCart('${name.replace(/'/g, "\\'")}')" style="background:none; border:none; color:#bbb; font-size:20px; cursor:pointer; padding:4px 8px; font-weight:bold; display:flex; align-items:center; justify-content:center; line-height:1; transition: color 0.2s;" onmouseover="this.style.color='#ff4d4d'" onmouseout="this.style.color='#bbb'">&times;</button>
                         </div>
                     `;
                     listContainer.appendChild(itemDiv);
@@ -5616,7 +5762,7 @@
                 } else if (cartType === 'today') {
                     titleEl.innerHTML = `🚚 당일구매 장바구니 목록`;
                 } else {
-                    titleEl.innerHTML = `📅 예약구매 장바구니 목록`;
+                    titleEl.innerHTML = `🗓️ 예약구매 장바구니 목록`;
                 }
             }
 
@@ -5633,6 +5779,19 @@
         function closeCartDetailModal() {
             document.getElementById('cart-detail-overlay').style.display = 'none';
             checkScrollLock();
+        }
+
+        function removeFromCart(name) {
+            if (cart[name] !== undefined) {
+                delete cart[name];
+                if (cartDeliveryType[name] !== undefined) {
+                    delete cartDeliveryType[name];
+                }
+                updateFooter();
+                openCartDetailModal();
+                const activeBtn = document.querySelector('.date-btn.active');
+                if (activeBtn) renderList(activeBtn.dataset.date);
+            }
         }
 
         async function openDetail(name) {
@@ -5835,12 +5994,12 @@
                 if (!grouped[feeDate]) grouped[feeDate] = [];
                 grouped[feeDate].push({
                     name: "배달비",
-                    price: 3000,
+                    price: deliveryFee,
                     qty: 1,
                     displayDate: "배달비",
                     matchKey: "배달비"
                 });
-                totalSum += 3000;
+                totalSum += deliveryFee;
                 totalQty += 1;
             }
 
@@ -5960,7 +6119,15 @@
             // [신규] 당일배송 주말/공휴일 및 평일 13시 마감 및 06시 시작 제한 시간 차단
             if (currentDeliveryType === 'today') {
                 if (isHoliday) {
-                    showSystemModal("주말 및 공휴일에는 당일배송 주문이 불가능합니다.<br><br><b>[📅 예약배송]</b>을 이용해 주세요!", 'alert');
+                    let holidayMsg = "";
+                    if (publicHolidays.includes(todayStr)) {
+                        holidayMsg = "임시휴무일에는 당일구매 주문이 불가능합니다.";
+                    } else if (isSaturdayAsWeekday) {
+                        holidayMsg = "일요일에는 당일구매 주문이 불가능합니다.";
+                    } else {
+                        holidayMsg = "주말에는 당일구매 주문이 불가능합니다.";
+                    }
+                    showSystemModal(`${holidayMsg}<br><br><b>[🗓️ 예약구매]</b>를 이용해 주세요!`, 'alert');
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.innerText = "주문확정";
@@ -6057,7 +6224,15 @@
 
 
                 if (isHoliday && hasAnyRegular && !holidayConfirmed && shippingMethod === '배달주문') {
-                    const holidayMsg = "주말 및 공휴일에 주문하신 상품은\n<span style='color:var(--nego-orange);'>다음 평일</span>에 배달됩니다.\n\n주문하시겠습니까?";
+                    let holidayTerm = "주말 및 공휴일";
+                    if (publicHolidays.includes(todayStr)) {
+                        holidayTerm = "임시휴무일";
+                    } else if (isSaturdayAsWeekday) {
+                        holidayTerm = "일요일";
+                    } else {
+                        holidayTerm = "주말";
+                    }
+                    const holidayMsg = `${holidayTerm}에 주문하신 상품은\n<span style='color:var(--nego-orange);'>다음 평일</span>에 배달됩니다.\n\n주문하시겠습니까?`;
                     showSystemModal(holidayMsg, 'confirm', () => {
                         completeOrder(shippingMethod, extraItems, cutoffConfirmed, true);
                         return true;
@@ -6186,7 +6361,7 @@
                     }
                 }
 
-                // [신규] 15,000원 미만 배달비 3,000원 추가 수락 시 최종 주문 항목(allItems)에 배달비 품목 주입
+                // [신규] 15,000원 미만 배달비 추가 수락 시 최종 주문 항목(allItems)에 배달비 품목 주입
                 if (window.isDeliveryFeeAddedUnder15000 && shippingMethod === '배달주문') {
                     let feeDate = todayStr;
                     if (allItems.length > 0) {
@@ -6195,8 +6370,8 @@
                     allItems.push({
                         name: "배달비",
                         qty: 1,
-                        price: 3000,
-                        subtotal: 3000,
+                        price: deliveryFee,
+                        subtotal: deliveryFee,
                         date: feeDate,
                         matchKey: "배달비",
                         isCategorized: false,
@@ -6917,6 +7092,7 @@
             fetchLoginEntryStatus();
             fetchProductListStatus();
             fetchSaturdayWeekdayStatus();
+            fetchDeliveryFee();
             
             // [신규] 동적 오프라인 및 로컬 파일 실행 감지하여 주소 입력창 수동 여부 조절
             checkAddressInputMode();
