@@ -1681,12 +1681,11 @@
                     style="text-align:left; font-size:13px; margin: 0 0 12px 0; color:#455464; line-height:1.5; padding:0; font-weight:700; border-top: 1px solid #eee; padding-top: 12px;">
                     <!-- 수령방법에 따라 동적 생성 -->
                 </div>
-                <div
-                    style="margin-bottom:15px; font-weight:700; font-size:14px; color:#455464; display:flex; align-items:center; justify-content:center; gap:8px;">
+                <label style="margin-bottom:15px; font-weight:700; font-size:14px; color:#455464; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="confirm-notice-check"
                         style="width:18px; height:18px; margin:0; cursor:pointer;">
-                    <label for="confirm-notice-check" style="cursor:pointer;">위 내용을 확인하였습니다.</label>
-                </div>
+                    <span>위 내용을 확인하였습니다.</span>
+                </label>
                 <div style="display:flex; gap:10px;">
                     <button class="btn-common btn-close"
                         onclick="document.getElementById('confirm-notice-check').checked = false; closeModal('confirm-overlay')"
@@ -2868,16 +2867,11 @@
                 const pendingItems = getPendingItemsByDate(deliveryDate);
                 if (pendingItems.length > 0) {
                     let itemNames = pendingItems.map(it => `• ${it.item} (${it.qty}개)`).join('<br>');
-                    let msg = `해당 배달일(${deliveryDate})에 예약된 상품이 있습니다.<br><div style="background:#f5f5f5; padding:10px; border-radius:8px; margin:10px 0; text-align:left; font-size:14px; font-weight:700; color:var(--item-black);">${itemNames}</div>같이 배달합산 하시겠습니까?`;
+                    let msg = `해당 배달 날짜에 예약된 상품이 있어 같이 합배송 됩니다.<br><div style="background:#f5f5f5; padding:10px; border-radius:8px; margin:10px 0; text-align:left; font-size:14px; font-weight:700; color:var(--item-black);">${itemNames}</div>`;
 
-                    showSystemModal(msg, 'confirm', () => {
+                    showSystemModal(msg, 'alert', () => {
                         selectedShippingMethod = '배달주문';
                         combinedDeliveryItems = pendingItems;
-                        closeModal('shipping-overlay');
-                        openConfirm();
-                    }, () => {
-                        selectedShippingMethod = '배달주문';
-                        combinedDeliveryItems = [];
                         closeModal('shipping-overlay');
                         openConfirm();
                     });
