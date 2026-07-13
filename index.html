@@ -2971,13 +2971,22 @@
             return fullHistoryData.filter(item => {
                 const isDeliveryFee = (item.item === "배달비");
 
-                let itemDate = item.pickupDate ? String(item.pickupDate).split(' ')[0].replace(/\./g, '-') : "";
-                if (itemDate.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) itemDate = "20" + itemDate;
-                const pt = itemDate.split('-');
-                if (pt.length === 3) itemDate = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
-
-                const orderDateFull = item.timestamp || "";
-                const isTodayOrder = orderDateFull.includes(todayStr) || orderDateFull.includes(todayStr.replace(/-/g, '.'));
+                // parseKRDate를 사용하여 한글 날짜 형식(예: 2026년 7월 14일 (화))을 YYYY-MM-DD로 안전하게 파싱하여 비교
+                let itemDate = "";
+                if (item.pickupDate) {
+                    const parsedPickup = parseKRDate(item.pickupDate);
+                    if (parsedPickup && !isNaN(parsedPickup.getTime())) {
+                        const y = parsedPickup.getFullYear();
+                        const m = String(parsedPickup.getMonth() + 1).padStart(2, '0');
+                        const day = String(parsedPickup.getDate()).padStart(2, '0');
+                        itemDate = `${y}-${m}-${day}`;
+                    } else {
+                        let tempDate = String(item.pickupDate).split(' ')[0].replace(/\./g, '-');
+                        if (tempDate.match(/^\d{2}-\d{1,2}-\d{1,2}$/)) tempDate = "20" + tempDate;
+                        const pt = tempDate.split('-');
+                        if (pt.length === 3) itemDate = `${pt[0]}-${pt[1].padStart(2, '0')}-${pt[2].padStart(2, '0')}`;
+                    }
+                }
 
                 const isRegularSale = String(item.pickupDate).includes("상시판매") || String(item.pickupDate).includes("현장판매");
 
@@ -2991,8 +3000,8 @@
 
                 const matchDate = (itemDate === targetDate) || (targetDate === todayStr && isRegularSale);
 
-                return (matchDate || (isDeliveryFee && isTodayOrder)) &&
-                    !isCancelled && !isReceived && !isDelivered && !isOnSite;
+                // 배달비도 동일 배송일에만 적용되도록 matchDate 기준 필터링 처리 (배송일별 각 배달비 개별 적용)
+                return matchDate && !isCancelled && !isReceived && !isDelivered && !isOnSite;
             });
         }
 
@@ -6625,10 +6634,17 @@
                             ${total.toLocaleString()}원
                         </div>
                         
-                        <div style="font-size:16px; font-weight:800; color:var(--nego-orange);">배달일 오후 1시까지 입금 부탁드립니다.
-                        <div style="font-size:16px; font-weight:600; color:#666;">
-                            ${isDelivery ? '(입금 확인 후 배달이 진행됩니다.)' : '(낮 12시까지 입금건에 한하여 <span style="color:var(--moket-green);">상품 준비</span>가 시작됩니다.)'}
+                        <div style="font-size:16px; font-weight:800; color:var(--nego-orange); margin-bottom:4px;">배달일 오후 1시까지 입금 부탁드립니다.</div>
+                        ${isDelivery ? `
+                        <div style="font-size:16px; font-weight:600; color:#666; margin-top:2px;">
+                            (입금 확인 후 배달이 진행됩니다.)
                         </div>
+                        ` : ''}
+                        ${isDelivery ? `
+                        <div style="font-size:16px; font-weight:800; color:#d32f2f; margin-top:8px; padding-top:8px; border-top:1px dashed #ffd8d8;">
+                            🚨 꼭! 차량등록 부탁드립니다. (53구6662)
+                        </div>
+                        ` : ''}
                     </div>
                 `;
             } else {
@@ -6874,7 +6890,7 @@
                     qty: it.qty,
                     price: it.price,
                     total: it.subtotal,
-                    pickupDate: it.name === "배달비" ? "" : jsFormatPickup(getDisplayDate(it)),
+                    pickupDate: jsFormatPickup(getDisplayDate(it)),
                     received: false,
                     delivered: false,
                     cashReceipt: cashReceipt,
@@ -6943,7 +6959,7 @@
                         qty: it.qty,
                         price: it.price,
                         total: it.price * it.qty,
-                        pickupDate: it.name === "배달비" ? "" : jsFormatPickup(getDisplayDate(it)),
+                        pickupDate: jsFormatPickup(getDisplayDate(it)),
                         cashReceipt: cashReceipt,
                         cashReceiptType: (cashReceipt === '발행') ? cashReceiptType : "",
                         cashReceiptPhone: (cashReceipt === '발행') ? receiptPhone : ""
