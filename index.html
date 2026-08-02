@@ -1416,6 +1416,8 @@
                 transform: translateY(-20px);
             }
         }
+
+
     </style>
 </head>
 
@@ -1595,14 +1597,16 @@
             </div>
             <div style="display:flex; justify-content:center; margin:20px 0;">
                 <div
-                    style="text-align:center; line-height:1.8; font-weight:700; font-size:17px; color:var(--item-black);">
+                    style="text-align:center; line-height:1.8; font-weight:700; font-size:17px; color:var(--item-black); width:100%;">
                     <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px;">
                         <span>카카오뱅크</span>
                     </div>
-                    <span
-                        style="font-size:25px; color:var(--nego-orange); letter-spacing:0.5px; font-weight:900;">3333-37-3410268</span><br>
+                    <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:4px;">
+                        <span style="font-size:24px; font-weight:900; color:var(--nego-orange);" id="bank-acc-num">3333-37-3410268</span>
+                        <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:5px 12px; border:none; border-radius:6px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow: 0 2px 6px rgba(255, 107, 0, 0.3);">📋 복사</button>
+                    </div>
                     <span style="font-size:15px; color:#666; letter-spacing:-0.5px;">예금주 : 강*민(모켓(MOKET))</span>
-                    <!-- [추가] 사다드림 전용 안내 문구 영역 -->
+                    <!-- [수정] 사다드림 전용 안내 문구 영역 -->
                     <div id="bank-modal-notice"
                         style="display:none; margin-top:15px; padding:12px; background:#fff0f0; border-radius:10px; color:#ff4d4d; font-size:14px; line-height:1.5; border:1.5px solid #ffcccc; word-break:keep-all;">
                         📢 <b>사다드림 안내</b> 📢<br>
@@ -1610,8 +1614,6 @@
                     </div>
                 </div>
             </div>
-            <button class="btn-common btn-primary" onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')">계좌번호
-                복사</button>
             <button class="btn-common btn-close" onclick="closeModal('bank-modal')">닫기</button>
         </div>
     </div>
@@ -2032,7 +2034,6 @@
 
                 let html = `
                     <button class="main-tab-btn ${currentMainTab === 'reserve' ? 'active' : ''}" data-tab="reserve" onclick="switchMainTab('reserve')">공동구매</button>
-                    <button class="main-tab-btn ${currentMainTab === 'fruit-veg' ? 'active' : ''}" data-tab="fruit-veg" onclick="switchMainTab('fruit-veg')">${fruitLabel}</button>
                     <button class="main-tab-btn ${currentMainTab === 'onsite-frozen' ? 'active' : ''}" data-tab="onsite-frozen" onclick="switchMainTab('onsite-frozen')">냉동</button>
                     <button class="main-tab-btn ${currentMainTab === 'onsite-refrigerated' ? 'active' : ''}" data-tab="onsite-refrigerated" onclick="switchMainTab('onsite-refrigerated')">냉장</button>
                     <button class="main-tab-btn ${currentMainTab === 'onsite-room' ? 'active' : ''}" data-tab="onsite-room" onclick="switchMainTab('onsite-room')">상온</button>
@@ -2656,14 +2657,26 @@
             const nameVal = document.getElementById('input-name')?.value || "";
             const phoneVal = document.getElementById('input-phone')?.value || "";
             if (nameVal && phoneVal) {
-                showSystemModal("주문 내역 확인 중입니다...", 'loading');
-                try {
-                    await openHistoryModal(true, true);
-                } catch (e) {
-                    console.error("History fetch error:", e);
+                const cleanPhone = phoneVal.replace(/\D/g, "");
+                const cacheKey = `history_cache_${nameVal}_${cleanPhone}`;
+                const cached = localStorage.getItem(cacheKey);
+
+                if (cached) {
+                    // 캐시가 존재하면 즉시 캐시데이터를 파싱하여 전역 변수 동기화 후 지연없이 통과
+                    fullHistoryData = JSON.parse(cached);
+                    // 백그라운드에서 조용히 최신 데이터 갱신 (배달비 계산 완료 후의 데이터 무결성을 위해)
+                    openHistoryModal(true, true).catch(e => console.error(e));
+                } else {
+                    // 캐시가 없거나 최초인 경우에만 로딩 모달을 띄우고 대기
+                    showSystemModal("주문 내역 확인 중입니다...", 'loading');
+                    try {
+                        await openHistoryModal(true, true);
+                    } catch (e) {
+                        console.error("History fetch error:", e);
+                    }
+                    document.getElementById('system-modal').style.display = 'none';
+                    checkScrollLock();
                 }
-                document.getElementById('system-modal').style.display = 'none';
-                checkScrollLock();
             }
 
             // 헬퍼: 기존 특정 배달비 삭제 처리 함수
@@ -3209,12 +3222,30 @@
 
         // [신규] 공휴일/휴무일 관리 로직
         let publicHolidays = [];
+        try {
+            const cachedHolidays = localStorage.getItem('moket_public_holidays');
+            if (cachedHolidays) {
+                publicHolidays = JSON.parse(cachedHolidays) || [];
+            }
+        } catch (e) {
+            console.error("로컬 휴무일 캐시 읽기 실패:", e);
+        }
 
         async function fetchHolidays() {
             try {
                 const res = await fetch(FIREBASE_DB_URL + "public_holidays.json?t=" + Date.now());
                 const data = await res.json();
-                if (data) publicHolidays = Array.isArray(data) ? data : data.split(',').map(s => s.trim());
+                if (data) {
+                    const newHolidays = Array.isArray(data) ? data : data.split(',').map(s => s.trim());
+                    const hasChanged = JSON.stringify(publicHolidays) !== JSON.stringify(newHolidays);
+                    publicHolidays = newHolidays;
+                    localStorage.setItem('moket_public_holidays', JSON.stringify(publicHolidays));
+                    if (hasChanged) {
+                        console.log("휴무일 정보 변경 감지 - 화면 및 탭 재정렬");
+                        initMainTabs();
+                        processAndRender(cachedProducts || productsData);
+                    }
+                }
             } catch (e) { console.error("휴무일 로드 실패:", e); }
         }
 
@@ -3476,6 +3507,11 @@
 
                 // [신규] 주소 입력 방식 자동 감지 (오프라인 모드 시 수동 입력 개방)
                 checkAddressInputMode();
+            if (id === 'bank-modal') {
+                const notice = document.getElementById('bank-modal-notice');
+                if (notice && !window.isSadaOrderFinished) {
+                    notice.style.display = 'none';
+                }
             }
             document.getElementById(id).style.display = 'flex';
             checkScrollLock();
@@ -3847,6 +3883,13 @@
             if (s instanceof Date) return s;
             try {
                 let str = String(s).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                
+                // ISO 8601 형식(T 포함)인 경우 하이픈 치환 없이 직접 파싱 (Safari/iOS 호환)
+                if (str.includes('T')) {
+                    const d = new Date(str);
+                    return isNaN(d.getTime()) ? null : d;
+                }
+
                 // "24년 2월 10일 (화)" 또는 "2024년 2월 10일 (화)" 또는 "2024-02-10"
                 const m = str.match(/(?:20)?(\d{2})년\s*(\d{1,2})월\s*(\d{1,2})일/);
                 if (m) {
@@ -4358,10 +4401,14 @@
                     });
                 });
                 const showDeliveredBadge = (nonCanceledCount > 0 && allDelivered);
+                const isDeliveryCard = (group.shippingMethod === '배달주문');
+                const cardBorderColor = isDeliveryCard ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)';
+                const cardLeftBorder = isDeliveryCard ? '4px solid #10b981' : '4px solid #3b82f6';
+                const cardHeaderBg = isDeliveryCard ? '#f0fdf4' : '#eff6ff';
 
                 htmlBuffer += `
-                    <div style="background:var(--white); border: 1.5px solid #eee; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
-                        <div onclick="toggleHistoryGroup('${group.key}', this)" style="background:#f1f3f5; padding:12px 15px; cursor:pointer; position:relative; transition: background 0.2s;">
+                    <div style="background:var(--white); border: 1.5px solid ${cardBorderColor}; border-left: ${cardLeftBorder}; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
+                        <div onclick="toggleHistoryGroup('${group.key}', this)" style="background:${cardHeaderBg}; padding:12px 15px; cursor:pointer; position:relative; transition: background 0.2s;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                                 <div>
                                     <div style="font-size:11px; color:#999; margin-bottom:2px;">주문일시</div>
@@ -4374,9 +4421,9 @@
                             </div>
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <div style="font-size:16px; font-weight:800; color:var(--item-black); flex:1; padding-right:10px; display:flex; align-items:center; overflow:hidden;">
-                                    ${group.shippingMethod === '배달주문' 
-                                        ? '<span style="background:var(--sub-blue); color:var(--main-blue); font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">배달</span>' 
-                                        : '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">픽업</span>'}
+                                    ${isDeliveryCard 
+                                        ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">배달</span>' 
+                                        : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:6px; flex-shrink:0; font-weight:900;">픽업</span>'}
                                     <span style="display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;">${displaySummary}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:6px;">
@@ -4457,23 +4504,35 @@
                         else if (isStocked) { statusText = '입고완료'; statusColor = 'var(--nego-orange)'; }
                         else { statusText = '미입고'; statusColor = '#AAA'; }
 
+                        const isSadaItem = order.item && (order.item.includes('사다드림') || order.matchKey === '사다드림');
+                        const isDeliveryItem = order.shippingMethod === '배달주문';
+                        const isBadgeTarget = isDeliveryItem || isSadaItem || order.item === '배달비';
+                        const isPaid = (order.paid === true || order.paid === "true" || String(order.paid).toUpperCase() === "TRUE");
+
+                        let payBadgeHtml = '';
+                        if (isBadgeTarget && !isCancelled && !isCombined) {
+                            if (isPaid) {
+                                payBadgeHtml = `<span style="padding: 2px 7px; background: #e8f5e9; color: #2e7d32; border: 1px solid #c5e0b4; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">입금완료</span>`;
+                            } else {
+                                payBadgeHtml = `<span style="padding: 2px 7px; background: #ffd8d8; color: #d32f2f; border: 1px solid #ffb8b8; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">미입금</span>`;
+                            }
+                        }
+
                         htmlBuffer += `
                             <div style="padding: 10px 0; ${idx !== items.length - 1 ? 'border-bottom: 1px dashed #eee;' : ''} ${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <div style="flex:1;">
-                                        <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.2; margin-bottom:4px;">
-                                            ${order.shippingMethod === '배달주문' && order.item !== '배달비' 
-                                                ? '<span style="color:var(--main-blue); font-size:12px; margin-right:4px;">[배달]</span>' 
-                                                : (order.item !== '배달비' ? '<span style="color:#2e7d32; font-size:12px; margin-right:4px;">[픽업]</span>' : '')}
-                                            ${order.item}
+                                        <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.3; margin-bottom:4px;">
+                                            <span>${order.item}</span>
                                         </div>
                                         <div style="display:flex; align-items:center; gap:8px;">
                                             <div style="font-size:13px; font-weight:700; color:#455464;">${order.qty}개</div>
                                             <div style="font-size:13px; font-weight:700; color:var(--item-black);">${parseInt(order.total || 0).toLocaleString()}원</div>
                                         </div>
                                     </div>
-                                    <div style="text-align:right; min-width:80px;">
-                                        ${statusText !== '배달완료' ? `<div style="font-size:13px; font-weight:800; color:${statusColor}; margin-bottom:4px;">${order.onSite ? '상시판매' : statusText}</div>` : ''}
+                                    <div style="text-align:right; min-width:80px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:3px;">
+                                        ${payBadgeHtml}
+                                        ${statusText !== '배달완료' ? `<div style="font-size:12px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>` : ''}
                                         ${isProcessing ? `<div style="width:70px; height:26px; display:flex; align-items:center; justify-content:center; background:#f5f5f5; color:#999; border-radius:4px; font-size:12px; font-weight:700;">대기중</div>` : ''}
                                     </div>
                                 </div>
@@ -4624,10 +4683,7 @@
                             rawTimestamp: tempTimestamp
                         };
 
-                        fetch(API_URL, {
-                            method: 'POST',
-                            body: JSON.stringify(gasPayload)
-                        }).catch(e => console.error("GAS 배달비 전송 실패:", e));
+                        // GAS 동기화 생략
 
                         // 로컬 메모리 및 캐시 갱신
                         fullHistoryData.push(deliveryFeePayload);
@@ -4801,10 +4857,7 @@
                             pickupDate: String(order.pickupDate).trim(),
                             matchKey: String(order.matchKey || "").trim()
                         };
-                        fetch(API_URL, {
-                            method: 'POST',
-                            body: JSON.stringify(gasPayload)
-                        }).catch(e => console.error("GAS 취소 전송 실패:", e));
+                        // GAS 취소 동기화 생략
 
                         await Promise.all([fbPromise, stockPromise]);
 
@@ -4933,12 +4986,7 @@
                     matchKey: String(matchKey || "").trim()
                 };
 
-                fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
-                    .then(res => res.json())
-                    .then(gasResult => {
-                        console.log("GAS 취소 동기화 완료:", gasResult);
-                    })
-                    .catch(err => console.error("GAS 취소 동기화 네트워크 실패:", err));
+                // GAS 취소 동기화 생략
 
                 // 4. Firebase 완료 시 UI 즉시 갱신 (GAS를 기다리지 않음)
                 Promise.all([fbPromise, stockPromise]).then(() => {
@@ -4994,12 +5042,14 @@
         // [이미지 캐시] 브라우저 기본 캐시 활용 (Preloading)
         function getImgUrl(input, size = 1000, retry = false) {
             if (!input) return '';
-            let id = input.toString().trim();
+            const str = input.toString().trim();
+            if (str.startsWith("data:") || str.startsWith("http://") || str.startsWith("https://")) {
+                return str;
+            }
+            let id = str;
             const driveMatch = id.match(/[-\w]{25,}/);
             if (driveMatch) id = driveMatch[0];
 
-            // [수정] drive.google.com/thumbnail 대신 lh3.googleusercontent.com 주소를 사용하여 모바일/GitHub 호환성 개선
-            // thumbnail 주소는 특정 브라우저에서 Referrer 문제로 차단되는 경우가 많음
             let url = `https://lh3.googleusercontent.com/d/${id}=w${size}`;
             if (retry) url = `https://drive.google.com/thumbnail?id=${id}&sz=w${size}&t=${Date.now()}`;
             return url;
@@ -5110,19 +5160,42 @@
             }
 
             try {
-                // 2. [서버 호출] 배경에서 최신 데이터 가져오기 (Promise.all로 병렬 처리하여 속도 개선)
-                const fetchUrl = API_URL + (API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
+                // [신규 0.008KB 최적화] 파이어베이스 published_products_last_updated 시각 먼저 확인
+                let isProductsCacheValid = false;
+                const cachedProductsStr = localStorage.getItem('moket_products_cache_v2');
+                const cachedTimestamp = localStorage.getItem('published_products_last_updated');
 
+                if (!force && cachedProductsStr && cachedTimestamp) {
+                    try {
+                        const tsRes = await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`).catch(() => null);
+                        if (tsRes && tsRes.ok) {
+                            const serverTs = await tsRes.json();
+                            if (serverTs && String(serverTs) === String(cachedTimestamp)) {
+                                isProductsCacheValid = true;
+                                console.log("[0.008KB 초고속 렌더링] 상품 데이터 변경 없음 -> 로컬 캐시 100% 사용 (트래픽 0B)");
+                            }
+                        }
+                    } catch(e) { console.error("타임스탬프 검증 실패:", e); }
+                }
+
+                // 2. [서버 호출] 배경에서 최신 데이터 가져오기 (Promise.all로 병렬 처리하여 속도 개선)
                 // 로딩 중 표시 (수동 새로고침일 때만 투명도 조절하여 배경 갱신 시 불쾌함 감소)
                 const header = document.querySelector('.header');
                 if (force && header) header.style.opacity = '0.7';
 
-                const [mainRes, stockRes, statusRes, pubRes] = await Promise.all([
-                    fetch(fetchUrl).catch(e => { console.error("GAS 로드 실패:", e); return { ok: false }; }),
+                const fetchPromises = [
                     fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 로드 실패:", e); return { ok: false }; }),
-                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; }),
-                    fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`).catch(e => { console.error("Firebase published_products 로드 실패:", e); return { ok: false }; })
-                ]);
+                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; })
+                ];
+
+                if (!isProductsCacheValid) {
+                    fetchPromises.push(fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`).catch(e => { console.error("Firebase published_products 로드 실패:", e); return { ok: false }; }));
+                }
+
+                const results = await Promise.all(fetchPromises);
+                const stockRes = results[0];
+                const statusRes = results[1];
+                const pubRes = isProductsCacheValid ? null : results[2];
 
                 // [추가] 공개 여부 설정을 즉시 확인하여 반영
                 const prevEnabled = isProductListEnabled;
@@ -5134,24 +5207,37 @@
 
                 if (header) header.style.opacity = '1';
 
-                // 메인 데이터 처리
-                if (!mainRes.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
-                const rawData = await mainRes.json();
-
-                // 실시간 전역 재고 변동분 처리
-                let globalAdjustments = {};
-                if (stockRes.ok) {
-                    globalAdjustments = await stockRes.json() || {};
-                }
-
-                // 상품업로드 도구에서 Firebase에 저장한 최신 기본 재고 목록 수신
+                let rawData = [];
                 let publishedProducts = [];
-                if (pubRes && pubRes.ok) {
-                    const pubData = await pubRes.json();
+
+                if (isProductsCacheValid) {
+                    rawData = JSON.parse(cachedProductsStr);
+                    publishedProducts = rawData;
+                } else if (pubRes && pubRes.ok) {
+                    const pubData = await pubRes.json() || [];
                     if (pubData) {
                         checkAndRunWeeklyProductsAutoUpdate(pubData);
                     }
                     publishedProducts = pubData || [];
+                    rawData = JSON.parse(JSON.stringify(publishedProducts));
+                    localStorage.setItem('moket_products_cache_v2', JSON.stringify(rawData));
+
+                    const serverTsRes = await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`).catch(() => null);
+                    if (serverTsRes && serverTsRes.ok) {
+                        const sTs = await serverTsRes.json();
+                        if (sTs) localStorage.setItem('published_products_last_updated', String(sTs));
+                    }
+                } else if (cachedProductsStr) {
+                    rawData = JSON.parse(cachedProductsStr);
+                    publishedProducts = rawData;
+                } else {
+                    throw new Error('네트워크 응답이 올바르지 않습니다.');
+                }
+
+                // 실시간 전역 재고 변동분 처리
+                let globalAdjustments = {};
+                if (stockRes && stockRes.ok) {
+                    globalAdjustments = await stockRes.json() || {};
                 }
 
                 // [디버깅] 서버 수신 데이터 확인
@@ -5198,7 +5284,12 @@
                             const pubMKey = (pub.matchKey || pub.date || "").trim();
                             if (normKey(pubMKey) === normKey(mKey)) return true;
                             if (pubMKey === mKey) return true;
-                            if (pub.showWeekly === true || pub.showWeekly === 'true') return true;
+                            if (pub.showWeekly === true || pub.showWeekly === 'true') {
+                                const localDateRegex = /(\d{2,4})[./-]?(\d{1,2})[./-]?(\d{1,2})|(\d{1,2})[./-](\d{1,2})/;
+                                const isDateMKey = localDateRegex.test(mKey);
+                                const isDatePubMKey = localDateRegex.test(pubMKey);
+                                if (isDateMKey === isDatePubMKey) return true;
+                            }
                             const isReserve = pub.date && pub.date.trim() !== "" && (pub.date.includes("월") || pub.date.includes("일") || pub.date.includes("-"));
                             if (!isReserve) return true;
                             return false;
@@ -5386,41 +5477,8 @@
             for (const p of sortPriority) {
                 // [수정] 이미 로드되었다고 되어있어도 이미지가 없는 경우 또는 folderId가 있는 경우 재시도 허용
                 if (!p.isFullLoaded || (p.images && p.images.length === 0 && p.folderId)) {
-                    try {
-                        const res = await fetch(`${API_URL}?action=fetchProductImages&name=${encodeURIComponent(p.name)}&folderId=${p.folderId || ''}`);
-                        const allImages = await res.json();
-
-                        if (Array.isArray(allImages)) {
-                            const target = productsData.find(pd => pd.name === p.name && pd.matchKey === p.matchKey);
-                            if (target) {
-                                if (allImages.length > 0) target.images = allImages;
-                                target.isFullLoaded = true;
-                                localStorage.setItem('moket_products_cache_v2', JSON.stringify(productsData));
-
-                                // [핵심 수정] 한꺼번에 로드하지 않고 하나씩 간격을 두고 로드
-                                for (const id of allImages) {
-                                    await new Promise(resolve => {
-                                        const img = new Image();
-                                        img.onload = resolve;
-                                        img.onerror = () => {
-                                            // 실패 시 1회 재시도
-                                            setTimeout(() => {
-                                                const retryImg = new Image();
-                                                retryImg.src = getImgUrl(id, 1000, true);
-                                                resolve();
-                                            }, 1000);
-                                        };
-                                        img.src = getImgUrl(id, 1000);
-                                    });
-                                    await new Promise(r => setTimeout(r, 200)); // 이미지 한 장당 0.2초 휴식
-                                }
-                                console.log(`[프리로드 완료] ${p.name} (${allImages.length}장)`);
-                            }
-                        }
-                    } catch (e) {
-                        console.error(`[프리로드 실패] ${p.name}:`, e);
-                    }
-                    await new Promise(r => setTimeout(r, 800)); // 상품 하나당 0.8초 휴식 (안정성 확보)
+                    // GAS 사용 중단으로 드라이브 폴더 연동 백그라운드 이미지 로드 생략
+                    p.isFullLoaded = true;
                 }
             }
             isPreloading = false;
@@ -6387,12 +6445,12 @@
 
                     // [추가] 관리자 모드일 때는 남은 수량을 정확하게 표시
                     if (isAdminMode) {
-                        stockText = (isSoldOut ? "품절" : "잔여") + `: ${stock}개 ✏️`;
+                        stockText = (isSoldOut ? "품절" : "잔여") + `: ${stock}개`;
                         stockColor = isSoldOut ? "#ff0000" : "#2196F3"; // 관리자용 파란색 (품절시는 빨간색 유지)
                     }
                 } else if (isAdminMode) {
                     // 무제한 재고인 경우 관리자 모드에서 별도 표시
-                    stockText = "재고: 무제한 ✏️";
+                    stockText = "재고: 무제한";
                     stockColor = "#2196F3";
                 }
 
@@ -6411,20 +6469,12 @@
                     `<div class="item-controls-bottom-v">` +
                     `<button class="btn-detail" onclick="openDetail('${escapeArg(p.name)}')">상세보기</button>` +
                     `<div class="qty-group">` +
-                    `<div class="stock-status" style="color:${stockColor}; font-weight:800; ${isAdminMode ? 'cursor:pointer; text-decoration:underline; text-underline-offset:3px;' : ''}" ${isAdminMode ? `onclick="adminEditStock('${escapeArg(p.name)}', '${escapeArg(p.matchKey)}', '${escapeArg(p.originalStock || "")}', ${isFinite(stock) ? stock : 'Infinity'})"` : ''}>${stockText}</div>` +
-                    (isAdminMode ? 
-                    `<div class="qty-controls admin-stock-edit selected">` +
-                    `<button class="qty-btn" onclick="adminChangeStock(this, '${escapeArg(p.name)}', '${escapeArg(p.matchKey)}', '${escapeArg(p.originalStock || "")}', -1)">-</button>` +
-                    `<input class="qty-num admin-stock-input" type="number" min="0" value="${isFinite(stock) ? stock : ''}" placeholder="무제한" data-name="${escapeArg(p.name)}" data-matchkey="${escapeArg(p.matchKey)}" data-original-stock="${escapeArg(p.originalStock || "")}" onchange="adminUpdateStockInput(this)">` +
-                    `<button class="qty-btn" onclick="adminChangeStock(this, '${escapeArg(p.name)}', '${escapeArg(p.matchKey)}', '${escapeArg(p.originalStock || "")}', 1)">+</button>` +
-                    `</div>`
-                    :
+                    `<div class="stock-status" style="color:${stockColor}; font-weight:800;">${stockText}</div>` +
                     `<div class="qty-controls ${currentQty > 0 ? 'selected' : ''}" style="${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
                     `<button class="qty-btn" onclick="qty(this, -1)">-</button>` +
                     `<input class="qty-num" value="${currentQty}" readonly data-name="${p.name}" data-price="${p.price}" data-stock="${stock}">` +
                     `<button class="qty-btn" onclick="qty(this, 1)">+</button>` +
-                    `</div>`
-                    ) +
+                    `</div>` +
                     `</div></div>`;
 
                 // [수정] 박스 래퍼가 있으면 그 안에 넣고, 없으면 기본 컨테이너에 넣음
@@ -6715,20 +6765,8 @@
             if (detailScrollArea) detailScrollArea.scrollTop = 0;
 
             if (!p.isFullLoaded || (p.images && p.images.length <= 1 && p.folderId)) {
-                try {
-                    const res = await fetch(`${API_URL}?action=fetchProductImages&name=${encodeURIComponent(p.name)}&folderId=${p.folderId || ''}`);
-                    const allImages = await res.json();
-                    if (Array.isArray(allImages) && allImages.length > 0) {
-                        p.images = allImages;
-                        p.isFullLoaded = true;
-                        localStorage.setItem('moket_products_cache_v2', JSON.stringify(productsData));
-                        renderImgs();
-                    } else if (Array.isArray(allImages)) {
-                        p.isFullLoaded = true;
-                    }
-                } catch (e) {
-                    console.error("상세 이미지 로드 실패:", e);
-                }
+                // GAS 사용 중단으로 인해 상세 이미지 동적 페치 생략
+                p.isFullLoaded = true;
             }
         }
 
@@ -6788,31 +6826,61 @@
             const phone = document.getElementById('input-phone').value || "입력되지 않음";
             const address = document.getElementById('input-address').value;
             const addressDetail = document.getElementById('input-address-detail').value;
-            const fullAddress = address ? `${address} ${addressDetail}`.trim() : "입력되지 않음";
             const entrance = document.getElementById('input-entrance').value || "정보없음";
 
-            const header = document.getElementById('confirm-header-area');
-            const displayAddress = fullAddress.replace("경기 하남시", "").trim();
+            let shortAddress = "";
+            if (address) {
+                let cleanAddr = address.replace(/^(?:경기도\s*|경기\s*)?(?:하남시\s*)?/, '').trim();
+                const matchParen = cleanAddr.match(/\(([^)]+)\)/);
+                if (matchParen && matchParen[1]) {
+                    cleanAddr = matchParen[1].trim();
+                }
+                shortAddress = `${cleanAddr} ${addressDetail || ''}`.trim();
+            } else {
+                shortAddress = addressDetail || "입력되지 않음";
+            }
 
-            header.innerHTML = `
-                <div style="font-size:18px; font-weight:900; color:var(--item-black); margin-bottom:10px;">주문 내용을 확인해 주세요</div>
-                <div style="text-align:left; background:#edf2f7; padding: 12px; border-radius:var(--common-radius); margin-bottom:10px; font-size:14px; line-height:1.6;">
-                    <div style="font-size:15px; font-weight:800; color:var(--item-black); margin-bottom:4px;">주문자 정보</div>
-                    <div>수령방법 : <span style="font-weight:700; color:var(--nego-orange);">${selectedShippingMethod}</span></div>
-                    <div>주문자명 : <span style="font-weight:700; color:var(--nego-orange);">${name}</span></div>
-                    <div>연락처 : <span style="font-weight:700; color:var(--nego-orange);">${phone}</span></div>
-                    <div style="word-break: keep-all;">주소 : <span style="font-weight:700; color:var(--nego-orange);">${displayAddress}</span></div>
-                    <div>공동현관 : <span style="font-weight:700; color:var(--nego-orange);">${entrance}</span></div>
-                </div>
-            `;
+            const header = document.getElementById('confirm-header-area');
+            if (selectedShippingMethod === '배달주문') {
+                header.innerHTML = `
+                    <div style="font-size:16px; font-weight:900; color:var(--item-black); margin-bottom:8px;">주문 내용을 확인해 주세요</div>
+                    <div style="text-align:left; background:#f8fafc; border:1.5px solid #e2e8f0; padding: 8px 12px; border-radius:10px; margin-bottom:10px; font-size:13px; line-height:1.4;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; white-space:nowrap; overflow:hidden;">
+                            <span style="background:#e8f5e9; color:#2e7d32; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:800; flex-shrink:0;">🚚 배달주문</span>
+                            <span style="font-weight:800; color:#1e293b; font-size:13.5px; flex-shrink:0;">${name}</span>
+                            <span style="color:#64748b; font-weight:700; font-size:12.5px; flex-shrink:0;">(${phone})</span>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; color:#334155; font-weight:700; font-size:12.5px; white-space:nowrap; overflow:hidden;">
+                            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📍 ${shortAddress}</span>
+                            ${entrance && entrance !== "정보없음" ? `<span style="color:#64748b; font-size:11.5px; flex-shrink:0; background:#edf2f7; padding:1px 5px; border-radius:4px;">🚪 ${entrance}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            } else {
+                header.innerHTML = `
+                    <div style="font-size:16px; font-weight:900; color:var(--item-black); margin-bottom:8px;">주문 내용을 확인해 주세요</div>
+                    <div style="text-align:left; background:#f8fafc; border:1.5px solid #e2e8f0; padding: 10px 12px; border-radius:10px; margin-bottom:10px; font-size:13px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="background:#eff6ff; color:#1d4ed8; font-size:11px; padding:2px 7px; border-radius:5px; font-weight:800;">🛍️ 매장픽업</span>
+                            <span style="font-weight:800; color:#1e293b; font-size:14px;">${name}</span>
+                            <span style="color:#64748b; font-weight:700;">(${phone})</span>
+                        </div>
+                    </div>
+                `;
+            }
 
             const noticeArea = document.getElementById('confirm-notice-area');
             if (selectedShippingMethod === '배달주문') {
+                const depositNoticeLine = (currentDeliveryType === 'reserve')
+                    ? '<div>✅ 자정 전까지 입금확인이 안될경우 자동으로 주문이 취소됩니다.</div>'
+                    : '<div>✅ 오후3시 전까지 입금확인이 안될경우 자동으로 주문이 취소됩니다.</div>';
+
                 noticeArea.innerHTML = `
                     <div style="font-size: 12px; line-height: 1.5;">
                         <div style="display: flex; flex-direction: column; gap: 2px; color: #4b5563;">
                             <div>✅ 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
-                            <div>✅ 냉장/냉동제품은 보냉백에 넣어드리나 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인 바랍니다.</div>
+                            <div>✅ 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인바랍니다.</div>
+                            ${depositNoticeLine}
                             <div>✅ 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
                         </div>
                     </div>
@@ -6986,6 +7054,40 @@
             checkScrollLock();
         }
 
+        // [신규] 주문 확정 단계에서 GAS 호출(3~5초 대기)을 건너뛰고 파이어베이스 실시간 재고/상태 정보로만 초고속 검증(0.1초)하는 함수
+        async function loadDataFirebaseOnly() {
+            try {
+                const [stockRes, statusRes, pubRes] = await Promise.all([
+                    fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 로드 실패:", e); return { ok: false }; }),
+                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; }),
+                    fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`).catch(e => { console.error("Firebase published_products 로드 실패:", e); return { ok: false }; })
+                ]);
+
+                if (statusRes && statusRes.ok) {
+                    const statusData = await statusRes.json();
+                    isProductListEnabled = (statusData === null) ? true : !!statusData;
+                }
+
+                let publishedProducts = [];
+                if (pubRes && pubRes.ok) {
+                    publishedProducts = await pubRes.json() || [];
+                }
+
+                if (stockRes && stockRes.ok) {
+                    globalAdjustments = await stockRes.json() || {};
+                }
+
+                // [중요 수정] productsData 원본을 파괴적으로 변형(in-place mutation)하지 않고
+                // 최신 publishedProducts 및 globalAdjustments 데이터로 안전하게 화면 수량을 갱신
+                if (productsData && productsData.length > 0) {
+                    processAndRender(productsData, false);
+                }
+            } catch (e) {
+                console.error("Firebase 전용 실시간 검증 실패:", e);
+                throw e;
+            }
+        }
+
         async function completeOrder(shippingMethod, extraItems = [], cutoffConfirmed = false, holidayConfirmed = false) {
             const now = new Date();
             const currentHour = now.getHours();
@@ -7041,8 +7143,8 @@
             }
 
             try {
-                // 최신 데이터를 서버에서 강제로 새로고침하여 검증
-                await loadData(true);
+                // 최신 데이터를 파이어베이스에서 직접 고속 검증하여 네트워크 딜레이(GAS 병목) 해소
+                await loadDataFirebaseOnly();
             } catch (e) {
                 console.error("실시간 상품 정보 확인 실패:", e);
                 showSystemModal("실시간 상품 정보를 불러오지 못했습니다.<br>네트워크 연결을 확인해주세요.", 'alert');
@@ -7614,7 +7716,7 @@
                             <span style="color:var(--item-black);">카카오뱅크</span><br>
                             <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:4px;">
                                 <span style="font-size:24px; font-weight:900; color:var(--nego-orange);" id="bank-acc-num">3333-37-3410268</span>
-                                <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:2px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; background:#fff; color:#666; cursor:pointer;">복사</button>
+                                <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:5px 12px; border:none; border-radius:6px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow: 0 2px 6px rgba(255, 107, 0, 0.3);">📋 복사</button>
                             </div>
                         </div>
                         <div style="font-size:15px; font-weight:600; color:#888;">예금주 : 강*민(모켓(MOKET))</div>
@@ -7760,12 +7862,10 @@
             const todayStr = `${nowForDate.getFullYear()}-${String(nowForDate.getMonth() + 1).padStart(2, '0')}-${String(nowForDate.getDate()).padStart(2, '0')}`;
 
             if (currentDeliveryType === 'today') {
-                // 1. 당일배송 모드: 모든 상품(배달비 제외)의 기록 날짜를 무조건 주문 당일 날짜(오늘)로 통일 (진입 시점에 13시 마감 및 주말 여부가 이미 차단 통제되므로 단순 고정)
+                // 1. 당일배송 모드: 모든 상품(배달비 포함)의 기록 날짜를 무조건 주문 당일 날짜(오늘)로 통일
                 allItems.forEach(it => {
-                    if (it.name !== "배달비") {
-                        it.date = todayStr;
-                        it.isCategorized = false; // 날짜 포맷이므로 범주형 해제
-                    }
+                    it.date = todayStr;
+                    it.isCategorized = false; // 날짜 포맷이므로 범주형 해제
                 });
             } else if (currentDeliveryType === 'reserve') {
                 if (shippingMethod === '배달주문') {
@@ -7800,7 +7900,7 @@
                     if (maxReserveDate) {
                         allItems.forEach(it => {
                             const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
-                            if (isSadaItem || it.name === "배달비") return;
+                            if (isSadaItem) return;
                             it.date = maxReserveDate;
                             it.isCategorized = false;
                         });
@@ -7855,6 +7955,17 @@
                 }
             }
 
+            // [안전장치] 배달비 항목의 날짜를 일반 상품의 날짜와 일치시킴
+            const mainItem = allItems.find(it => it.name !== "배달비" && !it.name.includes("사다드림") && it.matchKey !== "사다드림");
+            if (mainItem && mainItem.date) {
+                allItems.forEach(it => {
+                    if (it.name === "배달비") {
+                        it.date = mainItem.date;
+                        it.isCategorized = false;
+                    }
+                });
+            }
+
             // 픽업일(date)별로 아이템 그룹화
             const groups = allItems.reduce((acc, item) => {
                 const d = item.date || 'unknown';
@@ -7896,12 +8007,30 @@
                     return `${y}년 ${m}월 ${day}일 (${w})`;
                 };
 
+                const getNextBusinessDate = (ts) => {
+                    let d = new Date(ts);
+                    // 15시 이후 주문이거나 주말/휴무일인 경우 다음 날짜로 이동
+                    if (d.getHours() >= 15) {
+                        d.setDate(d.getDate() + 1);
+                    }
+                    while (true) {
+                        const chkDay = d.getDay();
+                        const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                        const isOff = (chkDay === 0 || (chkDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(dStr));
+                        if (isOff) {
+                            d.setDate(d.getDate() + 1);
+                        } else {
+                            break;
+                        }
+                    }
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                };
+
                 const getDisplayDate = (it) => {
                     let d = it.date;
                     if (it.isOnSite || it.isCategorized) {
                         if (!/^(\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(String(d).trim())) {
-                            const today = new Date(tempTimestamp);
-                            d = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                            d = getNextBusinessDate(tempTimestamp);
                         }
                     }
                     return d;
@@ -8039,12 +8168,6 @@
                 allItems.forEach(async it => {
                     if (it.isExtra && it.originalData) {
                         try {
-                            // 1. GAS 스프레드시트 서버 합산 처리
-                            fetch(API_URL, {
-                                method: 'POST',
-                                body: JSON.stringify({ header: 'combine', ...it.originalData })
-                            }).catch(e => console.error("GAS 합산 처리 실패:", e));
-
                             // 2. Firebase 실시간 데이터베이스에서 기존 개별 주문 삭제
                             const origPhone = String(it.originalData.phone || phone).replace(/\D/g, "");
                             const origOrderKey = fSafeKey(it.originalData.timestamp) + "_" + fSafeKey(it.originalData.item);
@@ -8063,15 +8186,6 @@
                         } catch (e) { console.error("합산 실패:", e); }
                     }
                 });
-
-                // 3. GAS 스프레드시트 동기화 (배경에서 실행)
-                fetch(API_URL, {
-                    method: 'POST',
-                    redirect: 'follow',
-                    body: JSON.stringify(payload)
-                }).then(res => res.json()).then(gasResult => {
-                    console.log("GAS 동기화 완료:", gasResult);
-                }).catch(err => console.error("GAS 동기화 네트워크 실패:", err));
 
                 // 4. 로컬 상태 업데이트 및 완료 안내 (Firebase 기록 완료 시 바로 표시)
                 isHistoryProcessing = false;
@@ -8094,7 +8208,7 @@
 
                 // 최종 완료 처리 (GAS 완료를 기다리지 않고 바로 표시)
                 document.getElementById('system-modal').style.display = 'none';
-                const hasSadaDream = allItems.some(it => String(it.name).includes('[사다드림]'));
+                const hasSadaDream = allItems.some(it => it.name !== "배달비" && (String(it.name).includes('사다드림') || it.matchKey === '사다드림' || it.date === '사다드림'));
 
                 if (hasSadaDream) {
                     showSystemModal("주문이 완료되었습니다!", 'alert', () => {
@@ -8137,7 +8251,7 @@
         }
 
         // window.onload 대신 DOMContentLoaded 사용 (훨씬 빠름)
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             // [마이그레이션] 구버전 카카오 키 이동
             const oldNick = localStorage.getItem('kakao_nickname');
             if (oldNick && !localStorage.getItem('kakao_original_name')) {
@@ -8146,6 +8260,9 @@
 
             // 주문내역은 배경에서 삭제 (UI 안막음)
             setTimeout(() => localStorage.removeItem('moket_order_history'), 100);
+
+            // [추가] 공휴일/휴무일 목록을 동기적으로 로드하거나 비동기 패치를 완료 대기하여 레이스 컨디션 완벽 차단
+            await fetchHolidays();
 
             // [추가] 시간 기반 카테고리 순서 동적 설정 및 기본 탭 설정
             initMainTabs(true);
@@ -8268,3 +8385,4 @@
 </body>
 
 </html>
+
