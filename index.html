@@ -5240,6 +5240,21 @@
                     globalAdjustments = await stockRes.json() || {};
                 }
 
+                // [버그수정] 재고 조정값(adj) 조회 헬퍼.
+                // 기존 '||' 방식은 정상값 0(주문관리에서 수량 변경 시 리셋되는 값)을 falsy로 오인해
+                // 뒷순위 키(같은 이름의 다른 회차 상품 키)로 넘어가 그 상품의 차감값을 잘못 끌어와
+                // 주문이 없는데도 품절로 표시되는 문제가 있었음. '정의된 첫 값'을 선택하도록 교체.
+                const pickAdj = (...keys) => {
+                    for (const k of keys) {
+                        if (k === undefined || k === null || k === "") continue;
+                        const encV = globalAdjustments[encodeURIComponent(k)];
+                        if (encV !== undefined && encV !== null) return encV;
+                        const rawV = globalAdjustments[k];
+                        if (rawV !== undefined && rawV !== null) return rawV;
+                    }
+                    return undefined;
+                };
+
                 // [디버깅] 서버 수신 데이터 확인
                 console.log("[Data Sync] 병렬 로드 완료", { rawData, globalAdjustments, publishedProductsCount: publishedProducts.length });
 
@@ -5318,9 +5333,7 @@
                         const adjKey2 = pubMatch ? fGetAdjKey(pubMatch.matchKey || pubMatch.date, pubMatch.name) : adjKey1;
                         const adjKey3 = fGetAdjKey(normKey(mKey), pName);
 
-                        const adj = globalAdjustments[encodeURIComponent(adjKey1)] || globalAdjustments[adjKey1]
-                                 || globalAdjustments[encodeURIComponent(adjKey2)] || globalAdjustments[adjKey2]
-                                 || globalAdjustments[encodeURIComponent(adjKey3)] || globalAdjustments[adjKey3];
+                        const adj = pickAdj(adjKey1, adjKey2, adjKey3);
 
                         let currentStock = baseStock;
                         const isSheetStockUnlimited = (baseStock === "" || baseStock === null || baseStock === undefined || String(baseStock).trim() === "무제한");
@@ -5359,8 +5372,7 @@
                     const adjKey1 = fGetAdjKey(pubKey, pubName);
                     const adjKey2 = fGetAdjKey(normKey(pubKey), pubName);
 
-                    const adj = globalAdjustments[encodeURIComponent(adjKey1)] || globalAdjustments[adjKey1]
-                             || globalAdjustments[encodeURIComponent(adjKey2)] || globalAdjustments[adjKey2];
+                    const adj = pickAdj(adjKey1, adjKey2);
 
                     let currentStock = baseStock;
                     const isSheetStockUnlimited = (baseStock === "" || baseStock === null || baseStock === undefined || String(baseStock).trim() === "무제한");
