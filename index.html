@@ -5289,7 +5289,9 @@
                         seenKeys.add(dupKey);
 
                         // [신규] Firebase published_products 로부터 상품업로드 도구가 편집한 최신 기본재고(stock) 값을 동적 동기화
-                        let baseStock = p.stock;
+                        // [버그수정] 캐시(moket_products_cache_v2)에는 조정 반영된 stock(=기본+adj)이 저장되므로,
+                        // 참 기본재고인 originalStock이 있으면 그것을 우선 사용해야 새로고침마다 adj가 이중 누적(수량 1씩 감소)되지 않음.
+                        let baseStock = (p.originalStock !== undefined && p.originalStock !== null && p.originalStock !== "") ? p.originalStock : p.stock;
                         let matchedPrice = p.price;
                         let matchedImages = p.images;
 
@@ -5312,7 +5314,10 @@
                         });
 
                         if (pubMatch) {
-                            if (pubMatch.stock !== undefined && pubMatch.stock !== null) {
+                            // [버그수정] 캐시 경로에서는 pubMatch도 캐시 항목이라 stock이 조정 반영값임 → originalStock 우선.
+                            if (pubMatch.originalStock !== undefined && pubMatch.originalStock !== null && pubMatch.originalStock !== "") {
+                                baseStock = pubMatch.originalStock;
+                            } else if (pubMatch.stock !== undefined && pubMatch.stock !== null) {
                                 baseStock = pubMatch.stock;
                             }
                             if (pubMatch.price !== undefined && pubMatch.price !== null && pubMatch.price !== "") {
@@ -5369,7 +5374,8 @@
                     if (seenKeys.has(dupKey)) return;
                     seenKeys.add(dupKey);
 
-                    const baseStock = pub.stock;
+                    // [버그수정] 캐시 항목이면 stock에 adj가 반영돼 있으므로 참 기본재고 originalStock 우선.
+                    const baseStock = (pub.originalStock !== undefined && pub.originalStock !== null && pub.originalStock !== "") ? pub.originalStock : pub.stock;
                     const adjKey1 = fGetAdjKey(pubKey, pubName);
                     const adjKey2 = fGetAdjKey(normKey(pubKey), pubName);
 
