@@ -1884,6 +1884,9 @@
         #tab-admin-products .segment-control.five-cols {
             grid-template-columns: repeat(5, 1fr) !important;
         }
+        /* [신규] 재고관리/예약구매 카테고리 가로 스크롤바 숨김 */
+        #manage-category-tabs { scrollbar-width: none; -ms-overflow-style: none; }
+        #manage-category-tabs::-webkit-scrollbar { display: none; }
         #tab-admin-products .segment-btn {
             background: none;
             border: none;
@@ -6388,19 +6391,27 @@
 
             // [수정] 재고관리·예약구매는 한 줄 가로 스크롤(개수 가변), 나머지는 그리드
             if (uploadManageDeliveryType === 'inventory' || uploadManageDeliveryType === 'reserve') {
-                container.classList.remove('five-cols'); // 모바일 '.five-cols { display:grid !important }' 규칙 회피 → 인라인 flex 적용
-                container.style.display = 'flex';
+                // '#tab-admin-products .segment-control { display:grid !important }'를 이기려면 인라인에도 !important 필요
+                container.classList.remove('five-cols');
+                container.style.setProperty('display', 'flex', 'important');
+                container.style.setProperty('flex-direction', 'row', 'important');
+                container.style.setProperty('flex-wrap', 'nowrap', 'important');
+                container.style.setProperty('overflow-x', 'auto', 'important');
                 container.style.gridTemplateColumns = '';
-                container.style.flexWrap = 'nowrap';
-                container.style.overflowX = 'auto';
                 container.style.rowGap = '';
                 container.style.gap = '4px';
+                // [신규] 마우스 휠(세로)로 가로 스크롤
+                container.onwheel = (e) => {
+                    if (e.deltaY !== 0) { e.preventDefault(); container.scrollLeft += e.deltaY; }
+                };
             } else {
+                container.onwheel = null;
                 container.classList.add('five-cols');
-                container.style.display = 'grid';
+                container.style.removeProperty('flex-direction');
+                container.style.removeProperty('flex-wrap');
+                container.style.removeProperty('overflow-x');
+                container.style.setProperty('display', 'grid', 'important');
                 container.style.gridTemplateColumns = 'repeat(5, 1fr)';
-                container.style.overflowX = '';
-                container.style.flexWrap = '';
                 container.style.rowGap = '4px';
                 container.style.gap = '';
             }
