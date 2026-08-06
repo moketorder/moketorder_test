@@ -2507,26 +2507,35 @@
             <div id="sales-sub-purchase">
             <!-- A. 오늘 이후 주문 집계 (준비·발주) -->
             <div class="card" style="padding: 14px; margin-bottom: 16px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-                    <div class="card-title" style="margin:0;">📦 오늘 이후 주문 집계 (준비·발주)</div>
-                    <button type="button" onclick="initSalesTab()" style="padding:5px 10px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">🔄 새로고침</button>
+                <!-- 컨트롤 패널: 기간 / 분류 / 요약을 하나의 틀로 정리 -->
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px;">
+                    <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:9px;">
+                        <span style="font-size:11px; font-weight:800; color:#64748b; flex-shrink:0; width:36px; padding-top:6px;">기간</span>
+                        <div id="sales-uprange-tabs" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; flex:1;"></div>
+                    </div>
+                    <div id="sales-upcoming-range" style="display:none; gap:6px; margin:0 0 9px 44px; align-items:center; flex-wrap:wrap;">
+                        <input type="date" id="sales-up-from" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
+                        <span style="font-size:12px;">~</span>
+                        <input type="date" id="sales-up-to" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
+                    </div>
+                    <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:9px;">
+                        <span style="font-size:11px; font-weight:800; color:#64748b; flex-shrink:0; width:36px; padding-top:6px;">분류</span>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; flex:1;">
+                            <button type="button" data-sales-upcat="all" onclick="setSalesUpcomingCat('all')" class="sales-toggle-btn active">전체</button>
+                            <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn">🍎 과일</button>
+                            <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn">📦 공동구매</button>
+                            <button type="button" data-sales-upcat="sada" onclick="setSalesUpcomingCat('sada')" class="sales-toggle-btn">🛒 사다드림</button>
+                            <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn">그외</button>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:flex-start; gap:8px;">
+                        <span style="font-size:11px; font-weight:800; color:#64748b; flex-shrink:0; width:36px; padding-top:5px;">요약</span>
+                        <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:wrap; flex:1;"></div>
+                    </div>
                 </div>
-                <div id="sales-uprange-tabs" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;"></div>
-                <div id="sales-upcoming-range" style="display:none; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
-                    <input type="date" id="sales-up-from" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
-                    <span style="font-size:12px;">~</span>
-                    <input type="date" id="sales-up-to" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
-                </div>
-                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
-                    <button type="button" data-sales-upcat="all" onclick="setSalesUpcomingCat('all')" class="sales-toggle-btn active">전체</button>
-                    <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn">🍎 과일</button>
-                    <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn">📦 공동구매</button>
-                    <button type="button" data-sales-upcat="sada" onclick="setSalesUpcomingCat('sada')" class="sales-toggle-btn">🛒 사다드림</button>
-                    <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn">그외</button>
-                </div>
-                <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
-                <div style="margin-bottom:8px;">
-                    <input type="text" id="sales-upcoming-search" placeholder="🔍 상품 검색" oninput="renderSalesUpcoming()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+                    <input type="text" id="sales-upcoming-search" placeholder="🔍 상품 검색" oninput="renderSalesUpcoming()" style="flex:1; padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
+                    <button type="button" onclick="initSalesTab()" style="flex-shrink:0; padding:8px 12px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">🔄 새로고침</button>
                 </div>
                 <div id="sales-upcoming-sortbar" style="display:flex; gap:5px; margin-bottom:8px; flex-wrap:wrap; align-items:center;"></div>
                 <div id="sales-upcoming-list"></div>
@@ -6884,16 +6893,20 @@
                 return;
             }
             let totalQty = 0, totalAmount = 0, shortageCount = 0;
-            list.innerHTML = filteredRows.map(r => {
+            filteredRows.forEach(r => {
                 totalQty += r.qty; totalAmount += r.amount;
+                if (r.shortage !== null && r.shortage !== Infinity && r.shortage < 0) shortageCount++;
+            });
+            // 상품 카드 1개 HTML (부수효과 없음)
+            const cardHTML = (r) => {
                 const stockText = (r.stock === null) ? '-' : (r.stock === Infinity ? '무제한' : (r.stock + '개'));
                 const onHandText = (r.onHand === null) ? '-' : (r.onHand === Infinity ? '무제한' : (r.onHand + '개'));
                 let shortText;
                 if (r.shortage === null) shortText = '<b style="color:var(--text-sub); font-weight:900;">-</b>';
-                else if (r.shortage < 0){ shortageCount++; shortText = `<b style="color:#dc2626; font-weight:900;">${r.shortage}개</b>`; } // 부족(음수)만 표시
+                else if (r.shortage < 0) shortText = `<b style="color:#dc2626; font-weight:900;">${r.shortage}개</b>`; // 부족(음수)만 표시
                 else shortText = '<b style="color:#64748b; font-weight:900;">0개</b>'; // 0 이상(여유·무제한)은 0개
                 const dateHint = [...r.dates].sort().map(fmtMD).join(', ');
-                // [신규] 재고 변경칸용 인덱스/현재값 (상품이 매칭된 경우만)
+                // 재고 변경칸용 인덱스/현재값 (상품이 매칭된 경우만)
                 const idx = r.prod ? uploadProducts.indexOf(r.prod) : -1;
                 const stockInputVal = (r.stock === Infinity) ? '무제한' : (r.stock === null ? '' : r.stock);
                 return `<div style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff;">
@@ -6915,12 +6928,12 @@
                         </div>` : ''}
                     </div>
                 </div>`;
-            }).join('');
+            };
+            list.innerHTML = filteredRows.map(cardHTML).join('');
             if (sumBox) sumBox.innerHTML =
                 salesStatChip('상품 종류', filteredRows.length + '종') +
-                salesStatChip('총 주문수량', totalQty.toLocaleString() + '개') +
-                salesStatChip('총 주문액', totalAmount.toLocaleString() + '원') +
-                salesStatChip('재고 부족', shortageCount + '종', shortageCount > 0 ? '#dc2626' : null);
+                salesStatChip('재고 부족', shortageCount + '종', shortageCount > 0 ? '#dc2626' : null) +
+                salesStatChip('총 주문액', totalAmount.toLocaleString() + '원');
         }
 
         function getSalesPeriodRange(){
