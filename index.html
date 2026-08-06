@@ -2021,6 +2021,7 @@
                     <option value="배달완료">배달완료</option>
                     <option value="배달미입금">배달미입금</option>
                     <option value="픽업미입금">픽업미입금</option>
+                    <option value="입금완료">입금완료</option>
                 </select>
                 <div class="controls-row button-row">
                     <button class="btn-common" style="border: 1.5px solid var(--purple); background: var(--purple-light); color: var(--purple); font-weight: 700;" onclick="showTodaySummary()">📊 주문현황</button>
@@ -2040,7 +2041,8 @@
             </div>
 
             <!-- [신규] 상태별 탭 (개수 표시, 클릭 시 그 상태만) -->
-            <div id="order-status-tabs" class="no-print" style="display:flex; gap:5px; overflow-x:auto; padding:2px 0 8px; margin:4px 0 6px; -ms-overflow-style:none; scrollbar-width:none;"></div>
+            <div id="order-status-tabs" class="no-print" style="display:flex; gap:5px; overflow-x:auto; padding:2px 0 4px; margin:4px 0 0; -ms-overflow-style:none; scrollbar-width:none;"></div>
+            <div id="order-status-tabs2" class="no-print" style="display:flex; gap:5px; overflow-x:auto; padding:2px 0 8px; margin:0 0 6px; -ms-overflow-style:none; scrollbar-width:none;"></div>
 
             <!-- [신규] 수령방법(작게) + 검색(크게) -->
             <div class="no-print" style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
@@ -2488,8 +2490,8 @@
         .sales-sub-btn { color:var(--text-sub); }
         .sales-sub-btn.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,0.1); }
         #tab-admin-sales table th, #tab-admin-sales table td { border-bottom:1px solid #f1f5f9; }
-        #order-status-tabs { -webkit-overflow-scrolling: touch; }
-        #order-status-tabs::-webkit-scrollbar { display: none; }
+        #order-status-tabs, #order-status-tabs2 { -webkit-overflow-scrolling: touch; }
+        #order-status-tabs::-webkit-scrollbar, #order-status-tabs2::-webkit-scrollbar { display: none; }
     </style>
     <div id="tab-admin-sales" class="admin-tab-content" style="display: none;">
         <div class="container" style="max-width: 900px; margin: 0 auto; padding: 15px;">
@@ -2509,21 +2511,13 @@
                     <div class="card-title" style="margin:0;">📦 오늘 이후 주문 집계 (준비·발주)</div>
                     <button type="button" onclick="initSalesTab()" style="padding:5px 10px; border:1.5px solid var(--primary); background:#fff; color:var(--primary); border-radius:8px; font-size:11px; font-weight:800; cursor:pointer;">🔄 새로고침</button>
                 </div>
-                <div style="font-size:11px; color:var(--text-sub); font-weight:700; margin-bottom:8px;">픽업/배달 예정일 기준 미취소 주문을 상품별로 집계 · 부족분(주문−재고)이 있으면 빨강</div>
-                <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
-                    <span style="font-size:12px; font-weight:800; color:#475569;">집계 범위</span>
-                    <button type="button" data-sales-uprange="today_after" onclick="setSalesUpcomingRange('today_after')" class="sales-toggle-btn active">전체</button>
-                    <button type="button" data-sales-uprange="today_only" onclick="setSalesUpcomingRange('today_only')" class="sales-toggle-btn">오늘</button>
-                    <button type="button" data-sales-uprange="after_today" onclick="setSalesUpcomingRange('after_today')" class="sales-toggle-btn">그외</button>
-                    <button type="button" data-sales-uprange="custom" onclick="setSalesUpcomingRange('custom')" class="sales-toggle-btn">📅 기간설정</button>
-                </div>
+                <div id="sales-uprange-tabs" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;"></div>
                 <div id="sales-upcoming-range" style="display:none; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
                     <input type="date" id="sales-up-from" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
                     <span style="font-size:12px;">~</span>
                     <input type="date" id="sales-up-to" class="form-control" style="width:auto; height:38px;" onchange="renderSalesUpcoming()">
                 </div>
                 <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
-                    <span style="font-size:12px; font-weight:800; color:#475569;">카테고리</span>
                     <button type="button" data-sales-upcat="all" onclick="setSalesUpcomingCat('all')" class="sales-toggle-btn active">전체</button>
                     <button type="button" data-sales-upcat="fruit" onclick="setSalesUpcomingCat('fruit')" class="sales-toggle-btn">🍎 과일</button>
                     <button type="button" data-sales-upcat="group" onclick="setSalesUpcomingCat('group')" class="sales-toggle-btn">📦 공동구매</button>
@@ -2531,6 +2525,9 @@
                     <button type="button" data-sales-upcat="other" onclick="setSalesUpcomingCat('other')" class="sales-toggle-btn">그외</button>
                 </div>
                 <div id="sales-upcoming-summary" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>
+                <div style="margin-bottom:8px;">
+                    <input type="text" id="sales-upcoming-search" placeholder="🔍 상품 검색" oninput="renderSalesUpcoming()" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; box-sizing:border-box;">
+                </div>
                 <div id="sales-upcoming-sortbar" style="display:flex; gap:5px; margin-bottom:8px; flex-wrap:wrap; align-items:center;"></div>
                 <div id="sales-upcoming-list"></div>
             </div>
@@ -3270,9 +3267,10 @@
 
         // [신규] 상태별 탭(개수) — 상태 제외 필터된 항목으로 각 상태 개수 계산 후 렌더
         function buildOrderStatusTabs(items){
-            const container = document.getElementById('order-status-tabs');
-            if (!container) return;
-            const counts = { all: 0, '대기': 0, '입고': 0, '픽업': 0, '배달완료': 0, '배달미입금': 0, '픽업미입금': 0 };
+            const c1 = document.getElementById('order-status-tabs');
+            const c2 = document.getElementById('order-status-tabs2');
+            if (!c1) return;
+            const counts = { all: 0, '대기': 0, '입고': 0, '픽업': 0, '배달완료': 0, '배달미입금': 0, '입금완료': 0 };
             (items || []).forEach(item => {
                 counts.all++;
                 const status = item.status || '대기';
@@ -3284,14 +3282,17 @@
                 else if (status === '픽업') counts['픽업']++;
                 else if (status === '배달완료') counts['배달완료']++;
                 if (asm === '배달주문' && !paid && !canceled && status !== '배달완료') counts['배달미입금']++;
-                if (asm === '매장픽업' && !paid && !canceled && status !== '픽업') counts['픽업미입금']++;
+                if (paid && !canceled) counts['입금완료']++;
             });
             const cur = document.getElementById('filterStatus').value;
-            const tabs = [['all','전체'],['대기','🔘 대기'],['입고','🟡 입고'],['픽업','🟣 픽업완료'],['배달완료','🟢 배달완료'],['배달미입금','🔴 배달미입금'],['픽업미입금','🔴 픽업미입금']];
-            container.innerHTML = tabs.map(([v,label]) => {
+            const renderTab = ([v, label]) => {
                 const active = (cur === v);
                 return `<button type="button" onclick="selectOrderStatus('${v}')" style="flex:0 0 auto; white-space:nowrap; padding:7px 10px; border-radius:8px; border:1.5px solid ${active?'var(--primary)':'var(--border)'}; background:${active?'var(--primary-light)':'#fff'}; color:${active?'var(--primary)':'var(--text-sub)'}; font-size:12px; font-weight:800; cursor:pointer;">${label} <b style="color:${active?'var(--primary)':'var(--text-main)'};">${counts[v]}</b></button>`;
-            }).join('');
+            };
+            const row1 = [['all','전체'],['대기','🔘 대기'],['입고','🟡 입고'],['픽업','🟣 픽업완료'],['배달완료','🟢 배달완료']];
+            const row2 = [['배달미입금','🔴 배달미입금'],['입금완료','💵 입금완료']];
+            c1.innerHTML = row1.map(renderTab).join('');
+            if (c2) c2.innerHTML = row2.map(renderTab).join('');
         }
         function selectOrderStatus(v){
             const sel = document.getElementById('filterStatus');
@@ -3417,6 +3418,7 @@
                         if (statusFilter === '배달완료') return status === '배달완료';
                         if (statusFilter === '배달미입금') return (actualShippingMethod === '배달주문') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '배달완료';
                         if (statusFilter === '픽업미입금') return (actualShippingMethod === '매장픽업') && !(item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true") && status !== '픽업';
+                        if (statusFilter === '입금완료') return (item.paid === true || item.paid === "true") && !(item.canceled === true || item.canceled === "true");
                         return true;
                     });
                 }
@@ -6627,6 +6629,29 @@
             else { state.key = key; state.dir = defaultDir; }
         }
         function sortSalesUpcoming(key){ toggleSalesSort(salesUpcomingSort, key, key === 'name' ? 'asc' : 'desc'); renderSalesUpcoming(); }
+        // [신규] 집계 범위 탭 동적 생성: 전체 + 오늘 + 오늘 이후 주문 있는 날짜별 + 기간설정
+        function buildSalesUpcomingRangeTabs(){
+            const bar = document.getElementById('sales-uprange-tabs');
+            if (!bar) return;
+            const today = salesTodayMidnight();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+            const dateSet = new Set([todayStr]); // 오늘은 주문 없어도 포함
+            getSalesSourceOrders().forEach(o => {
+                if (isSalesCanceled(o)) return;
+                const info = getOrderDateInfo(o);
+                if (!info.dateStr || info.dateStr === '기타') return;
+                const p = info.dateStr.split('-');
+                const d = new Date(+p[0], +p[1]-1, +p[2]);
+                if (d >= today) dateSet.add(info.dateStr);
+            });
+            const dates = [...dateSet].sort(); // 오름차순 (오늘 → 미래)
+            const cur = salesUpcomingRange;
+            const tab = (v, label) => `<button type="button" data-sales-uprange="${v}" onclick="setSalesUpcomingRange('${v}')" class="sales-toggle-btn${cur === v ? ' active' : ''}">${label}</button>`;
+            let html = tab('today_after', '전체');
+            dates.forEach(ds => { html += tab(ds, fmtMD(ds)); });
+            bar.innerHTML = html;
+        }
+
         function setSalesUpcomingRange(mode){
             salesUpcomingRange = mode;
             document.querySelectorAll('[data-sales-uprange]').forEach(b => b.classList.toggle('active', b.dataset.salesUprange === mode));
@@ -6752,6 +6777,12 @@
             renderSalesStatus();
         }
 
+        // [신규] 발주 관리 카드에서 재고 변경 (상품목록의 updateProductStock 재사용 후 판매탭 재렌더)
+        async function salesUpdateStock(index, value){
+            await updateProductStock(index, value);
+            renderSalesUpcoming();
+        }
+
         // A. 오늘 이후 주문 집계
         function renderSalesUpcoming(){
             const list = document.getElementById('sales-upcoming-list');
@@ -6759,16 +6790,27 @@
             const sortbar = document.getElementById('sales-upcoming-sortbar');
             if (!list) return;
             const today = salesTodayMidnight();
+            buildSalesUpcomingRangeTabs(); // 집계 범위 탭(전체/날짜별/기간설정) 갱신
+            // [수정] 보유분 기준일: 특정 날짜 탭 선택 시 그 날짜, 아니면 오늘
+            let refDate = today;
+            const isDateSel = /^\d{4}-\d{2}-\d{2}$/.test(salesUpcomingRange); // 특정 날짜 탭 선택 여부
+            if (isDateSel) {
+                const _rp = salesUpcomingRange.split('-');
+                refDate = new Date(+_rp[0], +_rp[1]-1, +_rp[2]);
+            }
             const map = new Map();
-            const pendingMap = new Map(); // [신규] 보유분용: 취소/픽업완료/배달완료가 아닌 주문 수량(날짜·카테고리 무관 전 기간 누적)
+            const todayAfterMap = new Map(); // [신규] 보유분용: (전체=오늘이후 누적 / 날짜선택=해당 날짜만) 주문 수량, 취소 제외
             getSalesSourceOrders().forEach(o => {
                 if (isSalesCanceled(o)) return;
                 const prod = salesFindProduct(o);
                 const key = prod ? (String(prod.name) + '|' + String(prod.matchKey || '')) : ('name:' + String(o.item || ''));
-                // 보유분: 미완료(대기/입고) 주문 수량 누적 → 차감된 현재재고에 더해줄 분
-                const _st = String(o.status || '');
-                if (_st !== '픽업' && _st !== '배달완료') {
-                    pendingMap.set(key, (pendingMap.get(key) || 0) + (parseInt(o.qty || 0) || 0));
+                // 보유분: 전체 탭=오늘 포함 이후 누적 / 특정 날짜 탭=그 날짜 주문수량만 → 재고에 더할 분
+                const _oi = getOrderDateInfo(o);
+                if (_oi.dateStr && _oi.dateStr !== '기타') {
+                    const _pp = _oi.dateStr.split('-');
+                    const _dd = new Date(+_pp[0], +_pp[1]-1, +_pp[2]);
+                    const _inScope = isDateSel ? (_oi.dateStr === salesUpcomingRange) : (_dd >= refDate);
+                    if (_inScope) todayAfterMap.set(key, (todayAfterMap.get(key) || 0) + (parseInt(o.qty || 0) || 0));
                 }
                 // 카드 집계: 카테고리 + 날짜범위 필터
                 if (salesUpcomingCats.size > 0 && !salesUpcomingCats.has(salesProductCategory(prod, o.item))) return; // 카테고리 필터(비어있으면 전체)
@@ -6784,8 +6826,7 @@
                     if (from && d < from) return;
                     if (to && d > to) return;
                 }
-                else if (salesUpcomingRange === 'today_only') { if (d.getTime() !== today.getTime()) return; } // 오늘
-                else if (salesUpcomingRange === 'after_today') { if (d <= today) return; } // 그외(오늘 제외 이후)
+                else if (/^\d{4}-\d{2}-\d{2}$/.test(salesUpcomingRange)) { if (info.dateStr !== salesUpcomingRange) return; } // 특정 날짜만
                 else { if (d < today) return; } // 전체(오늘 포함 이후)
                 if (!map.has(key)) map.set(key, { key, name: o.item || '상품명 없음', prod, qty: 0, amount: 0, dates: new Set() });
                 const g = map.get(key);
@@ -6795,21 +6836,26 @@
             });
             const rows = [...map.values()].map(g => {
                 const stock = g.prod ? salesRealStock(g.prod) : null;   // 주문으로 차감된 현재 재고
-                const pending = pendingMap.get(g.key) || 0;             // 미완료 주문 수량
-                let onHand; // 보유분 = 현재재고 + 미완료 주문 수량
+                const todayAfter = todayAfterMap.get(g.key) || 0;       // 오늘 포함 이후 주문 수량
+                let onHand; // 보유분 = 재고 + 오늘 이후 주문 수량
                 if (stock === null) onHand = null;
                 else if (stock === Infinity) onHand = Infinity;
-                else onHand = stock + pending;
-                let shortage; // 부족분 = 주문 - 현재재고 (양수=사와야 할 수량)
-                if (stock === null) shortage = null;
-                else if (stock === Infinity) shortage = -Infinity; // 무제한 = 부족 없음(정렬 맨 뒤)
-                else shortage = g.qty - stock;
+                else onHand = stock + todayAfter;
+                let shortage; // 부족분 = 보유분 - 주문수량 (음수=부족, 양수=여유)
+                if (onHand === null) shortage = null;
+                else if (onHand === Infinity) shortage = Infinity; // 무제한 보유 → 부족 없음
+                else shortage = onHand - g.qty;
                 return Object.assign(g, { stock, onHand, shortage });
             });
+            // [신규] 상품명 검색 필터
+            const _searchEl = document.getElementById('sales-upcoming-search');
+            const _kw = _searchEl ? _searchEl.value.trim().toLowerCase() : '';
+            const filteredRows = _kw ? rows.filter(r => String(r.name || '').toLowerCase().includes(_kw)) : rows;
             // 정렬 칩 (표 헤더 대신)
             const upCols = [
                 { key:'name', label:'상품명' },
                 { key:'qty', label:'주문수량' },
+                { key:'stock', label:'재고' },
                 { key:'onhand', label:'보유분' },
                 { key:'shortage', label:'부족분' },
                 { key:'amount', label:'주문액' }
@@ -6820,48 +6866,58 @@
                 return `<button type="button" onclick="sortSalesUpcoming('${c.key}')" class="sales-toggle-btn${active ? ' active' : ''}" style="padding:5px 9px; font-size:11px;">${c.label}${arrow}</button>`;
             }).join('');
             const us = salesUpcomingSort;
-            rows.sort((a, b) => {
+            filteredRows.sort((a, b) => {
                 if (us.key === 'name') return salesCmpStr(a.name, b.name, us.dir);
                 const pick = (r) => {
                     if (us.key === 'qty') return r.qty;
+                    if (us.key === 'stock') return (r.stock === Infinity ? Number.MAX_SAFE_INTEGER : (r.stock === null ? -1 : r.stock));
                     if (us.key === 'onhand') return (r.onHand === Infinity ? Number.MAX_SAFE_INTEGER : r.onHand);
-                    if (us.key === 'shortage') return (r.shortage === -Infinity ? -Number.MAX_SAFE_INTEGER : r.shortage);
+                    if (us.key === 'shortage') return (r.shortage === Infinity ? Number.MAX_SAFE_INTEGER : r.shortage);
                     if (us.key === 'amount') return r.amount;
                     return 0;
                 };
                 return salesCmpNum(pick(a), pick(b), us.dir);
             });
-            if (rows.length === 0){
-                list.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-sub); font-size:13px;">해당 조건의 예정 주문이 없습니다.</div>`;
+            if (filteredRows.length === 0){
+                list.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-sub); font-size:13px;">${_kw ? '검색 결과가 없습니다.' : '해당 조건의 예정 주문이 없습니다.'}</div>`;
                 if (sumBox) sumBox.innerHTML = '';
                 return;
             }
             let totalQty = 0, totalAmount = 0, shortageCount = 0;
-            list.innerHTML = rows.map(r => {
+            list.innerHTML = filteredRows.map(r => {
                 totalQty += r.qty; totalAmount += r.amount;
+                const stockText = (r.stock === null) ? '-' : (r.stock === Infinity ? '무제한' : (r.stock + '개'));
                 const onHandText = (r.onHand === null) ? '-' : (r.onHand === Infinity ? '무제한' : (r.onHand + '개'));
                 let shortText;
-                if (r.shortage === null) shortText = '<b style="color:var(--text-sub);">-</b>';
-                else if (r.shortage > 0){ shortageCount++; shortText = `<b style="color:#dc2626; font-weight:900;">${r.shortage}개</b>`; }
-                else shortText = '<b style="color:#64748b;">0개</b>';
+                if (r.shortage === null) shortText = '<b style="color:var(--text-sub); font-weight:900;">-</b>';
+                else if (r.shortage < 0){ shortageCount++; shortText = `<b style="color:#dc2626; font-weight:900;">${r.shortage}개</b>`; } // 부족(음수)만 표시
+                else shortText = '<b style="color:#64748b; font-weight:900;">0개</b>'; // 0 이상(여유·무제한)은 0개
                 const dateHint = [...r.dates].sort().map(fmtMD).join(', ');
+                // [신규] 재고 변경칸용 인덱스/현재값 (상품이 매칭된 경우만)
+                const idx = r.prod ? uploadProducts.indexOf(r.prod) : -1;
+                const stockInputVal = (r.stock === Infinity) ? '무제한' : (r.stock === null ? '' : r.stock);
                 return `<div style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:6px; background:#fff;">
-                    <div style="font-weight:700; font-size:13px; word-break:break-all; line-height:1.3;">${r.name}</div>
-                    <div style="font-size:10px; color:var(--text-sub); margin-bottom:6px;">${dateHint}</div>
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; font-size:12px; gap:8px;">
-                        <div style="display:flex; flex-direction:column; gap:3px;">
-                            <span style="color:var(--text-sub);">주문수량 <b style="color:var(--text-main);">${r.qty}개</b></span>
-                            <span style="color:var(--text-sub);">보유분 <b style="color:var(--text-main);">${onHandText}</b></span>
-                        </div>
-                        <div style="display:flex; flex-direction:column; gap:3px; text-align:right;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                        <div style="font-weight:700; font-size:13px; word-break:break-all; line-height:1.3;">${r.name}</div>
+                        <span style="flex-shrink:0; font-size:12px; color:var(--text-sub); white-space:nowrap;">주문액 <b style="color:var(--text-main);">${r.amount.toLocaleString()}원</b></span>
+                    </div>
+                    <div style="font-size:10px; color:var(--text-sub); margin:2px 0 5px;">${dateHint}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                        <div style="display:flex; gap:12px; font-size:12px; flex-wrap:wrap;">
+                            <span style="color:var(--text-sub);">주문수량 <b style="color:#2563eb; font-weight:900;">${r.qty}개</b></span>
+                            <span style="color:var(--text-sub);">재고 <b style="color:#7c3aed; font-weight:900;">${stockText}</b></span>
+                            <span style="color:var(--text-sub);">보유분 <b style="color:#059669; font-weight:900;">${onHandText}</b></span>
                             <span style="color:var(--text-sub);">부족분 ${shortText}</span>
-                            <span style="color:var(--text-sub);">주문액 <b style="color:var(--text-main);">${r.amount.toLocaleString()}원</b></span>
                         </div>
+                        ${idx >= 0 ? `<div style="flex-shrink:0; display:flex; gap:4px; align-items:center;">
+                            <input type="text" id="sales-stock-input-${idx}" value="${stockInputVal}" placeholder="${stockInputVal}" inputmode="numeric" onfocus="this.value='';" onkeydown="if(event.key==='Enter'){event.preventDefault(); salesUpdateStock(${idx}, this.value);}" title="재고 수량 입력 (숫자, 999=무제한)" style="width:58px; padding:4px 6px; border:1.5px solid var(--border); border-radius:6px; font-size:12px; font-weight:700; text-align:center; box-sizing:border-box;">
+                            <button type="button" onclick="salesUpdateStock(${idx}, document.getElementById('sales-stock-input-${idx}').value)" style="padding:5px 11px; border:1.5px solid var(--primary); background:var(--primary-light); color:var(--primary); border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap;">변경</button>
+                        </div>` : ''}
                     </div>
                 </div>`;
             }).join('');
             if (sumBox) sumBox.innerHTML =
-                salesStatChip('상품 종류', rows.length + '종') +
+                salesStatChip('상품 종류', filteredRows.length + '종') +
                 salesStatChip('총 주문수량', totalQty.toLocaleString() + '개') +
                 salesStatChip('총 주문액', totalAmount.toLocaleString() + '원') +
                 salesStatChip('재고 부족', shortageCount + '종', shortageCount > 0 ? '#dc2626' : null);
@@ -9309,7 +9365,7 @@
             }
 
             // [신규] PC 환경에서 가로 스크롤 탭 컨테이너 마우스 휠 스크롤 지원
-            const horizontalScrollIds = ['sub-products-list-tabs', 'month-tabs', 'day-tabs', 'order-status-tabs'];
+            const horizontalScrollIds = ['sub-products-list-tabs', 'month-tabs', 'day-tabs', 'order-status-tabs', 'order-status-tabs2'];
             horizontalScrollIds.forEach(id => {
                 const container = document.getElementById(id);
                 if (container) {
