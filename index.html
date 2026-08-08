@@ -1858,7 +1858,7 @@
         </div>
     </div>
 
-    <script>const API_URL = 'https://script.google.com/macros/s/AKfycbw6F-D5UhJTkLafBv4uOs5_lUD61ervXveLCcZ6ROHNYhFbEi_vJUamKHUjHE9wGeaY/exec'
+    <script>const API_URL = '' /* [비활성화] GAS 미사용 — 연결 해제 */
 
         const FIREBASE_DB_URL = "https://moketdb-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
@@ -1904,7 +1904,7 @@
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
  
-            if (type === 'today') {
+            if (type === 'today' && !isAdminMode) { // [수정] 관리자모드는 시간·휴일 상관없이 당일구매 탭 진입 허용
                 // 1. 주말 및 공휴일 당일구매 차단
                 if (isHoliday) {
                     let holidayMsg = "";
@@ -1956,16 +1956,16 @@
             const isHoliday = (currentDay === 0 || (currentDay === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayStr));
             
             const isAfterCutoffOrHoliday = isHoliday || (hour >= 15);
-            const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour >= 8 && hour < 15);
-            
+            const isFruitVegFirst = !isAfterCutoffOrHoliday && (hour >= 6 && hour < 15);
+
             // 1. 첫 페이지 로드 시에만 기본 탭 설정
             if (isInitialPageLoad) {
-                if (hour < 8 || hour >= 15 || isHoliday) {
+                if (hour < 6 || hour >= 15 || isHoliday) {
                     currentDeliveryType = 'reserve';
-                    currentMainTab = 'reserve'; // 15시 이후, 8시 이전, 휴무일에는 예약배송으로 유도
+                    currentMainTab = 'reserve'; // 15시 이후, 6시 이전, 휴무일에는 예약배송으로 유도
                 } else {
                     currentDeliveryType = 'today';
-                    currentMainTab = 'today-fruit'; // 평일 8시 ~ 15시 사이에는 당일배송으로 기본 시작
+                    currentMainTab = 'today-fruit'; // 평일 6시 ~ 15시 사이에는 당일배송으로 기본 시작
                 }
             }
             
@@ -4102,8 +4102,9 @@
                 if (res.ok) {
                     const data = await res.json();
                     if (data) {
-                        // 객체 형태를 배열로 변환하고 최신순 정렬
-                        const allOrders = Object.values(data).sort((a, b) => {
+                        // 객체 형태를 배열로 변환(실제 Firebase 키 __fbKey 보존)하고 최신순 정렬
+                        // [버그수정] 키를 보존해야 취소/수정 시 재계산 키 불일치(쉼표·따옴표 등)로 인한 유령 노드 문제를 막음
+                        const allOrders = Object.entries(data).map(([k, v]) => Object.assign({ __fbKey: k }, v)).sort((a, b) => {
                             return parseKRDate(b.timestamp) - parseKRDate(a.timestamp);
                         });
 
@@ -4847,7 +4848,9 @@
                 try {
                     const promises = targetOrders.map(async (order) => {
                         const rawItemName = String(order.item).replace(/\[취소\]/g, "").replace(/['"]/g, '').trim();
-                        const orderKey = fSafeKey(order.timestamp) + "_" + fSafeKey(rawItemName);
+                        // [버그수정] 저장된 실제 Firebase 키를 우선 사용 → 상품명 쉼표·따옴표 등으로 키를 재계산할 때
+                        // 실제 경로와 어긋나 유령 노드만 생기고 실제 주문은 취소 안 되던 문제 방지 (키 없으면 기존 방식 폴백)
+                        const orderKey = order.__fbKey || (fSafeKey(order.timestamp) + "_" + fSafeKey(rawItemName));
                         const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
                         const updatedItem = "[취소] " + rawItemName;
 
@@ -5370,7 +5373,9 @@
                                 if (isDateMKey === isDatePubMKey) return true;
                             }
                             const isReserve = pub.date && pub.date.trim() !== "" && (pub.date.includes("월") || pub.date.includes("일") || pub.date.includes("-"));
-                            if (!isReserve) return true;
+                            // [수정] 같은 이름이라도 탭(분류)이 다르면 다른 상품 — 현재 항목이 날짜(예약)면 이름만으로 매칭하지 않음
+                            const curIsDate = /(\d{2,4})[.\/-](\d{1,2})[.\/-](\d{1,2})|(\d{1,2})[.\/-](\d{1,2})/.test(mKey);
+                            if (!isReserve && !curIsDate) return true;
                             return false;
                         });
 
@@ -5677,6 +5682,11 @@
 
                         if (!isAdminMode) {
                             if (isFruitVeg) {
+                                // [신규] 전날(오늘 이전) 날짜의 과일/야채 상품은 모두 숨김
+                                if (pDate < today) {
+                                    return false;
+                                }
+
                                 // [수정] 주말 및 공휴일에는 미노출 처리
                                 const now = new Date();
                                 const currentDay = now.getDay();
@@ -5686,12 +5696,12 @@
                                     return false;
                                 }
 
-                                // 과일/야채 상품의 경우 해당 날짜 오전 8시 이전 또는 오후 3시(15시) 이후에는 미노출 처리
-                                const startDate = new Date(y, m - 1, d, 8, 0, 0, 0);
+                                // 과일/야채 상품의 경우 해당 날짜 오전 6시 이전 또는 오후 3시(15시) 이후에는 미노출 처리
+                                const startDate = new Date(y, m - 1, d, 6, 0, 0, 0);
                                 const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                 const nowTime = new Date();
                                 if (nowTime < startDate || nowTime >= cutoffDate) {
-                                    return false; // 8시 이전 또는 15시 이후이므로 제외
+                                    return false; // 6시 이전 또는 15시 이후이므로 제외
                                 }
                             } else {
                                 // 공동구매 카테고리 상품의 경우 해당 날짜 오후 3시(15시) 이후에는 미노출 처리
@@ -6169,6 +6179,11 @@
                             if (isFruitVeg) {
                                 // [신규] 예약배송 모드일 때는 과일 상품의 요일 및 시간 제약을 일체 배제 (24시간 무중단 노출 및 예약을 받기 위함)
                                 if (currentDeliveryType !== 'reserve') {
+                                    // [신규] 전날(오늘 이전) 날짜의 과일/야채 상품은 모두 숨김
+                                    if (pDate < today) {
+                                        return false;
+                                    }
+
                                     // [수정] 주말 및 공휴일에는 미노출 처리
                                     const now = new Date();
                                     const currentDay = now.getDay();
@@ -6178,12 +6193,12 @@
                                         return false;
                                     }
 
-                                    // 과일/야채 상품의 경우 해당 날짜 오전 8시 이전 또는 오후 3시(15시) 이후에는 미노출 처리
-                                    const startDate = new Date(y, m - 1, d, 8, 0, 0, 0);
+                                    // 과일/야채 상품의 경우 해당 날짜 오전 6시 이전 또는 오후 3시(15시) 이후에는 미노출 처리
+                                    const startDate = new Date(y, m - 1, d, 6, 0, 0, 0);
                                     const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                     const nowTime = new Date();
                                     if (nowTime < startDate || nowTime >= cutoffDate) {
-                                        return false; // 8시 이전 또는 15시 이후이므로 제외
+                                        return false; // 6시 이전 또는 15시 이후이므로 제외
                                     }
                                 }
                             } else {
@@ -7514,8 +7529,9 @@
                             finalDate = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
                         }
 
-                        // [합배송 처리] 공동구매 입고일이 있는 경우, 다른 모든 일반 상품(또는 날짜가 더 이른 공동구매 상품)의 배송/픽업일을 가장 늦은 공동구매일로 맞춤
-                        if (unifiedReserveDate) {
+                        // [합배송 처리] 공동구매 입고일이 있는 경우, 다른 모든 일반 상품의 배송일을 가장 늦은 공동구매일로 맞춤
+                        // [수정] 픽업주문은 합배송(날짜 통합) 제외 → 각 상품이 자기 날짜로 따로 처리됨. 배달주문에만 적용.
+                        if (unifiedReserveDate && shippingMethod === '배달주문') {
                             const isSadaItem = itemName.includes('사다드림') || mKey === '사다드림';
                             if ((unifiedReserveDate > todayStr || !isTodayOffOrAfterCutoff) && !isSadaItem) {
                                 finalDate = unifiedReserveDate;
@@ -8074,23 +8090,7 @@
                         }
                     });
 
-                    if (reserveDates.length > 0) {
-                        reserveDates.sort();
-                        minReserveDate = reserveDates[0];
-
-                        // 상시판매나 과일(공동구매가 아닌 상품)은 공동구매 상품 중 가장 빠른 날짜로 기록되도록 설정
-                        allItems.forEach(it => {
-                            const d = String(it.date || "");
-                            const m = String(it.matchKey || "");
-                            const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
-                                               /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
-                            const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
-                            if (!isDateItem && it.name !== "배달비" && !isSadaItem) {
-                                it.date = minReserveDate;
-                                it.isCategorized = false;
-                            }
-                        });
-                    }
+                    // [수정] 픽업주문은 상시판매·과일도 각자 자기 날짜로 완전 분리 → 공동구매 최소일로 묶지 않음 (각 상품 date 그대로 유지)
                 }
             }
 
