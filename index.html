@@ -3642,11 +3642,15 @@
         // 담을 때 박제한 배송 모드(cartDeliveryType)에 맞는 항목을 선택한다.
         // - 예약(reserve): matchKey/date가 실제 날짜인 항목 우선
         // - 당일(today): 날짜가 아닌(카테고리) 항목 우선
-        function gFindCartProduct(itemName) {
+        // [버그수정] 인자로 들어오는 건 장바구니 키(상품명 + 옵션서명)라서 그대로 상품명과 비교하면
+        //  옵션을 고른 상품은 하나도 못 찾는다. 주문 저장 때 그 상품이 통째로 빠지던 원인.
+        //  상품은 이름으로 찾고, 배송 모드는 키 그대로 조회한다.
+        function gFindCartProduct(cartKey) {
+            const itemName = gCartName(cartKey);
             const matches = productsData.filter(p => p.name === itemName);
             if (matches.length <= 1) return matches[0] || null;
-            const mode = (typeof cartDeliveryType !== 'undefined' && cartDeliveryType[itemName])
-                ? cartDeliveryType[itemName] : currentDeliveryType;
+            const mode = (typeof cartDeliveryType !== 'undefined' && cartDeliveryType[cartKey])
+                ? cartDeliveryType[cartKey] : currentDeliveryType;
             const isDateMk = (p) => {
                 const s = String(p.matchKey || "").trim();
                 const d = String(p.date || "").trim();
@@ -5063,6 +5067,7 @@
                                     <div style="flex:1;">
                                         <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.3; margin-bottom:4px;">
                                             <span>${order.item}</span>
+                                            ${gOptionLinesHtml(order.optionText)}
                                         </div>
                                         <div style="display:flex; align-items:center; gap:8px;">
                                             <div style="font-size:13px; font-weight:700; color:#455464;">${order.qty}개</div>
@@ -7625,6 +7630,44 @@
             return base + opt;
         }
 
+        // [신규] 사다드림 대행료는 개당 붙는다. 같은 상품을 2개 사면 대행료도 2번.
+        //  대행하러 가는 수고가 개수만큼 드는 값이므로, 구간도 상품 1개 금액으로 정한다.
+        function gCartAgencyFeeUnit(p, name) {
+            if (!p) return 0;
+            return gCalcAgencyFee(p, gCartUnitPrice(p, name));
+        }
+
+        // 장바구니 한 줄에 붙는 대행료 합계 = 개당 대행료 × 수량
+        function gCartAgencyFee(p, name) {
+            const q = parseInt(cart[name]) || 0;
+            if (!p || q <= 0) return 0;
+            return gCartAgencyFeeUnit(p, name) * q;
+        }
+
+        // [신규] 주문에 기록·표시할 단가 = 상품가 + 옵션 + 개당 대행료.
+        //  개당으로 붙이면 단가 × 수량 = 총액이 언제나 딱 맞아떨어져 반올림이 필요 없다.
+        function gCartPaidUnitPrice(p, name) {
+            return gCartUnitPrice(p, name) + gCartAgencyFeeUnit(p, name);
+        }
+
+        // [신규] 장바구니 한 줄의 최종 금액
+        function gCartLineTotal(p, name) {
+            const q = parseInt(cart[name]) || 0;
+            if (!p || q <= 0) return 0;
+            return gCartPaidUnitPrice(p, name) * q;
+        }
+
+        // [신규] 고른 옵션을 상품명 아래에 한 줄에 하나씩 보여준다.
+        //  저장은 '초코, 우유 1개'처럼 한 줄로 하지만, 화면에서는 쉼표로 나눠 각각 표시한다.
+        function gOptionLinesHtml(optionText, fontSize) {
+            const items = String(optionText || '').split(',').map(s => s.trim()).filter(Boolean);
+            if (items.length === 0) return '';
+            const fs = fontSize || 12;
+            return items.map(t =>
+                `<span style="display:block; font-size:${fs}px; font-weight:700; color:#c2610a; margin-top:2px; line-height:1.35; word-break:keep-all;">└ ${t}</span>`
+            ).join('');
+        }
+
         // [신규] 선택한 옵션을 한 줄 글로 (주문 기록·화면 표시용)
         function gCartOptionText(name) {
             const o = cartOptions[name];
@@ -7756,13 +7799,16 @@
                 }
             });
 
-            // [수정] 최저·최대 금액은 옵션 합계가 아니라 '총 주문금액'(기본가 + 옵션) × 수량 기준
+            // [수정] 최저·최대 금액은 실제로 내는 금액 기준으로 본다.
+            //  기본가 + 옵션 + 개당 대행료를 수량만큼 곱한 값(payTotal)이 판단 기준이다.
+            const feeUnit = gCalcAgencyFee(p, unit);
             const orderTotal = unit * st.count;
+            const payTotal = (unit + feeUnit) * st.count;
             if (gBool(p.useAmountLimit)) {
                 const min = parseInt(p.minAmount) || 0;
                 const max = parseInt(p.maxAmount) || 0;
-                if (min > 0 && orderTotal < min) errors.push(`주문금액을 ${min.toLocaleString()}원 이상 맞춰주세요. (현재 ${orderTotal.toLocaleString()}원)`);
-                if (max > 0 && orderTotal > max) errors.push(`주문금액은 ${max.toLocaleString()}원까지 가능합니다. (현재 ${orderTotal.toLocaleString()}원)`);
+                if (min > 0 && payTotal < min) errors.push(`주문금액을 ${min.toLocaleString()}원 이상 맞춰주세요. (현재 ${payTotal.toLocaleString()}원)`);
+                if (max > 0 && payTotal > max) errors.push(`주문금액은 ${max.toLocaleString()}원까지 가능합니다. (현재 ${payTotal.toLocaleString()}원)`);
             }
 
             if (gBool(p.usePersonLimit)) {
@@ -7772,7 +7818,8 @@
                 }
             }
 
-            return { p, groups, picked, optionTotal, base, unit, orderTotal, already, errors, fee: gCalcAgencyFee(p, orderTotal) };
+            // 대행료는 개당 붙는다. 구간은 상품 1개 금액(unit)으로 정하고 수량만큼 곱한다.
+            return { p, groups, picked, optionTotal, base, unit, orderTotal, payTotal, already, errors, feeUnit, fee: feeUnit * st.count };
         }
 
         function renderOptionModal() {
@@ -7822,34 +7869,41 @@
                 html += `</div>`;
             });
 
+            // [수정] 금액 제한 안내는 옵션 목록이 아니라 합계 바로 위(하단)에 둔다.
+            //  기준 금액도 대행료를 포함한 실제 결제 금액(payTotal)으로 보여준다.
+            let amountLimitHtml = ``;
             if (gBool(s.p.useAmountLimit)) {
                 const min = parseInt(s.p.minAmount) || 0;
                 const max = parseInt(s.p.maxAmount) || 0;
                 const parts = [];
                 if (min > 0) parts.push(`${min.toLocaleString()}원 이상`);
                 if (max > 0) parts.push(`${max.toLocaleString()}원 이하`);
-                html += `<div style="font-size:12px; font-weight:700; color:#c2610a; background:#fff4e9; border:1px solid #ffd9b3; border-radius:10px; padding:9px 12px;">이 상품은 주문금액을 ${parts.join(' ~ ')}로 맞춰주세요.<br><span style="font-weight:600; color:#a8794a;">현재 ${s.orderTotal.toLocaleString()}원 (수량 ${st.count}개 포함)</span></div>`;
+                // 현재 금액은 바로 아래 '합계'와 같은 숫자라 따로 적지 않는다
+                amountLimitHtml = `<div style="font-size:12px; font-weight:700; color:#c2610a; background:#fff4e9; border:1px solid #ffd9b3; border-radius:10px; padding:9px 12px; margin-bottom:10px; line-height:1.5; text-align:left;">이 상품은 주문금액을 ${parts.join(' ~ ')}로 맞춰주세요.</div>`;
             }
 
             body.innerHTML = html || `<div style="text-align:center; color:#999; font-weight:700; padding:20px 0;">선택할 옵션이 없습니다.</div>`;
 
             // 하단: 수량 + 금액 + 담기
             const canAdd = s.errors.length === 0;
+            // [수정] 금액은 '상품 1개 기준'으로 먼저 보여주고, 수량은 합계 바로 위에 둔다.
+            //  대행료도 개당 금액(4,000원)만 적어, 아래 합계가 (1개 금액 × 수량)으로 자연스럽게 읽히게 한다.
             foot.innerHTML =
-                `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">` +
+                (s.optionTotal ? `<div style="display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:#777; margin-bottom:6px;"><span>옵션 합계</span><span>${s.optionTotal.toLocaleString()}원</span></div>` : ``) +
+                (s.feeUnit ? `<div style="display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:#0284c7; margin-bottom:6px;"><span>사다드림 대행료</span><span>${s.feeUnit.toLocaleString()}원</span></div>` : ``) +
+                (s.feeUnit ? gAgencyFeeTable(s.p) : ``) +
+                `<div style="display:flex; align-items:center; justify-content:space-between; margin:10px 0; padding-top:10px; border-top:1px solid #eef1f4;">` +
                 `<span style="font-size:13px; font-weight:800; color:#777;">수량</span>` +
                 `<div style="display:flex; align-items:center; gap:8px;">` +
                 `<button onclick="changeOptionCount(-1)" style="width:30px; height:30px; border:1.5px solid #e2e8f0; background:#fff; border-radius:8px; font-size:16px; font-weight:800; cursor:pointer;">-</button>` +
                 `<span style="min-width:28px; text-align:center; font-size:15px; font-weight:900;">${st.count}</span>` +
                 `<button onclick="changeOptionCount(1)" style="width:30px; height:30px; border:1.5px solid #e2e8f0; background:#fff; border-radius:8px; font-size:16px; font-weight:800; cursor:pointer;">+</button>` +
                 `</div></div>` +
-                (s.optionTotal ? `<div style="display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:#777; margin-bottom:6px;"><span>옵션 합계</span><span>${s.optionTotal.toLocaleString()}원</span></div>` : ``) +
-                (s.fee ? `<div style="display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:#0284c7; margin-bottom:6px;"><span>사다드림 대행료</span><span>${s.fee.toLocaleString()}원</span></div>` : ``) +
-                (s.fee ? gAgencyFeeTable(s.p) : ``) +
-                `<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px;">` +
+                `<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;">` +
                 `<span style="font-size:14px; font-weight:900;">합계</span>` +
-                `<span style="font-size:20px; font-weight:900; color:var(--nego-orange);">${(s.orderTotal + s.fee).toLocaleString()}원</span>` +
+                `<span style="font-size:20px; font-weight:900; color:var(--nego-orange);">${s.payTotal.toLocaleString()}원</span>` +
                 `</div>` +
+                amountLimitHtml +
                 (s.errors.length ? `<div style="font-size:12.5px; font-weight:700; color:#ff4d4d; background:#fff5f5; border:1px solid #ffd6d6; border-radius:10px; padding:9px 12px; margin-bottom:12px; line-height:1.6; text-align:left;">${s.errors.map(e => '· ' + e).join('<br>')}</div>` : ``) +
                 `<div style="display:flex; gap:10px;">` +
                 `<button onclick="closeOptionModal()" style="flex:1; height:48px; border:1.5px solid #e2e8f0; background:#fff; color:#555; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer;">취소</button>` +
@@ -7926,13 +7980,40 @@
                 `<summary style="cursor:pointer; list-style:none; font-size:12px; font-weight:800; color:#0284c7; display:flex; align-items:center;">` +
                 `<span>대행료 계산 방식</span><span style="margin-left:auto; font-size:11px; opacity:0.75;">보기</span>` +
                 `</summary>` +
-                `<div style="margin-top:7px; padding-top:7px; border-top:1px dashed #cfe6f5; font-size:12px; font-weight:700;">${rows}</div>` +
+                `<div style="margin-top:7px; padding-top:7px; border-top:1px dashed #cfe6f5; font-size:12px; font-weight:700;">` +
+                rows +
+                `</div>` +
                 `</details>`;
         }
 
-        // 최종금액에 맞는 사다드림 대행료 (기준금액이 가장 큰 줄 적용)
+        // [신규] 주문관리에서 정한 대행료 규칙 읽기.
+        //  규칙: 기준금액 미만은 기본료, 그 이상은 단위마다 추가액이 붙는다.
+        function gAgencyRule(p) {
+            const r = p && p.agencyFeeRule;
+            if (r && (parseInt(r.baseFee) || parseInt(r.stepFee))) {
+                return {
+                    threshold: Math.max(0, parseInt(r.threshold) || 0),
+                    baseFee: Math.max(0, parseInt(r.baseFee) || 0),
+                    step: Math.max(1, parseInt(r.step) || 5000),
+                    stepFee: Math.max(0, parseInt(r.stepFee) || 0)
+                };
+            }
+            return null;
+        }
+
+        // 주문금액에 맞는 사다드림 대행료.
+        //  규칙이 있으면 규칙으로 계산한다. 구간표와 달리 위쪽 금액에서 끊기지 않는다.
+        //  규칙이 없는 예전 상품은 기존처럼 기준금액이 가장 큰 줄을 적용한다.
         function gCalcAgencyFee(p, amount) {
             if (!p || !gBool(p.useOptions, true) || !gBool(p.useAgencyFee)) return 0;
+
+            const rule = gAgencyRule(p);
+            if (rule) {
+                const amt = parseInt(amount) || 0;
+                if (amt < rule.threshold) return rule.baseFee;
+                return rule.baseFee + rule.stepFee * (Math.floor((amt - rule.threshold) / rule.step) + 1);
+            }
+
             const tiers = Array.isArray(p.agencyFeeTiers) ? p.agencyFeeTiers : [];
             let fee = 0, best = -1;
             tiers.forEach(t => {
@@ -8011,7 +8092,7 @@
                 const product = productsData.find(p => p.name === gCartName(name));
                 if (product) {
                     tQ += q;
-                    tP += (q * gCartUnitPrice(product, name)); // [수정] 선택한 옵션 금액 포함
+                    tP += gCartLineTotal(product, name); // [수정] 선택한 옵션 금액 + 사다드림 대행료 포함
                 }
             }
 
@@ -8053,8 +8134,10 @@
                 if (cart[name] > 0) {
                     hasItems = true;
                     const p = productsData.find(pd => pd.name === gCartName(name));
-                    const price = gCartUnitPrice(p, name); // [수정] 선택한 옵션 금액 포함
-                    const subTotal = price * cart[name];
+                    // [수정] 화면 단가도 주문에 저장되는 값과 같게 대행료를 포함한 금액으로 보여준다
+                    //  (대행료 금액 자체는 따로 표시하지 않는다)
+                    const price = gCartPaidUnitPrice(p, name);
+                    const subTotal = gCartLineTotal(p, name);
                     totalSum += subTotal;
 
                     cartType = cartDeliveryType[name] || 'today';
@@ -8068,7 +8151,7 @@
                     itemDiv.style = "padding:12px 0; border-bottom:1px solid #f2f2f2;";
                     itemDiv.innerHTML = `
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                            <span style="flex:1; font-weight:800; color:var(--item-black); font-size:14.5px; word-break:keep-all; line-height:1.3;">${gCartName(name)}${optText ? `<span style="display:block; font-size:12px; font-weight:700; color:#c2610a; margin-top:3px;">└ ${optText}</span>` : ''}</span>
+                            <span style="flex:1; font-weight:800; color:var(--item-black); font-size:14.5px; word-break:keep-all; line-height:1.3;">${gCartName(name)}${gOptionLinesHtml(optText)}</span>
                             <button onclick="removeFromCart('${safeName}')" style="flex:0 0 auto; background:none; border:none; color:#bbb; font-size:20px; cursor:pointer; padding:0 4px; font-weight:bold; line-height:1;" onmouseover="this.style.color='#ff4d4d'" onmouseout="this.style.color='#bbb'">&times;</button>
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:8px;">
@@ -8361,12 +8444,15 @@
                 const product = productsData.find(p => p.name === gCartName(itemName));
                 if (product && q > 0) {
                     const mKey = product.matchKey || "";
-                    let currentPrice = parseInt(product.price || 0);
+                    // [버그수정] 기본가만 쓰면 선택한 상세옵션 금액이 빠져서 확인창 합계가
+                    //  실제 주문 금액과 달라진다. 다른 화면과 같이 옵션 금액을 포함한 단가를 쓴다.
+                    let currentPrice = gCartPaidUnitPrice(product, itemName);
+                    const lineTotal = gCartLineTotal(product, itemName);
 
                     const date = product.displayDate;
                     if (!grouped[date]) grouped[date] = [];
-                    grouped[date].push({ ...product, qty: q, price: currentPrice });
-                    totalSum += q * currentPrice;
+                    grouped[date].push({ ...product, qty: q, price: currentPrice, optionText: gCartOptionText(itemName), lineTotal: lineTotal });
+                    totalSum += lineTotal;
                     totalQty += q;
                 }
             }
@@ -8424,10 +8510,11 @@
                 `;
 
                 grouped[date].forEach((p, idx) => {
-                    const sub = p.qty * parseInt(p.price || 0);
+                    // 대행료가 나눠떨어지지 않는 수량에서도 실제 청구액과 같도록 줄 합계를 그대로 쓴다
+                    const sub = (p.lineTotal !== undefined) ? p.lineTotal : p.qty * parseInt(p.price || 0);
                     groupHtml += `
                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px; padding: 8px 0; ${idx !== grouped[date].length - 1 ? 'border-bottom: 1px dashed #eee;' : ''}">
-                            <span style="color:var(--item-black); font-weight:800; flex:1; padding-right:10px; word-break:keep-all; line-height:1.2; white-space: pre-wrap;">${p.name.replace(/^(\[.*?\](?:\s*\[.*?\])*)/, '<span style="color:var(--nego-orange); font-size: 0.9em;">$1</span><br>')}</span>
+                            <span style="color:var(--item-black); font-weight:800; flex:1; padding-right:10px; word-break:keep-all; line-height:1.2; white-space: pre-wrap;">${p.name.replace(/^(\[.*?\](?:\s*\[.*?\])*)/, '<span style="color:var(--nego-orange); font-size: 0.9em;">$1</span><br>')}${gOptionLinesHtml(p.optionText)}</span>
                             <div style="display:flex; align-items:center; min-width:90px; justify-content:flex-end; flex-shrink:0;">
                                 <span style="color:#455464; font-size:15px; font-weight:700; text-align:right;">${p.qty}개</span>
                                 <span style="color:#ccc; font-size:0.75rem; margin:0 4px;">/</span>
@@ -8872,10 +8959,13 @@
 
                         const isCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(finalDate);
                         // [수정] 선택한 상세옵션 금액을 상품 금액에 합산하고, 고른 내용은 별도 항목(optionText)으로 기록
-                        let currentPrice = gCartUnitPrice(pData, cartKey);
                         const optionText = gCartOptionText(cartKey);
+                        // [수정] 사다드림 대행료를 상품 금액에 합쳐 청구한다. 대행료는 개당 붙으므로
+                        //  단가에 그대로 더하면 단가 × 수량 = 총액이 딱 맞는다.
+                        const agencyFee = gCartAgencyFee(pData, cartKey);
+                        const currentPrice = gCartPaidUnitPrice(pData, cartKey);
 
-                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: q * currentPrice, date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText });
+                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee });
                     }
                 }
 
@@ -9269,7 +9359,7 @@
                                                     ${it.isExtra ? '<span style="color:#999; font-size:10px; margin-right:4px; font-weight:900;">[이전 주문]</span>' : ''}
                                                     ${it.name}
                                                 </span>
-                                                ${it.optionText ? `<span style="display:block; font-size:11.5px; font-weight:600; color:#c2610a; margin-top:2px; white-space:normal; word-break:keep-all;">└ ${it.optionText}</span>` : ''}
+                                                ${gOptionLinesHtml(it.optionText, 11.5)}
                                             </span>
                                             <span style="font-weight:800; color:#666; margin-right:10px; flex-shrink:0;">${it.qty}개</span>
                                             <span style="font-weight:800; color:${it.isExtra ? '#bbb' : 'var(--nego-orange)'}; flex-shrink:0;">${(it.price * it.qty).toLocaleString()}원</span>
@@ -9624,13 +9714,17 @@
                         item: it.name,
                         qty: it.qty,
                         price: it.price,
-                        total: it.price * it.qty,
+                        // [버그수정] price × qty로 다시 계산하면 줄당 한 번 붙는 사다드림 대행료가 빠진다.
+                        //  화면에 보여준 금액과 같도록 계산해 둔 subtotal을 그대로 저장한다.
+                        total: (it.subtotal !== undefined ? it.subtotal : it.price * it.qty),
                         pickupDate: jsFormatPickup(getDisplayDate(it)),
                         cashReceipt: cashReceipt,
                         cashReceiptType: (cashReceipt === '발행') ? cashReceiptType : "",
                         cashReceiptPhone: (cashReceipt === '발행') ? receiptPhone : "",
                         // [신규] 손님이 고른 상세옵션 (상품명은 그대로 두고 별도 항목으로 저장)
-                        optionText: it.optionText || ""
+                        optionText: it.optionText || "",
+                        // [신규] 상품 금액에 합쳐 청구한 사다드림 대행료 (정산 확인용)
+                        agencyFee: it.agencyFee || 0
                     };
                     if (it.isExtra) {
                         if (it.paid !== undefined) itemPayload.paid = it.paid;
