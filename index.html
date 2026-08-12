@@ -1546,6 +1546,7 @@
             <li onclick="openSideModal('profile-modal')">주문자 변경</li>
             <li onclick="openSideModal('location-modal')">매장위치</li>
             <li onclick="openSideModal('bank-modal')">계좌번호</li>
+            <li onclick="showCombinedDeliveryGuide()">합배송 안내</li>
             <li onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기</li>
 
         </ul>
@@ -1662,7 +1663,7 @@
                 상품목록 전체 비공개 (숨김)</button>
         </div>
     </div>
-    <div id="save-confirm-modal" class="modal-overlay">
+    <div id="save-confirm-modal" class="modal-overlay"
         <div class="modal-content" style="text-align: center; width: 80%; max-width: 300px; padding: 30px 20px;">
             <h3 style="margin: 0; font-weight: 900; font-size: 1.3rem;">저장되었습니다</h3>
         </div>
@@ -1868,9 +1869,15 @@
         </div>
     </div>
     <div class="footer" id="main-footer">
+        <!-- [수정] 무료배달 안내 옆에 합배송 안내를 여는 작은 칩을 둔다.
+             푸터는 자리가 좁으므로 줄을 늘리지 않고 같은 줄에 붙인다. -->
         <div id="free-delivery-notice"
-            style="display:none; justify-content:center; align-items:center; padding-bottom:8px; font-weight:900; font-size:17px; color:var(--nego-orange);">
-            15,000원 이상 주문시 무료배달
+            style="display:none; justify-content:center; align-items:center; gap:7px; padding-bottom:8px; font-weight:900; color:var(--nego-orange);">
+            <!-- 좁은 화면(320px)에서 칩과 함께 한 줄에 들어가도록 글자 크기를 폭에 맞춰 줄인다 -->
+            <span style="font-size:clamp(13px, 4.2vw, 16px); white-space:nowrap;">15,000원 이상 주문시 무료배달</span>
+            <!-- 누를 수 있다는 게 보이도록, 아래 '총 N개' 알약과 같은 형태(주황 채움 + 그림자)로 맞춘다 -->
+            <button type="button" onclick="showCombinedDeliveryGuide()"
+                style="flex:0 0 auto; background:var(--nego-orange); border:none; color:#fff; font-size:11.5px; font-weight:900; padding:4px 9px 4px 8px; border-radius:20px; cursor:pointer; line-height:1.4; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2.5px 6px rgba(255,77,0,0.28);">🛵 합배송 안내 <span style="font-weight:700; opacity:0.85;">›</span></button>
         </div>
         <div
             style="display:flex; justify-content:center; align-items:center; padding-bottom:12px; font-weight:800; font-size: 20px;">
@@ -2255,10 +2262,17 @@
                 html = `<div style="font-size: 18px; font-weight: 900; color: #ff4d4d; margin-bottom: 6px;">코스트코 구매대행 상품입니다.</div>` +
                     `<div style="font-size: 14px; font-weight: 600; color: #666; letter-spacing: -0.5px;">가격에 수수료가 포함되어있으며 품절시 제공되지 못할 수 있습니다.</div>`;
             } else if ((!searchQ && key === '사다드림') || (currentDeliveryType === 'today' && hasSadaInList)) {
-                html = `<div style="display:inline-flex; align-items:center; gap:6px; background:#fff4e9; border:1px solid #ffd9b3; color:#c2610a; font-size:14px; font-weight:700; line-height:1.5; padding:8px 14px; border-radius:20px; word-break:keep-all;">` +
-                    `<span style="flex:0 0 auto;">🛵</span>` +
-                    `<span>사다드림 상품은 무료배달 기준 금액(15,000원)에 포함되지 않아요.</span>` +
-                    `</div>`;
+                // [수정] 입금 안내창에서 뺀 사다드림 안내(당일 입금·카드 불가)를 여기로 옮겼다.
+                //  상품을 고르는 시점에 알아야 하는 내용이라 목록 위가 더 맞는 자리.
+                html = `<div style="background:#fff4e9; border:1px solid #ffd9b3; border-radius:14px; padding:11px 14px; text-align:left; word-break:keep-all;">` +
+                    `<div style="display:flex; align-items:center; gap:6px; font-size:14px; font-weight:900; color:#c2610a; margin-bottom:6px;"><span style="flex:0 0 auto;">🛵</span><span>사다드림 안내</span></div>` +
+                    `<div style="display:flex; flex-direction:column; gap:4px; font-size:13px; font-weight:700; color:#8a6a45; line-height:1.55;">` +
+                    `<div>· 무료배달 기준 금액(15,000원)에 <b style="color:#c2610a;">포함되지 않아요.</b></div>` +
+                    `<div>· <b style="color:#c2610a;">당일 입금</b>이 확인되어야 주문이 확정됩니다.</div>` +
+                    `<div>· 사다드림은 <b style="color:#c2610a;">카드 결제가 불가</b>합니다.</div>` +
+                    // [수정] 대행료 안내는 여기 두지 않는다. 대행료는 상세옵션에서 주문금액에 따라
+                    //  계산되므로, 실제로 금액이 매겨지는 장바구니 담기(옵션 선택창)에서 설명한다.
+                    `</div></div>`;
             }
 
             el.innerHTML = html;
@@ -2930,7 +2944,7 @@
 
             for (const name in cart) {
                 if (cart[name] > 0) {
-                    const p = productsData.find(pd => pd.name === name);
+                    const p = productsData.find(pd => pd.name === gCartName(name));
                     if (p) {
                         const isSada = name.includes("사다드림") || p.matchKey === "사다드림";
                         const price = gCartUnitPrice(p, name) * cart[name]; // [수정] 선택한 옵션 금액 포함
@@ -3053,6 +3067,12 @@
 
             const feeAmount = (v) => `<b style="color:var(--nego-orange);">${v.toLocaleString()}원</b>`;
 
+            // [신규] 무료배달까지 얼마나 남았는지 알려준다. 배달비를 내는 바로 그 순간이라
+            //  '조금만 더 담으면 무료'라는 정보가 가장 쓸모 있는 자리.
+            const feeNudge = (shortfall) => shortfall > 0
+                ? `<div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:9px 12px; margin-top:10px; font-size:13px; font-weight:700; color:#2e7d32; line-height:1.6; word-break:keep-all; text-align:center;">💡 같은 날짜 상품을 ${`<b>${shortfall.toLocaleString()}원</b>`}만 더 담으면 배달비가 무료예요.</div>`
+                : ``;
+
             if (needSadaFeePrompt && needReserveFeePrompt) {
                 showSystemModal(
                     feeModal(
@@ -3102,7 +3122,9 @@
                         `배달 최소주문금액 미달`,
                         feeRow('주문금액', reserveTotal) + feeRow('최소주문금액', 15000),
                         cartHasSada ? feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.') : ``,
-                        `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>`
+                        `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>` +
+                        feeNudge(15000 - reserveTotal) +
+                        gCombinedDeliveryFold('여러 번 나눠 주문해도 괜찮나요?')
                     ),
                     'confirm',
                     async () => {
@@ -3126,7 +3148,7 @@
 
             for (const name in cart) {
                 if (cart[name] > 0) {
-                    const p = productsData.find(pd => pd.name === name);
+                    const p = productsData.find(pd => pd.name === gCartName(name));
                     if (p) {
                         const mk = String(p.matchKey || "").trim();
                         const isDate = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
@@ -3176,7 +3198,7 @@
             let maxDateTime = 0;
             for (const name in cart) {
                 if (cart[name] > 0) {
-                    const p = productsData.find(pd => pd.name === name);
+                    const p = productsData.find(pd => pd.name === gCartName(name));
                     if (p) {
                         // [수정] 사다드림보다 늦은 상품은 담기지 않으므로, 사다드림 날짜가 곧 합배송 배달일이 된다.
                         //  따라서 사다드림도 배달예정일 계산에 포함한다.
@@ -3350,7 +3372,7 @@
 
             for (const name in cart) {
                 if (cart[name] > 0) {
-                    const p = productsData.find(pd => pd.name === name);
+                    const p = productsData.find(pd => pd.name === gCartName(name));
                     if (p) {
                         const mk = String(p.matchKey || "").trim();
                         const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mk);
@@ -3595,6 +3617,20 @@
             return String(s || "").replace(/[\.\-\$#\[\]\/%?]/g, "_").trim();
         }
 
+        // [버그수정] 주문 타임스탬프 포맷터. 원래 submitOrder 안에만 지역(const)으로 있어서,
+        // 취소 후 배달비 재부과(checkAndApplyDeliveryFeeAfterCustomerCancellation)에서 부를 때
+        // ReferenceError가 나고 catch가 그걸 삼켜서 배달비가 한 번도 안 붙던 문제가 있었음.
+        function gFormatOrderTimestamp(d) {
+            const y = d.getFullYear();
+            const m = d.getMonth() + 1;
+            const day = d.getDate();
+            const w = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+            const h = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            const s = String(d.getSeconds()).padStart(2, '0');
+            return `${y}년 ${m}월 ${day}일 (${w}) ${h}:${min}:${s}`;
+        }
+
         // [수정] 사이클(날짜) 갱신 로직 제거: 수동 동기화 전까지 재고 누적 유지
         function fGetAdjKey(mKey, name) {
             const s = String(mKey || "").trim();
@@ -3791,6 +3827,73 @@
             document.body.style.overflow = isAnyOpen ? 'hidden' : '';
         }
 
+        // ===== [신규] 합배송 안내 =====
+        // 같은 날짜 상품을 한 번에 배달하고, 합계가 무료배달 기준을 넘으면 이미 낸 배달비까지
+        // 빼주는 기능이 코드에는 있는데 어디에도 설명이 없었다. 설명 본문을 여기 한 곳에 두고
+        // 메뉴(전체 안내)와 각 안내창(접이식)에서 같이 쓴다.
+        function gCombinedDeliveryGuideBody() {
+            const line = (label, value, opt = {}) =>
+                `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; ${opt.mt ? 'margin-top:5px;' : ''}">` +
+                `<span style="font-size:13px; font-weight:700; color:${opt.color || '#8a97a3'};">${label}</span>` +
+                `<span style="font-size:${opt.strong ? '15px' : '13.5px'}; font-weight:${opt.strong ? '900' : '800'}; color:${opt.color || 'var(--item-black)'}; font-variant-numeric:tabular-nums; white-space:nowrap;">${value}</span>` +
+                `</div>`;
+
+            return `<div style="white-space:normal; text-align:left; word-break:keep-all; line-height:1.65;">` +
+                `<div style="font-size:14px; font-weight:700; color:var(--item-black);">받는 날짜가 같으면 <b style="color:var(--nego-orange);">여러 번 나눠 주문하셔도 한 번에 배달</b>됩니다.</div>` +
+
+                `<div style="background:#f8f9fa; border:1px solid #eef1f4; border-radius:10px; padding:11px 12px; margin-top:10px;">` +
+                `<div style="font-size:11.5px; font-weight:900; color:#8a97a3; letter-spacing:0.03em; margin-bottom:8px;">예시 · 8월 20일에 받는 주문</div>` +
+                line('1차 주문', '9,000원') +
+                line('└ 배달비', '+3,000원', { mt: true, color: '#d32f2f' }) +
+                line('2차 주문', '8,000원', { mt: true }) +
+                `<div style="border-top:1px dashed #dde3e8; margin-top:9px; padding-top:9px;">` +
+                line('상품 합계', '17,000원', { strong: true, color: 'var(--nego-orange)' }) +
+                `</div></div>` +
+
+                `<div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:11px 12px; margin-top:8px; font-size:13px; font-weight:700; color:#2e7d32; display:flex; flex-direction:column; gap:5px;">` +
+                `<div>✅ 15,000원을 넘어 <b>1차에 내신 배달비 3,000원을 빼드려요.</b></div>` +
+                `<div>✅ 상품은 8월 20일에 <b>한 번에</b> 배달돼요.</div>` +
+                `</div>` +
+
+                // [신규] 과일은 당일에만 살 수 있어서, 받는 날 오후 3시 전에 얹으면
+                //  같은 배달로 나가고 무료배달 기준도 채우기 쉽다. 주력 상품이라 눈에 띄게 둔다.
+                `<div style="background:#fff9f2; border:1px solid #ffe8cc; border-radius:10px; padding:11px 12px; margin-top:8px;">` +
+                `<div style="font-size:13px; font-weight:900; color:#c2610a; margin-bottom:4px;">🍎 받는 날 당일에도 과일을 더할 수 있어요</div>` +
+                // [수정] 당일구매와 예약구매는 한 장바구니에 담을 수 없으므로 '따로 주문'이라고 짚어준다
+                `<div style="font-size:12.5px; font-weight:700; color:#8a7461;">과일은 <b style="color:var(--item-black);">받는 날 당일에만</b> 주문할 수 있어요. 그날 <b style="color:var(--nego-orange);">오후 3시</b> 전까지 따로 주문하시면 같은 배달에 함께 나갑니다.</div>` +
+                `</div>` +
+
+                `<div style="margin-top:10px; font-size:12.5px; font-weight:700; color:#8a7461; display:flex; flex-direction:column; gap:4px;">` +
+                `<div>· 받는 날짜가 다르면 각각 배달되고 배달비도 각각 붙어요.</div>` +
+                `<div>· 사다드림은 당일 드시는 상품이라 더 늦은 날짜 상품과 함께 배달되지 않아요.</div>` +
+                `</div>` +
+                `</div>`;
+        }
+
+        // 안내창 안에 접어 넣는 형태. 모달을 새로 띄우지 않으므로 확인/취소 흐름을 끊지 않는다.
+        function gCombinedDeliveryFold(label) {
+            return `<details style="white-space:normal; background:#fff; border:1px solid #ffd9b3; border-radius:10px; padding:9px 12px; margin-top:10px; text-align:left;">` +
+                `<summary style="cursor:pointer; list-style:none; font-size:13px; font-weight:800; color:#c2610a; display:flex; align-items:center; gap:6px;">` +
+                `<span style="flex:0 0 auto;">🛵</span><span>${label || '합배송이 뭔가요?'}</span>` +
+                `<span style="margin-left:auto; font-size:11px; font-weight:700; color:#d9a878;">자세히</span>` +
+                `</summary>` +
+                `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed #ffe8cc;">${gCombinedDeliveryGuideBody()}</div>` +
+                `</details>`;
+        }
+
+        function showCombinedDeliveryGuide() {
+            // 메뉴에서 부를 때만 메뉴를 닫는다. 푸터 등 다른 곳에서 부를 땐 건드리지 않는다.
+            const side = document.getElementById('side-menu');
+            if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
+            showSystemModal(
+                `<div style="white-space:normal;">` +
+                `<div style="text-align:center; font-size:18px; font-weight:900; color:var(--nego-orange); margin-bottom:14px;">🛵 합배송 안내</div>` +
+                gCombinedDeliveryGuideBody() +
+                `</div>`,
+                'alert'
+            );
+        }
+
         // [시스템 모달]
         function showSystemModal(msg, type, yesCallback, noCallback, isTight = false) {
             const modal = document.getElementById('system-modal');
@@ -3907,7 +4010,7 @@
                 el.innerHTML = box(
                     '🛵 사다드림 안내',
                     '사다드림은 <b style="color:var(--nego-orange);">당일 입금</b>이 확인되어야 주문이 확정됩니다.',
-                    ['입금자명을 닉네임과 같게 보내주세요', '당일 입금이 없으면 주문이 취소될 수 있습니다', '그 외 상품은 현장 결제도 가능합니다']
+                    ['입금자명을 닉네임과 같게 보내주세요', '사다드림은 <b style="color:var(--text-main, #222);">카드 결제가 불가</b>합니다', '당일 입금이 없으면 주문이 취소될 수 있습니다', '그 외 상품은 현장 결제도 가능합니다']
                 );
                 el.style.display = 'block';
             } else if (kind === 'delivery') {
@@ -4999,7 +5102,60 @@
             renderHistory();
         }
         // 고객이 주문 취소(부분 취소)한 경우 배달비 조건 체크 및 부과 처리 함수
+        // [신규] 상품이 전부 취소되어 홀로 남은 배달비 항목을 취소 처리한다.
+        // 취소 방식(PATCH 내용·재시도)은 deleteOrderCard와 동일하게 맞춤. 배달비는 재고 항목이
+        // 아니므로 재고 복구는 하지 않는다.
+        async function cancelLeftoverDeliveryFees(cleanPhone, name, feeOrders) {
+            let canceledCount = 0;
+
+            for (const order of feeOrders) {
+                const rawItemName = String(order.item).replace(/\[취소\]/g, "").replace(/['"]/g, '').trim();
+                const orderKey = order.__fbKey || (fSafeKey(order.timestamp) + "_" + fSafeKey(rawItemName));
+                const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+
+                let ok = false;
+                for (let a = 1; a <= 5 && !ok; a++) {
+                    try {
+                        const r = await fetch(url, {
+                            method: 'PATCH',
+                            body: JSON.stringify({
+                                item: "[취소] " + rawItemName,
+                                received: "취소완료",
+                                canceled: true
+                            })
+                        });
+                        if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+                        ok = true;
+                    } catch (e) {
+                        console.warn(`잔여 배달비 취소 재시도 ${a}/5:`, e.message);
+                        await new Promise(res => setTimeout(res, 500 * a));
+                    }
+                }
+
+                if (!ok) {
+                    console.error("잔여 배달비 취소 최종 실패:", orderKey);
+                    continue;
+                }
+
+                order.item = "[취소] " + rawItemName;
+                order.received = "취소완료";
+                order.canceled = true;
+                canceledCount++;
+            }
+
+            if (canceledCount > 0) {
+                localStorage.setItem(`history_cache_${name}_${cleanPhone}`, JSON.stringify(fullHistoryData));
+                renderHistory();
+            }
+
+            return canceledCount;
+        }
+
+        // [수정] 자체 안내창을 띄우지 않고 처리 결과만 돌려준다.
+        // 취소 완료 안내와 배달비 안내가 따로 두 번 뜨던 것을 deleteOrderCard의 통합 안내 하나로 합치기 위함.
         async function checkAndApplyDeliveryFeeAfterCustomerCancellation(cleanPhone, name) {
+            const feeResult = { addedFeeTotal: 0, addedFeeDates: [], canceledFeeCount: 0 };
+
             // 1. 해당 고객의 전체 history 중에서 취소되지 않은 active 주문들을 분류
             // 이때 배달주문(shippingMethod === '배달주문')이고 아직 배달완료/픽업완료/취소완료되지 않은 날짜별로 그룹화
             const activeOrdersByDate = {};
@@ -5021,9 +5177,21 @@
             // 2. 날짜별로 체크
             for (const pDate in activeOrdersByDate) {
                 const items = activeOrdersByDate[pDate];
-                
+
+                // [신규] 상품이 전부 취소되고 배달비만 덩그러니 남은 경우 → 남은 배달비도 같이 취소.
+                // 배달비는 부분취소 뒤 별도 타임스탬프로 새로 생성되기 때문에, 그 뒤 남은 상품을
+                // 모두 취소해도 배달비 카드만 살아남아 고객에게 청구되던 문제를 정리함.
+                const feeItems = items.filter(o => o.item === '배달비');
+                const productItems = items.filter(o => o.item !== '배달비');
+                if (productItems.length === 0) {
+                    if (feeItems.length > 0) {
+                        feeResult.canceledFeeCount += await cancelLeftoverDeliveryFees(cleanPhone, name, feeItems);
+                    }
+                    continue;
+                }
+
                 // 이미 활성 배달비가 있는지 체크
-                const hasActiveDeliveryFee = items.some(o => o.item === '배달비');
+                const hasActiveDeliveryFee = feeItems.length > 0;
                 if (hasActiveDeliveryFee) continue;
 
                 // 일반 상품들의 금액 합산
@@ -5050,7 +5218,7 @@
 
                         // 새 배달비 주문 생성 및 Firebase PUT
                         const tempTimestamp = Date.now();
-                        const formattedTimestamp = jsFormatDate(new Date(tempTimestamp));
+                        const formattedTimestamp = gFormatOrderTimestamp(new Date(tempTimestamp));
                         const orderKey = fSafeKey(formattedTimestamp) + "_배달비";
                         const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
 
@@ -5124,19 +5292,93 @@
                         // GAS 동기화 생략
 
                         // 로컬 메모리 및 캐시 갱신
+                        // [추가] 실제 저장된 Firebase 키를 들고 있어야 나중에 이 배달비를 취소할 때
+                        // 키를 다시 계산하다 어긋나는 일이 없음 (deleteOrderCard와 동일한 이유)
+                        deliveryFeePayload.__fbKey = orderKey;
                         fullHistoryData.push(deliveryFeePayload);
                         localStorage.setItem(`history_cache_${name}_${cleanPhone}`, JSON.stringify(fullHistoryData));
                         
                         // 화면 리렌더링
                         renderHistory();
 
-                        showSystemModal(`⚠️ 부분 취소로 인해 무료배송 기준(15,000원) 미만이 되어 배달비 ${dFee.toLocaleString()}원이 자동으로 추가 청구되었습니다.`, 'alert');
+                        // [수정] 안내는 호출한 쪽(deleteOrderCard)에서 통합 안내로 한 번에 보여준다
+                        feeResult.addedFeeTotal += dFee;
+                        feeResult.addedFeeDates.push(pDate);
                     } catch (e) {
                         console.error("배달비 부과 실패:", e);
                     }
                 }
             }
+
+            return feeResult;
         }
+        // [신규] 취소 완료 안내 + 배달비 안내를 하나로 합친 통합 안내문을 만든다.
+        // 예전엔 "배달비가 추가되었습니다" 알림과 "주문이 취소되었습니다" 알림이 연달아 두 번 떠서
+        // 확인을 두 번 눌러야 했고, 마지막에 남는 인상이 '취소됨'이라 배달비 청구가 묻혔음.
+        function buildCancelResultMessage(targetOrders, targetDigitTime, feeResult) {
+            const won = (n) => (parseInt(n) || 0).toLocaleString() + "원";
+            const addedFee = (feeResult && feeResult.addedFeeTotal) || 0;
+
+            const canceledTotal = targetOrders.reduce((a, o) => a + (parseInt(o.total) || 0), 0);
+
+            // 같은 주문(타임스탬프)에서 취소되지 않고 남은 금액.
+            // 이번 취소로 새로 붙은 배달비는 타임스탬프가 달라 여기 안 잡히므로 따로 더한다.
+            let remainingTotal = 0;
+            fullHistoryData.forEach(d => {
+                const rowDigitTime = normD(d.timestamp);
+                const isTimeMatch = rowDigitTime === targetDigitTime ||
+                    (rowDigitTime.length > targetDigitTime.length ? rowDigitTime.endsWith(targetDigitTime) : targetDigitTime.endsWith(rowDigitTime));
+                if (!isTimeMatch) return;
+                if (isOrderCancelled(d)) return;
+                if (d.item && d.item.includes('[배달합산]')) return;
+                remainingTotal += parseInt(d.total) || 0;
+            });
+            remainingTotal += addedFee;
+
+            const row = (label, value, opt = {}) => `
+                <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; ${opt.mt ? 'margin-top:7px;' : ''}">
+                    <span style="font-size:13px; font-weight:700; color:${opt.strong ? '#8a7461' : '#9a8b7a'};">${label}</span>
+                    <span style="font-size:${opt.strong ? '20px' : '15px'}; font-weight:${opt.strong ? '900' : '800'}; color:${opt.color || '#8a7461'}; font-variant-numeric:tabular-nums; white-space:nowrap;">${value}</span>
+                </div>`;
+
+            // [주의] showSystemModal이 white-space:pre-wrap을 걸어두기 때문에, HTML 구조로 쓴 이
+            // 안내문은 normal로 되돌리지 않으면 들여쓰기·줄바꿈이 그대로 여백으로 찍힌다.
+            let msg = `<div style="text-align:left; display:flex; flex-direction:column; gap:14px; white-space:normal;">
+                <div style="text-align:center; font-size:18px; font-weight:800; color:var(--item-black);">
+                    ${remainingTotal > 0 ? '주문이 취소되었습니다' : '주문이 모두 취소되었습니다'}
+                </div>
+
+                <div style="background:#fff9f2; padding:14px; border-radius:12px; border:1px solid #ffe8cc;">
+                    ${row('취소한 금액', '-' + won(canceledTotal))}
+                    ${addedFee > 0 ? row('추가된 배달비', '+' + won(addedFee), { mt: true, color: '#d32f2f' }) : ''}
+                    <div style="border-top:1px dashed #ffdfc0; margin:11px 0 0; padding-top:11px;">
+                        ${row(remainingTotal > 0 ? '남은 결제 금액' : '남은 금액', won(remainingTotal), { strong: true, color: 'var(--nego-orange)' })}
+                    </div>
+                </div>`;
+
+            if (addedFee > 0) {
+                msg += `
+                <div style="background:#fff5f5; border:1px solid #ffd8d8; border-radius:10px; padding:11px 12px; font-size:13px; font-weight:700; color:#d32f2f; line-height:1.6; word-break:keep-all;">
+                    ⚠️ 남은 주문 금액이 무료배송 기준(15,000원) 미만이 되어 배달비 ${won(addedFee)}이 추가되었습니다.
+                </div>`;
+            }
+
+            if (remainingTotal > 0) {
+                msg += `
+                <div style="font-size:14px; font-weight:700; color:var(--item-black); line-height:1.6; text-align:center; word-break:keep-all;">
+                    취소된 금액을 제외한 <span style="color:var(--nego-orange); font-weight:900;">${won(remainingTotal)}</span>을 입금해 주세요.
+                    <div style="font-size:12px; font-weight:600; color:#9a8b7a; margin-top:6px;">이미 입금하셨다면 차액은 환불해 드립니다.</div>
+                </div>`;
+            } else {
+                msg += `
+                <div style="font-size:13px; font-weight:600; color:#9a8b7a; line-height:1.6; text-align:center;">
+                    이미 입금하셨다면 환불해 드립니다.
+                </div>`;
+            }
+
+            return msg + `</div>`;
+        }
+
         async function deleteOrderCard(timestamp) {
             if (isHistoryProcessing) {
                 showSystemModal("이전 주문 취소 처리중입니다.\n잠시만 기다려 주세요.", 'alert');
@@ -5342,7 +5584,7 @@
                     await Promise.all(promises);
 
                     // 배달비 조건 검사 및 추가 처리
-                    await checkAndApplyDeliveryFeeAfterCustomerCancellation(cleanPhone, name);
+                    const feeResult = await checkAndApplyDeliveryFeeAfterCustomerCancellation(cleanPhone, name);
 
                     // 전체 로컬 캐시 영구 저장
                     localStorage.setItem(`history_cache_${name}_${cleanPhone}`, JSON.stringify(fullHistoryData));
@@ -5351,7 +5593,7 @@
                     const activeBtn = document.querySelector('.date-btn.active');
                     if (activeBtn) renderList(activeBtn.dataset.date);
 
-                    showSystemModal("주문이 취소되었습니다.", 'alert');
+                    showSystemModal(buildCancelResultMessage(targetOrders, targetDigitTime, feeResult), 'alert');
                 } catch (err) {
                     console.error("주문 카드 전체 취소 중 오류 발생:", err);
                     showSystemModal("주문 취소 처리에 실패했습니다.<br>네트워크 확인 후 다시 시도해 주세요.", 'alert');
@@ -6042,7 +6284,12 @@
                 ],
                 useAmountLimit: true, minAmount: 3000, maxAmount: 50000,
                 usePersonLimit: true, maxPerPerson: 3,
-                useAgencyFee: true, agencyFeeTiers: [{ from: 0, fee: 3000 }, { from: 30000, fee: 0 }]
+                // 실제 운영 기준과 같게: 2만원 미만 4,000원, 이후 5,000원마다 1,000원씩
+                useAgencyFee: true, agencyFeeTiers: [
+                    { from: 0, fee: 4000 }, { from: 20000, fee: 5000 }, { from: 25000, fee: 6000 },
+                    { from: 30000, fee: 7000 }, { from: 35000, fee: 8000 }, { from: 40000, fee: 9000 },
+                    { from: 45000, fee: 10000 }
+                ]
             });
         }
 
@@ -7063,7 +7310,13 @@
                 const thumbUrl = imgId ? getImgUrl(imgId, 300) : '';
 
                 // [수정] 현재 탭 배송 유형과 상품이 실제로 담겼을 때의 배송 탭 유형이 일치할 때만 화면 수량을 표시 (양방향 수량 연동 방지)
-                const currentQty = (cartDeliveryType[p.name] === currentDeliveryType) ? (cart[p.name] || 0) : 0;
+                //  옵션 조합별로 여러 줄에 담길 수 있으므로, 같은 상품의 모든 줄을 합쳐서 보여준다.
+                let currentQty = 0;
+                for (const ck in cart) {
+                    if (gCartName(ck) !== p.name) continue;
+                    if (cartDeliveryType[ck] !== currentDeliveryType) continue;
+                    currentQty += (cart[ck] || 0);
+                }
                 let stock = p.stock !== undefined && p.stock !== "" ? parseInt(p.stock) : Infinity;
 
                 // [신규] 예약배송 과일 상품 수량 무제한 처리
@@ -7333,7 +7586,7 @@
 
             const hidden = card ? card.querySelector('.qty-num') : null;
             const name = hidden ? hidden.dataset.name : "";
-            const p = productsData.find(pd => pd.name === name);
+            const p = productsData.find(pd => pd.name === gCartName(name));
 
             if (p && gHasProductOptions(p)) {
                 openOptionModal(name, count);
@@ -7350,6 +7603,19 @@
         //   useAgencyFee / agencyFeeTiers[{from,fee}] (사다드림 대행료)
         let cartOptions = {};      // { 상품명: { picks:[{group,name,price,qty}], optionTotal, text } }
         let optionModalState = null;
+
+        // [신규] 옵션 조합이 다르면 장바구니에 따로 담기도록, 장바구니 키를 '상품명 + 옵션서명'으로 만든다.
+        //  옵션이 없는 상품은 예전처럼 상품명만 키로 쓴다. (구분자는 화면에 안 보이는 제어문자)
+        const CART_SEP = '@@OPT@@';
+        function gCartKey(name, signature) { return signature ? (name + CART_SEP + signature) : name; }
+        function gCartName(key) { return String(key || '').split(CART_SEP)[0]; }
+        function gCartProduct(key) { const n = gCartName(key); return productsData.find(pd => pd.name === n); }
+
+        // 고른 옵션을 조합 서명으로 (같은 조합이면 같은 문자열이 되도록 정렬)
+        function gOptionSignature(picks) {
+            if (!Array.isArray(picks) || picks.length === 0) return '';
+            return picks.map(x => `${x.group}:${x.name}:${x.qty}`).sort().join('|');
+        }
 
         // [신규] 장바구니 품목의 1개당 금액 = 상품 기본가 + 선택한 옵션 금액
         //  옵션이 없는 상품은 기존과 동일하게 기본가만 쓴다.
@@ -7377,7 +7643,7 @@
 
         // 옵션 선택창 열기
         function openOptionModal(name, count) {
-            const p = productsData.find(pd => pd.name === name);
+            const p = productsData.find(pd => pd.name === gCartName(name));
             if (!p) return;
 
             const groups = (gBool(p.useChoiceOptions) && Array.isArray(p.options)) ? p.options : [];
@@ -7579,6 +7845,7 @@
                 `</div></div>` +
                 (s.optionTotal ? `<div style="display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:#777; margin-bottom:6px;"><span>옵션 합계</span><span>${s.optionTotal.toLocaleString()}원</span></div>` : ``) +
                 (s.fee ? `<div style="display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:#0284c7; margin-bottom:6px;"><span>사다드림 대행료</span><span>${s.fee.toLocaleString()}원</span></div>` : ``) +
+                (s.fee ? gAgencyFeeTable(s.p) : ``) +
                 `<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px;">` +
                 `<span style="font-size:14px; font-weight:900;">합계</span>` +
                 `<span style="font-size:20px; font-weight:900; color:var(--nego-orange);">${(s.orderTotal + s.fee).toLocaleString()}원</span>` +
@@ -7599,18 +7866,68 @@
             const name = optionModalState.name;
             const count = optionModalState.count;
 
-            cartOptions[name] = {
+            // [수정] 옵션 조합이 다르면 장바구니에 별도 줄로 담긴다.
+            //  같은 조합을 또 담으면 그 줄의 수량만 늘어난다.
+            const key = gCartKey(name, gOptionSignature(s.picked));
+
+            cartOptions[key] = {
                 picks: s.picked,
                 optionTotal: s.optionTotal,
-                text: s.picked.map(x => x.name).join(', ')
+                text: s.picked.map(x => (x.qty > 1 ? `${x.name} ×${x.qty}` : x.name)).join(', ')
             };
 
-            cart[name] = (cart[name] || 0) + count;
-            cartDeliveryType[name] = currentDeliveryType;
+            cart[key] = (cart[key] || 0) + count;
+            cartDeliveryType[key] = currentDeliveryType;
 
             closeOptionModal();
             updateFooter();
             refreshProductListAfterCartChange();
+        }
+
+        // [신규] 대행료 구간 안내. 상품에 설정된 값을 그대로 읽으므로 안내와 계산이 어긋나지 않는다.
+        //  구간이 '기준금액부터 일정 간격마다 일정액씩'인 등차면 두 줄로 줄여 보여주고,
+        //  그렇지 않으면 설정된 구간을 그대로 나열한다.
+        function gAgencyFeeTable(p) {
+            const tiers = (Array.isArray(p && p.agencyFeeTiers) ? p.agencyFeeTiers : [])
+                .map(t => ({ from: parseInt(t.from) || 0, fee: parseInt(t.fee) || 0 }))
+                .sort((a, b) => a.from - b.from);
+            if (tiers.length === 0) return ``;
+
+            const row = (label, value) =>
+                `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:3px 0;">` +
+                `<span style="color:#7f93a3;">${label}</span>` +
+                `<span style="font-weight:800; color:#0284c7; font-variant-numeric:tabular-nums; white-space:nowrap;">${value}</span>` +
+                `</div>`;
+
+            let rows = ``;
+            const step = tiers.length >= 3 ? tiers[2].from - tiers[1].from : 0;
+            const inc = tiers.length >= 3 ? tiers[2].fee - tiers[1].fee : 0;
+            const isLadder = tiers.length >= 3 && tiers[0].from === 0 && step > 0 && inc > 0
+                && tiers.every((t, i) => i < 2 || (t.from === tiers[1].from + step * (i - 1) && t.fee === tiers[1].fee + inc * (i - 1)))
+                && tiers[1].fee === tiers[0].fee + inc;
+
+            if (isLadder) {
+                rows = row(`${tiers[1].from.toLocaleString()}원 미만`, `${tiers[0].fee.toLocaleString()}원`) +
+                    row(`${tiers[1].from.toLocaleString()}원 이상`, `${step.toLocaleString()}원당 +${inc.toLocaleString()}원`);
+            } else {
+                rows = tiers.map((t, i) => {
+                    const next = tiers[i + 1];
+                    let label;
+                    if (i === 0 && t.from === 0) label = next ? `${next.from.toLocaleString()}원 미만` : `전체`;
+                    else if (next) label = `${t.from.toLocaleString()}원 ~ ${(next.from - 1).toLocaleString()}원`;
+                    else label = `${t.from.toLocaleString()}원 이상`;
+                    return row(label, `${t.fee.toLocaleString()}원`);
+                }).join('');
+            }
+
+            // 평소엔 접어두고 누르면 펼쳐진다. 대행료 금액은 위에 이미 나와 있으므로
+            // 계산 방식이 궁금한 사람만 열어보면 된다.
+            return `<details style="margin-bottom:8px; background:#f0f9ff; border:1px solid #cfe6f5; border-radius:10px; padding:8px 11px;">` +
+                `<summary style="cursor:pointer; list-style:none; font-size:12px; font-weight:800; color:#0284c7; display:flex; align-items:center;">` +
+                `<span>대행료 계산 방식</span><span style="margin-left:auto; font-size:11px; opacity:0.75;">보기</span>` +
+                `</summary>` +
+                `<div style="margin-top:7px; padding-top:7px; border-top:1px dashed #cfe6f5; font-size:12px; font-weight:700;">${rows}</div>` +
+                `</details>`;
         }
 
         // 최종금액에 맞는 사다드림 대행료 (기준금액이 가장 큰 줄 적용)
@@ -7633,7 +7950,7 @@
             let stock = input.dataset.stock ? parseFloat(input.dataset.stock) : Infinity;
             
             // [신규] 예약배송 과일 상품 수량 무제한 처리
-            const p = productsData.find(pd => pd.name === name);
+            const p = productsData.find(pd => pd.name === gCartName(name));
             const isFruit = p && (/과일/.test(p.matchKey || "") || /\[과일\]/.test(p.name || ""));
             if (currentDeliveryType === 'reserve' && isFruit) {
                 stock = Infinity;
@@ -7691,7 +8008,7 @@
             // 장바구니(cart) 상태를 기준으로 합산
             for (const name in cart) {
                 const q = cart[name];
-                const product = productsData.find(p => p.name === name);
+                const product = productsData.find(p => p.name === gCartName(name));
                 if (product) {
                     tQ += q;
                     tP += (q * gCartUnitPrice(product, name)); // [수정] 선택한 옵션 금액 포함
@@ -7735,7 +8052,7 @@
             for (const name in cart) {
                 if (cart[name] > 0) {
                     hasItems = true;
-                    const p = productsData.find(pd => pd.name === name);
+                    const p = productsData.find(pd => pd.name === gCartName(name));
                     const price = gCartUnitPrice(p, name); // [수정] 선택한 옵션 금액 포함
                     const subTotal = price * cart[name];
                     totalSum += subTotal;
@@ -7745,11 +8062,13 @@
                     const itemDiv = document.createElement('div');
                     itemDiv.style = "display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f2f2f2;";
                     // [수정] 이름 아래에 수량 조절(- +)을 두어 장바구니에서 개수를 바꿀 수 있게 함
+                    //  옵션 조합이 다르면 별도 줄로 담기므로, 상품명 아래에 고른 옵션을 함께 보여준다.
                     const safeName = name.replace(/'/g, "\\'");
+                    const optText = gCartOptionText(name);
                     itemDiv.style = "padding:12px 0; border-bottom:1px solid #f2f2f2;";
                     itemDiv.innerHTML = `
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                            <span style="flex:1; font-weight:800; color:var(--item-black); font-size:14.5px; word-break:keep-all; line-height:1.3;">${name}</span>
+                            <span style="flex:1; font-weight:800; color:var(--item-black); font-size:14.5px; word-break:keep-all; line-height:1.3;">${gCartName(name)}${optText ? `<span style="display:block; font-size:12px; font-weight:700; color:#c2610a; margin-top:3px;">└ ${optText}</span>` : ''}</span>
                             <button onclick="removeFromCart('${safeName}')" style="flex:0 0 auto; background:none; border:none; color:#bbb; font-size:20px; cursor:pointer; padding:0 4px; font-weight:bold; line-height:1;" onmouseover="this.style.color='#ff4d4d'" onmouseout="this.style.color='#bbb'">&times;</button>
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:8px;">
@@ -7815,7 +8134,7 @@
 
         // [신규] 장바구니 화면에서 수량을 직접 늘리고 줄인다 (상품 카드는 '담기'로 늘리기만 가능)
         function changeCartQty(name, change) {
-            const p = productsData.find(pd => pd.name === name);
+            const p = productsData.find(pd => pd.name === gCartName(name));
             let stock = (p && p.stock !== undefined && p.stock !== "") ? parseInt(p.stock) : Infinity;
 
             // 예약구매 과일은 수량 무제한 (상품 목록과 동일 규칙)
@@ -8039,7 +8358,7 @@
             const grouped = {};
             for (const itemName in cart) {
                 const q = cart[itemName];
-                const product = productsData.find(p => p.name === itemName);
+                const product = productsData.find(p => p.name === gCartName(itemName));
                 if (product && q > 0) {
                     const mKey = product.matchKey || "";
                     let currentPrice = parseInt(product.price || 0);
@@ -8303,9 +8622,9 @@
             const deletedItems = [];
             for (const itemName in cart) {
                 if (cart[itemName] > 0) {
-                    const exists = productsData.some(p => p.name === itemName);
+                    const exists = productsData.some(p => p.name === gCartName(itemName));
                     if (!exists) {
-                        deletedItems.push(itemName);
+                        deletedItems.push(gCartName(itemName));
                     }
                 }
             }
@@ -8461,10 +8780,12 @@
                 }
 
                 // 1. 데이터 수집 및 시간 보정
-                for (const itemName in cart) {
-                    if (!itemName || itemName === "undefined" || itemName === "null") continue;
-                    const q = cart[itemName];
-                    const pData = gFindCartProduct(itemName);
+                for (const cartKey in cart) {
+                    if (!cartKey || cartKey === "undefined" || cartKey === "null") continue;
+                    const q = cart[cartKey];
+                    const pData = gFindCartProduct(cartKey);
+                    // [수정] 장바구니 키에는 옵션 조합이 붙어 있으므로, 기록에는 실제 상품명만 쓴다
+                    const itemName = gCartName(cartKey);
                     if (q > 0 && pData) {
                         const mKey = pData.matchKey || "";
                         const normalizedMk = normalizeDateString(mKey);
@@ -8501,7 +8822,7 @@
                             //  기존에는 날짜 없는 상품을 무조건 다음날로 기록해서, 당일구매 과일만 주문하거나
                             //  상시판매만 주문하면 주문서에 내일 날짜로 올라가던 문제가 있었다.
                             //  (예약 상품과 함께 담긴 경우에는 아래 합배송 처리에서 배달일이 다시 맞춰진다)
-                            const _cartTab = cartDeliveryType[itemName];
+                            const _cartTab = cartDeliveryType[cartKey];
                             if ((_cartTab === 'today' || _cartTab === 'onsite') && !isTodayOffOrAfterCutoff) {
                                 finalDate = todayStr;
                             }
@@ -8551,8 +8872,8 @@
 
                         const isCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(finalDate);
                         // [수정] 선택한 상세옵션 금액을 상품 금액에 합산하고, 고른 내용은 별도 항목(optionText)으로 기록
-                        let currentPrice = gCartUnitPrice(pData, itemName);
-                        const optionText = gCartOptionText(itemName);
+                        let currentPrice = gCartUnitPrice(pData, cartKey);
+                        const optionText = gCartOptionText(cartKey);
 
                         allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: q * currentPrice, date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText });
                     }
@@ -8858,10 +9179,6 @@
             let displayTotal = Math.max(0, total - paidFeeDeduct);
             let showDeductNotice = paidFeeDeduct > 0;
 
-            // [신규] 사다드림이 포함된 주문이면 전용 안내를 함께 보여준다
-            const hasSadaInGuide = allItems.some(it => it.name !== '배달비'
-                && (String(it.name || "").includes('사다드림') || it.matchKey === '사다드림'));
-
             let receiptOpt = "미발행", receiptType = "개인", receiptPhone = phone;
             if (isFinal && finalReceiptData) {
                 receiptOpt = finalReceiptData.opt;
@@ -8897,46 +9214,47 @@
                 msg += `
                     <div><div class="final-success-badge">주문 완료</div><div style="font-size:18px; font-weight:800; color:var(--item-black);">주문이 정상적으로 접수되었습니다!</div></div>
                     
-                    <div style="background:#fff9f2; padding:12px 6px; border-radius:10px; border:1px solid #ffe8cc; display:flex; flex-direction:column; gap:8px;">
-                        <div style="font-size:18px; font-weight:800; line-height:1.2;">
-                            <span style="color:var(--item-black);">카카오뱅크</span><br>
-                            <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:4px;">
-                                <span style="font-size:24px; font-weight:900; color:var(--nego-orange);" id="bank-acc-num">3333-37-3410268</span>
-                                <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:5px 12px; border:none; border-radius:6px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow: 0 2px 6px rgba(255, 107, 0, 0.3);">📋 복사</button>
+                    <div style="background:#fff9f2; padding:16px 14px; border-radius:12px; border:1px solid #ffe8cc; display:flex; flex-direction:column; gap:0;">
+                        <!-- 계좌 -->
+                        <div style="font-size:14px; font-weight:800; color:#8a7461; letter-spacing:0.02em;">카카오뱅크</div>
+                        <div style="font-size:26px; font-weight:900; color:var(--nego-orange); letter-spacing:-0.02em; white-space:nowrap; margin-top:2px;" id="bank-acc-num">3333-37-3410268</div>
+                        <div style="font-size:13px; font-weight:600; color:#9a8b7a; margin-top:3px;">예금주 : 강*민 (모켓)</div>
+                        <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="align-self:center; margin-top:10px; padding:7px 18px; border:none; border-radius:8px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow:0 2px 6px rgba(255,107,0,0.28);">📋 계좌번호 복사</button>
+
+                        <!-- 금액 -->
+                        <div style="border-top:1px dashed #ffdfc0; margin:14px 0 0; padding-top:14px;">
+                            <div style="font-size:13px; font-weight:700; color:#8a7461;">입금하실 금액</div>
+                            <div style="font-size:32px; font-weight:900; color:var(--item-black); letter-spacing:-0.02em; margin-top:2px;">
+                                ${displayTotal.toLocaleString()}원
                             </div>
                         </div>
-                        <div style="font-size:15px; font-weight:600; color:#888;">예금주 : 강*민(모켓(MOKET))</div>
-                        
-                        <div style="font-size:32px; font-weight:900; color:var(--item-black); margin:8px 0;">
-                            ${displayTotal.toLocaleString()}원
-                        </div>
                         ${showDeductNotice ? `
-                        <div style="font-size:13px; font-weight:800; color:#2e7d32; background:#f1fbf5; border:1px solid #cfe6d8; border-radius:8px; padding:7px 10px; margin:-2px 6px 8px 6px; line-height:1.6; word-break:keep-all;">
+                        <div style="font-size:12.5px; font-weight:700; color:#2e7d32; background:#f1fbf5; border:1px solid #cfe6d8; border-radius:8px; padding:8px 11px; margin-top:10px; line-height:1.6; word-break:keep-all; text-align:left;">
                             이전 주문과 합쳐 무료배달 기준을 넘어<br>이미 내신 배달비 <b>${paidFeeDeduct.toLocaleString()}원</b>을 빼드렸습니다.
                         </div>
                         ` : ''}
                         ${extraItems.length > 0 ? `
-                        <div style="font-size:12.5px; font-weight:700; color:#888; margin-top:-2px; margin-bottom:8px; line-height:1.6; word-break:keep-all;">
-                            이전 주문 ${extraItems.filter(it => it.name !== '배달비').length}건도 같은 날 함께 배달됩니다.<br>위 금액은 <b style="color:#666;">이번 주문 건</b>에 대한 금액입니다.
+                        <div style="font-size:12.5px; font-weight:600; color:#9a8b7a; margin-top:8px; line-height:1.6; word-break:keep-all;">
+                            이전 주문 ${extraItems.filter(it => it.name !== '배달비').length}건도 같은 날 함께 배달됩니다.<br>위 금액은 <b style="color:#7a6a5a;">이번 주문 건</b>에 대한 금액입니다.
                         </div>
                         ` : ''}
-                        
-                        <div style="font-size:16px; font-weight:800; color:var(--nego-orange); margin-bottom:4px;">
-                            ${(currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? '오후 3시까지 입금 부탁드립니다.' : '당일 24시까지 입금 부탁드립니다.'}
+
+                        <!-- 입금 안내 -->
+                        <div style="border-top:1px dashed #ffdfc0; margin-top:14px; padding-top:12px; display:flex; flex-direction:column; gap:6px; word-break:keep-all;">
+                            <div style="font-size:15.5px; font-weight:800; color:var(--nego-orange); line-height:1.5;">
+                                ${(currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? '오후 3시까지 입금 부탁드립니다.' : '당일 24시까지 입금 부탁드립니다.'}
+                            </div>
+                            <!-- [수정] 입금자명 안내는 사다드림만이 아니라 모든 입금 주문에 해당하므로 기본 안내로 뺐다 -->
+                            <div style="font-size:13.5px; font-weight:700; color:#8a7461; line-height:1.6;">
+                                입금자명을 <b style="color:var(--item-black);">닉네임과 같게</b> 보내주세요.
+                            </div>
+                            <div style="font-size:14.5px; font-weight:800; color:#d32f2f; line-height:1.5; margin-top:2px;">
+                                🚨 미입금시 주문이 자동으로 취소됩니다.
+                            </div>
                         </div>
-                        <!-- [수정] 입금자명 안내는 사다드림만이 아니라 모든 입금 주문에 해당하므로 기본 안내로 뺐다 -->
-                        <div style="font-size:14px; font-weight:700; color:#666; margin-top:2px; margin-bottom:8px; word-break:keep-all;">
-                            입금자명을 <b style="color:var(--item-black);">닉네임과 같게</b> 보내주세요.
-                        </div>
-                        <div style="font-size:16px; font-weight:800; color:#d32f2f; margin-top:6px; margin-bottom:10px;">
-                            🚨 미입금시 주문이 자동으로 취소됩니다.
-                        </div>
-                        ${hasSadaInGuide ? `
-                        <div style="background:#fff4e9; border:1px solid #ffd9b3; border-radius:10px; padding:10px 12px; margin:0 6px 10px 6px; text-align:left; line-height:1.7; word-break:keep-all;">
-                            <div style="font-size:13px; font-weight:900; color:#c2610a; margin-bottom:4px;">🛵 사다드림 안내</div>
-                            <div style="font-size:13px; font-weight:700; color:var(--item-black);">사다드림은 <b style="color:var(--nego-orange);">당일 입금</b>이 확인되어야 주문이 확정됩니다.</div>
-                        </div>
-                        ` : ''}
+                        <!-- [수정] 사다드림 안내·합배송 안내는 여기서 뺐다.
+                             계좌·금액·입금기한·차감·이전주문 안내가 이미 쌓여 있어 정보량이 너무 많았음.
+                             합배송은 푸터 칩·메뉴·배달비 확인창에서 계속 볼 수 있다. -->
 
                         <!-- 주문 상품 내역 렌더링 -->
                         <div style="border-top:1px dashed #eee; padding-top:12px; margin-top:5px; text-align:left;">
