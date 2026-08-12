@@ -1889,6 +1889,48 @@
             <button class="main-submit-btn" onclick="openShippingSelection()">주문하기</button>
         </div>
     </div>
+    <!-- [신규] 임시 휴무일 달력 (관리자 전용).
+         예전에는 prompt()로 날짜를 콤마 구분해 받았는데, 앱 웹뷰 등에서 prompt가 막혀 아예 열리지 않았다. -->
+    <div id="holiday-modal" class="modal-overlay" style="z-index: 10000;">
+        <div class="modal-content" style="width:92%; max-width:420px; max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                <div style="font-size:18px; font-weight:900; color:var(--item-black);">🗓️ 임시 휴무일</div>
+                <span onclick="closeHolidayCalendar()" style="font-size:24px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <button type="button" onclick="moveHolidayMonth(-1)" style="width:36px; height:36px; border:1.5px solid #e2e8f0; background:#fff; border-radius:9px; font-size:17px; font-weight:800; color:var(--item-black); cursor:pointer;">‹</button>
+                <div id="holiday-month-label" style="font-size:16px; font-weight:900; color:var(--item-black);"></div>
+                <button type="button" onclick="moveHolidayMonth(1)" style="width:36px; height:36px; border:1.5px solid #e2e8f0; background:#fff; border-radius:9px; font-size:17px; font-weight:800; color:var(--item-black); cursor:pointer;">›</button>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:4px;">
+                <div style="text-align:center; font-size:11px; font-weight:800; color:#ff6b6b;">일</div>
+                <div style="text-align:center; font-size:11px; font-weight:800; color:#8a97a3;">월</div>
+                <div style="text-align:center; font-size:11px; font-weight:800; color:#8a97a3;">화</div>
+                <div style="text-align:center; font-size:11px; font-weight:800; color:#8a97a3;">수</div>
+                <div style="text-align:center; font-size:11px; font-weight:800; color:#8a97a3;">목</div>
+                <div style="text-align:center; font-size:11px; font-weight:800; color:#8a97a3;">금</div>
+                <div style="text-align:center; font-size:11px; font-weight:800; color:#5b8def;">토</div>
+            </div>
+            <div id="holiday-grid" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;"></div>
+
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-top:12px; font-size:11.5px; font-weight:700; color:#8a97a3;">
+                <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:#ff4d4d; vertical-align:-1px; margin-right:4px;"></span>임시 휴무일</span>
+                <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:#eef1f4; border:1px solid #e4e9ee; vertical-align:-1px; margin-right:4px;"></span>정기 휴무</span>
+                <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; border:2px solid var(--moket-green); vertical-align:-1px; margin-right:4px;"></span>오늘</span>
+            </div>
+            <div id="holiday-regular-note" style="margin-top:6px; font-size:11.5px; font-weight:700; color:#8a97a3; line-height:1.5;"></div>
+
+            <div id="holiday-selected-box" style="margin-top:12px; background:#f8fafc; border:1px solid #eef1f4; border-radius:10px; padding:10px 12px;"></div>
+
+            <div style="display:flex; gap:10px; margin-top:16px;">
+                <button type="button" onclick="closeHolidayCalendar()" style="flex:1; height:46px; border:1.5px solid #e2e8f0; background:#fff; color:#555; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer;">취소</button>
+                <button type="button" onclick="saveHolidayCalendar()" style="flex:1.4; height:46px; border:none; background:var(--moket-green); color:#fff; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer;">저장하기</button>
+            </div>
+        </div>
+    </div>
+
     <div id="system-modal" class="modal-overlay" style="z-index: 9999;">
         <!-- 시스템 모달 가로폭 확장 (배달비 안내 등 텍스트가 줄바꿈 없이 한 줄에 매끄럽게 들어가도록 보정) -->
         <div class="modal-content" style="text-align: center; width: 90%; max-width: 440px;">
@@ -2084,6 +2126,39 @@
             updateFooter();
         }
  
+        // ===== [신규] 주문 완료 후 새로고침해도 보던 탭으로 돌아오게 한다 =====
+        //  주문이 끝나면 장바구니·상태를 비우려고 페이지를 새로 읽는데, 그때 첫 화면(당일구매 과일)으로
+        //  튕겨서 방금 보던 목록을 다시 찾아 들어가야 했다. 새로고침 직전에 보던 위치를 적어두고 복원한다.
+        const VIEW_STATE_KEY = 'moket_view_state';
+
+        function gSaveViewState() {
+            try {
+                sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify({
+                    deliveryType: currentDeliveryType,
+                    mainTab: currentMainTab,
+                    listKey: window.lastRenderedTargetKey || '',
+                    at: Date.now()
+                }));
+            } catch (e) { /* 저장 못 해도 기본 탭으로 열릴 뿐이라 무시 */ }
+        }
+
+        // 한 번 쓰고 지운다. 오래된 값(5분 초과)은 버려서 나중에 다시 열 때 엉뚱한 탭이 뜨지 않게 한다.
+        function gTakeViewState() {
+            try {
+                const raw = sessionStorage.getItem(VIEW_STATE_KEY);
+                sessionStorage.removeItem(VIEW_STATE_KEY);
+                if (!raw) return null;
+                const s = JSON.parse(raw);
+                if (!s || !s.deliveryType || !s.at || (Date.now() - s.at) > 5 * 60 * 1000) return null;
+                return s;
+            } catch (e) { return null; }
+        }
+
+        function gReloadKeepingView() {
+            gSaveViewState();
+            location.reload();
+        }
+
         function restoreTabActiveState() {
             document.querySelectorAll('.delivery-type-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.type === currentDeliveryType);
@@ -2103,7 +2178,13 @@
 
             // 1. 첫 페이지 로드 시에만 기본 탭 설정
             if (isInitialPageLoad) {
-                if (hour >= 15 || isHoliday) {
+                // [신규] 주문 완료 후 새로고침이면 보던 탭을 그대로 되살린다
+                const _saved = gTakeViewState();
+                if (_saved) {
+                    currentDeliveryType = _saved.deliveryType;
+                    if (_saved.mainTab) currentMainTab = _saved.mainTab;
+                    if (_saved.listKey) window.lastRenderedTargetKey = _saved.listKey;
+                } else if (hour >= 15 || isHoliday) {
                     currentDeliveryType = 'reserve';
                     currentMainTab = 'reserve'; // 15시 이후, 휴무일에는 예약배송으로 유도
                 } else {
@@ -3588,22 +3669,131 @@
             } catch (e) { console.error("휴무일 로드 실패:", e); }
         }
 
-        async function adminManageHolidays() {
-            const currentHolidays = publicHolidays.join(', ');
-            const input = prompt("휴무일(건너뛸 날짜)을 콤마(,)로 구분해서 입력하세요.\n형식: YYYY-MM-DD\n예시: 2026-05-05, 2026-05-15\n(모두 지우려면 빈 칸으로 두고 확인)", currentHolidays);
-            if (input !== null) {
-                const newHolidays = input.split(',').map(s => s.trim()).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
-                try {
-                    const res = await fetch(FIREBASE_DB_URL + "public_holidays.json", {
-                        method: 'PUT',
-                        body: JSON.stringify(newHolidays)
-                    });
-                    if (!res.ok) throw new Error(`서버 응답 ${res.status}`); // [개선] 저장 성공 확인
-                    publicHolidays = newHolidays;
-                    showSystemModal("휴무일이 성공적으로 업데이트되었습니다.", "alert");
-                } catch (e) {
-                    showSystemModal("저장 실패: " + e.toString(), "alert");
-                }
+        // ===== [수정] 임시 휴무일 관리: prompt() 대신 달력에서 눌러 켜고 끈다 =====
+        //  prompt는 앱 웹뷰 등에서 막혀 있어("prompt() is not supported") 버튼을 눌러도 아무 일도 없었다.
+        //  달력이면 어디서든 열리고, 날짜를 직접 입력할 필요가 없어 오타도 나지 않는다.
+        let holidayCalMonth = null;   // 보고 있는 달 (해당 월 1일)
+        let holidayDraft = [];        // 편집 중인 목록 — 저장을 눌러야 실제로 반영된다
+
+        function gDateKey(y, m, d) {
+            return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+
+        function adminManageHolidays() {
+            if (!isAdminMode) return;
+
+            // 메뉴에서 눌렀으면 메뉴를 닫는다
+            const side = document.getElementById('side-menu');
+            if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
+
+            holidayDraft = Array.isArray(publicHolidays) ? publicHolidays.slice() : [];
+            const now = new Date();
+            holidayCalMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+            renderHolidayCalendar();
+            document.getElementById('holiday-modal').style.display = 'flex';
+            checkScrollLock();
+        }
+
+        function closeHolidayCalendar() {
+            document.getElementById('holiday-modal').style.display = 'none';
+            checkScrollLock();
+        }
+
+        function moveHolidayMonth(delta) {
+            if (!holidayCalMonth) return;
+            holidayCalMonth = new Date(holidayCalMonth.getFullYear(), holidayCalMonth.getMonth() + delta, 1);
+            renderHolidayCalendar();
+        }
+
+        function toggleHolidayDate(key) {
+            const i = holidayDraft.indexOf(key);
+            if (i >= 0) holidayDraft.splice(i, 1);
+            else holidayDraft.push(key);
+            renderHolidayCalendar();
+        }
+
+        function renderHolidayCalendar() {
+            const grid = document.getElementById('holiday-grid');
+            const label = document.getElementById('holiday-month-label');
+            if (!grid || !label || !holidayCalMonth) return;
+
+            const y = holidayCalMonth.getFullYear();
+            const m = holidayCalMonth.getMonth();
+            label.innerText = `${y}년 ${m + 1}월`;
+
+            const today = new Date();
+            const todayKey = gDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+            const firstDay = new Date(y, m, 1).getDay();
+            const lastDate = new Date(y, m + 1, 0).getDate();
+
+            let html = '';
+            for (let i = 0; i < firstDay; i++) html += `<div></div>`;
+
+            for (let d = 1; d <= lastDate; d++) {
+                const key = gDateKey(y, m, d);
+                const dow = new Date(y, m, d).getDay();
+                const isOff = holidayDraft.includes(key);
+                const isToday = (key === todayKey);
+                // [신규] 정기 휴무(일요일 · 토요일 평일작동 꺼짐)도 함께 칠해 그 달에 안 여는 날을 다 보이게 한다
+                const isRegularOff = (dow === 0) || (dow === 6 && !isSaturdayAsWeekday);
+
+                const baseColor = dow === 0 ? '#ff6b6b' : (dow === 6 ? '#5b8def' : 'var(--item-black)');
+                let bg = '#fff', fg = baseColor, bd = '1px solid #eef1f4';
+                if (isOff) { bg = '#ff4d4d'; fg = '#fff'; bd = '1px solid #ff4d4d'; }          // 임시 휴무일
+                else if (isRegularOff) { bg = '#eef1f4'; fg = '#9aa6b1'; bd = '1px solid #e4e9ee'; } // 정기 휴무
+                if (isToday) bd = '2px solid var(--moket-green)';
+
+                html += `<div onclick="toggleHolidayDate('${key}')" title="${isRegularOff ? '정기 휴무일' : ''}" style="` +
+                    `aspect-ratio:1; display:flex; align-items:center; justify-content:center; cursor:pointer;` +
+                    `border-radius:9px; font-size:14px; font-weight:${isOff ? '900' : '700'};` +
+                    `background:${bg}; color:${fg}; border:${bd};` +
+                    `">${d}</div>`;
+            }
+            grid.innerHTML = html;
+
+            // 정기 휴무가 어떤 요일인지 밝혀둔다 (토요일은 '토요일 평일 작동' 설정에 따라 달라진다)
+            const note = document.getElementById('holiday-regular-note');
+            if (note) {
+                note.innerText = isSaturdayAsWeekday
+                    ? '정기 휴무는 일요일입니다. (토요일은 평일로 작동 중)'
+                    : '정기 휴무는 일요일과 토요일입니다.';
+            }
+
+            // 고른 날짜 목록 (누르면 바로 뺄 수 있게)
+            const box = document.getElementById('holiday-selected-box');
+            if (box) {
+                const sorted = holidayDraft.slice().sort();
+                box.innerHTML =
+                    `<div style="font-size:11.5px; font-weight:800; color:#8a97a3; margin-bottom:${sorted.length ? '7px' : '0'};">임시 휴무일 ${sorted.length}일</div>` +
+                    (sorted.length === 0
+                        ? `<div style="font-size:12px; font-weight:700; color:#b6c0c9;">달력에서 날짜를 눌러 지정하세요.</div>`
+                        : `<div style="display:flex; flex-wrap:wrap; gap:5px;">` + sorted.map(k =>
+                            `<span onclick="toggleHolidayDate('${k}')" style="display:inline-flex; align-items:center; gap:4px; background:#fff; border:1px solid #ffd0d0; color:#d32f2f; font-size:11.5px; font-weight:800; padding:4px 8px; border-radius:20px; cursor:pointer;">${k}<span style="color:#e9a0a0;">&times;</span></span>`
+                          ).join('') + `</div>`);
+            }
+        }
+
+        async function saveHolidayCalendar() {
+            const newHolidays = holidayDraft.slice().sort();
+            try {
+                const res = await fetch(FIREBASE_DB_URL + "public_holidays.json", {
+                    method: 'PUT',
+                    body: JSON.stringify(newHolidays)
+                });
+                if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+
+                publicHolidays = newHolidays;
+                localStorage.setItem('moket_public_holidays', JSON.stringify(publicHolidays));
+                closeHolidayCalendar();
+
+                // 휴무일이 바뀌면 노출 날짜가 달라지므로 탭과 목록을 다시 그린다
+                initMainTabs();
+                processAndRender(cachedProducts || productsData);
+
+                showSystemModal(`임시 휴무일 ${newHolidays.length}일이 저장되었습니다.`, "alert");
+            } catch (e) {
+                showSystemModal("저장 실패: " + e.toString(), "alert");
             }
         }
 
@@ -4066,7 +4256,7 @@
                 // [추가] 사다드림 주문 완료 후 계좌창을 닫을 때만 페이지 새로고침
                 if (id === 'bank-modal' && window.isSadaOrderFinished) {
                     window.isSadaOrderFinished = false;
-                    location.reload();
+                    gReloadKeepingView();
                 }
             }
             checkScrollLock();
@@ -9452,7 +9642,7 @@
 
             showSystemModal(msg, 'confirm', async () => {
                 if (isFinal) {
-                    location.reload();
+                    gReloadKeepingView();
                     return true;
                 }
                 const opt = document.querySelector('input[name="receipt-opt"]:checked')?.value || "미발행";
@@ -9462,7 +9652,7 @@
                 return true;
             }, () => {
                 if (isFinal) {
-                    location.reload();
+                    gReloadKeepingView();
                     return;
                 }
                 isHistoryProcessing = false;
@@ -9878,7 +10068,7 @@
                     }
                 });
 
-                if (activeBtn) renderList(activeBtn.dataset.date);
+                renderList(gCurrentListKey());
 
                 // 최종 완료 처리 (GAS 완료를 기다리지 않고 바로 표시)
                 document.getElementById('system-modal').style.display = 'none';
@@ -9897,7 +10087,7 @@
                     showPaymentGuide(allItems, name, phone, shippingMethod, true, { opt: cashReceipt, phone: receiptPhone, type: cashReceiptType });
                 } else {
                     // 방문픽업 등은 기존처럼 완료 알림만 표시
-                    showSystemModal("주문이 완료되었습니다!", 'alert', () => { location.reload(); });
+                    showSystemModal("주문이 완료되었습니다!", 'alert', () => { gReloadKeepingView(); });
                 }
 
                 setTimeout(() => loadData(), 2000);
