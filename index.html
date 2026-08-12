@@ -1699,11 +1699,18 @@
                         <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:5px 12px; border:none; border-radius:6px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow: 0 2px 6px rgba(255, 107, 0, 0.3);">📋 복사</button>
                     </div>
                     <span style="font-size:15px; color:#666; letter-spacing:-0.5px;">예금주 : 강*민(모켓(MOKET))</span>
-                    <!-- [수정] 사다드림 전용 안내 문구 영역 -->
+                    <!-- [수정] 사다드림 입금 안내 — 다른 안내문과 같은 주황 톤 형식으로 정리 -->
                     <div id="bank-modal-notice"
-                        style="display:none; margin-top:15px; padding:12px; background:#fff0f0; border-radius:10px; color:#ff4d4d; font-size:14px; line-height:1.5; border:1.5px solid #ffcccc; word-break:keep-all;">
-                        📢 <b>사다드림 안내</b> 📢<br>
-                        [사다드림]은 입금 확인까지 되어야 최종 주문 확정이 됩니다.(이외 상품은 현장 결제 가능)<br>(입금자명을 닉네임과 동일하게 해주세요!)
+                        style="display:none; margin-top:16px; padding:12px 14px; background:#fff4e9; border:1px solid #ffd9b3; border-radius:12px; text-align:left; line-height:1.7; word-break:keep-all;">
+                        <div style="font-size:13px; font-weight:900; color:#c2610a; margin-bottom:6px;">🛵 사다드림 안내</div>
+                        <div style="font-size:13.5px; font-weight:700; color:var(--item-black);">
+                            사다드림은 <b style="color:var(--nego-orange);">당일 입금</b>이 확인되어야 주문이 확정됩니다.
+                        </div>
+                        <div style="font-size:12.5px; font-weight:600; color:#777; margin-top:8px;">
+                            · 입금자명을 닉네임과 같게 보내주세요<br>
+                            · 당일 입금이 없으면 주문이 취소될 수 있습니다<br>
+                            · 그 외 상품은 현장 결제도 가능합니다
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2926,7 +2933,7 @@
                     const p = productsData.find(pd => pd.name === name);
                     if (p) {
                         const isSada = name.includes("사다드림") || p.matchKey === "사다드림";
-                        const price = (parseInt(p.price) || 0) * cart[name];
+                        const price = gCartUnitPrice(p, name) * cart[name]; // [수정] 선택한 옵션 금액 포함
                         const pDate = _normFeeDate(p.matchKey) || _normFeeDate(p.date);
                         if (isSada) {
                             sadaTotal += price;
@@ -3885,6 +3892,36 @@
             checkScrollLock();
         }
 
+        // [신규] 계좌번호 안내 모달의 안내 문구를 상황에 맞게 바꾼다.
+        //  'sada' = 사다드림 주문 / 'delivery' = 배달 주문 / '' = 안내 없음
+        function setBankModalNotice(kind) {
+            const el = document.getElementById('bank-modal-notice');
+            if (!el) return;
+
+            const box = (title, body, lines) =>
+                `<div style="font-size:13px; font-weight:900; color:#c2610a; margin-bottom:6px;">${title}</div>` +
+                `<div style="font-size:13.5px; font-weight:700; color:var(--item-black);">${body}</div>` +
+                `<div style="font-size:12.5px; font-weight:600; color:#777; margin-top:8px;">${lines.map(l => '· ' + l).join('<br>')}</div>`;
+
+            if (kind === 'sada') {
+                el.innerHTML = box(
+                    '🛵 사다드림 안내',
+                    '사다드림은 <b style="color:var(--nego-orange);">당일 입금</b>이 확인되어야 주문이 확정됩니다.',
+                    ['입금자명을 닉네임과 같게 보내주세요', '당일 입금이 없으면 주문이 취소될 수 있습니다', '그 외 상품은 현장 결제도 가능합니다']
+                );
+                el.style.display = 'block';
+            } else if (kind === 'delivery') {
+                el.innerHTML = box(
+                    '🚚 배달 안내',
+                    '배달 주문은 <b style="color:var(--nego-orange);">당일 입금</b>이 확인되어야 배달 준비가 시작됩니다.',
+                    ['입금자명을 닉네임과 같게 보내주세요', '당일 입금이 없으면 주문이 자동으로 취소됩니다']
+                );
+                el.style.display = 'block';
+            } else {
+                el.style.display = 'none';
+            }
+        }
+
         function openSideModal(id) {
             toggleMenu();
             if (id === 'profile-modal') {
@@ -3899,10 +3936,10 @@
                 checkAddressInputMode();
             }
             if (id === 'bank-modal') {
-                const notice = document.getElementById('bank-modal-notice');
-                if (notice && !window.isSadaOrderFinished) {
-                    notice.style.display = 'none';
-                }
+                // [수정] 계좌 안내 문구는 주문 종류에 따라 다르게 (사다드림 / 배달)
+                if (window.isSadaOrderFinished) setBankModalNotice('sada');
+                else if (window.isDeliveryOrderFinished) setBankModalNotice('delivery');
+                else setBankModalNotice('');
             }
             document.getElementById(id).style.display = 'flex';
             checkScrollLock();
@@ -6003,7 +6040,7 @@
                         items: [{ name: '우유 1개', price: 2000 }, { name: '아메리카노', price: 3000 }, { name: '보냉백', price: 1500 }]
                     }
                 ],
-                useAmountLimit: true, minAmount: 3000, maxAmount: 10000,
+                useAmountLimit: true, minAmount: 3000, maxAmount: 50000,
                 usePersonLimit: true, maxPerPerson: 3,
                 useAgencyFee: true, agencyFeeTiers: [{ from: 0, fee: 3000 }, { from: 30000, fee: 0 }]
             });
@@ -7311,8 +7348,23 @@
         //   useAmountLimit / minAmount / maxAmount   (옵션 합계 금액 범위)
         //   usePersonLimit / maxPerPerson            (1인당 주문 개수)
         //   useAgencyFee / agencyFeeTiers[{from,fee}] (사다드림 대행료)
-        let cartOptions = {};      // { 상품명: { groups:[{name, picks:[{name, price}]}], total } }
+        let cartOptions = {};      // { 상품명: { picks:[{group,name,price,qty}], optionTotal, text } }
         let optionModalState = null;
+
+        // [신규] 장바구니 품목의 1개당 금액 = 상품 기본가 + 선택한 옵션 금액
+        //  옵션이 없는 상품은 기존과 동일하게 기본가만 쓴다.
+        function gCartUnitPrice(p, name) {
+            const base = parseInt((p && p.price) || 0) || 0;
+            const opt = parseInt((cartOptions[name] && cartOptions[name].optionTotal) || 0) || 0;
+            return base + opt;
+        }
+
+        // [신규] 선택한 옵션을 한 줄 글로 (주문 기록·화면 표시용)
+        function gCartOptionText(name) {
+            const o = cartOptions[name];
+            if (!o || !Array.isArray(o.picks) || o.picks.length === 0) return "";
+            return o.picks.map(x => (x.qty > 1 ? `${x.name} ×${x.qty}` : x.name)).join(', ');
+        }
 
         const gBool = (v, def = false) => (v === undefined || v === null) ? def : (v === true || v === 'true');
 
@@ -7642,7 +7694,7 @@
                 const product = productsData.find(p => p.name === name);
                 if (product) {
                     tQ += q;
-                    tP += (q * parseInt(product.price || 0));
+                    tP += (q * gCartUnitPrice(product, name)); // [수정] 선택한 옵션 금액 포함
                 }
             }
 
@@ -7684,7 +7736,7 @@
                 if (cart[name] > 0) {
                     hasItems = true;
                     const p = productsData.find(pd => pd.name === name);
-                    const price = p ? parseInt(p.price || 0) : 0;
+                    const price = gCartUnitPrice(p, name); // [수정] 선택한 옵션 금액 포함
                     const subTotal = price * cart[name];
                     totalSum += subTotal;
 
@@ -8498,9 +8550,11 @@
                         }
 
                         const isCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(finalDate);
-                        let currentPrice = parseInt(pData.price || 0);
+                        // [수정] 선택한 상세옵션 금액을 상품 금액에 합산하고, 고른 내용은 별도 항목(optionText)으로 기록
+                        let currentPrice = gCartUnitPrice(pData, itemName);
+                        const optionText = gCartOptionText(itemName);
 
-                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: q * currentPrice, date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff });
+                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: q * currentPrice, date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText });
                     }
                 }
 
@@ -8778,24 +8832,35 @@
 
 
         function showPaymentGuide(allItems, name, phone, shippingMethod, isFinal = false, finalReceiptData = null) {
-            const total = allItems.reduce((acc, it) => acc + it.subtotal, 0);
             const isDelivery = (shippingMethod === '배달주문');
 
-            let displayTotal = total;
-            let showDeductNotice = false;
+            // [수정] 총금액은 '이번 주문' 상품만 합산한다.
+            //  합배송으로 함께 나가는 기존 주문(isExtra)은 그때 이미 안내된 금액이므로 이번 청구에 넣지 않는다.
+            const thisItems = allItems.filter(it => !it.isExtra);
+            const extraItems = allItems.filter(it => it.isExtra);
+            const total = thisItems.reduce((acc, it) => acc + it.subtotal, 0);
 
-            // 합배송 이전 주문 중 입금완료된 건이 존재하면 해당 상품 가격 및 배달비 금액을 이번 입금할 금액에서 제외
-            const hasPaidExtra = allItems.some(it => it.isExtra && (it.originalData?.paid === true || it.originalData?.paid === "true"));
-            if (hasPaidExtra) {
-                let deductAmount = 0;
-                allItems.forEach(it => {
-                    if (it.isExtra && (it.originalData?.paid === true || it.originalData?.paid === "true")) {
-                        deductAmount += it.subtotal;
-                    }
-                });
-                displayTotal = total - deductAmount;
-                showDeductNotice = true;
+            // [신규] 기존 주문에서 이미 배달비를 냈고, 그 주문과 이번 주문을 합쳐 무료배달 기준을 넘으면
+            //  이번 결제 금액에서 그 배달비만큼 빼준다. (기존 배달비는 주문 처리 쪽에서 삭제됨)
+            const isPaidFlag = (it) => (it.paid === true || it.paid === "true"
+                || it.originalData?.paid === true || it.originalData?.paid === "true");
+
+            const extraGoodsTotal = extraItems.filter(it => it.name !== '배달비').reduce((a, it) => a + it.subtotal, 0);
+            const thisGoodsTotal = thisItems.filter(it => it.name !== '배달비').reduce((a, it) => a + it.subtotal, 0);
+            const paidExtraFee = extraItems.filter(it => it.name === '배달비' && isPaidFlag(it))
+                                           .reduce((a, it) => a + it.subtotal, 0);
+
+            let paidFeeDeduct = 0;
+            if (paidExtraFee > 0 && (extraGoodsTotal + thisGoodsTotal) >= 15000) {
+                paidFeeDeduct = paidExtraFee;
             }
+
+            let displayTotal = Math.max(0, total - paidFeeDeduct);
+            let showDeductNotice = paidFeeDeduct > 0;
+
+            // [신규] 사다드림이 포함된 주문이면 전용 안내를 함께 보여준다
+            const hasSadaInGuide = allItems.some(it => it.name !== '배달비'
+                && (String(it.name || "").includes('사다드림') || it.matchKey === '사다드림'));
 
             let receiptOpt = "미발행", receiptType = "개인", receiptPhone = phone;
             if (isFinal && finalReceiptData) {
@@ -8845,23 +8910,33 @@
                         <div style="font-size:32px; font-weight:900; color:var(--item-black); margin:8px 0;">
                             ${displayTotal.toLocaleString()}원
                         </div>
-                        ${allItems.some(it => it.isExtra) ? `
-                        <div style="font-size:14px; font-weight:800; color:#d32f2f; margin-top:-2px; margin-bottom:8px;">
-                            (기존에 입금했을 시 차액만 입금바랍니다.)
+                        ${showDeductNotice ? `
+                        <div style="font-size:13px; font-weight:800; color:#2e7d32; background:#f1fbf5; border:1px solid #cfe6d8; border-radius:8px; padding:7px 10px; margin:-2px 6px 8px 6px; line-height:1.6; word-break:keep-all;">
+                            이전 주문과 합쳐 무료배달 기준을 넘어<br>이미 내신 배달비 <b>${paidFeeDeduct.toLocaleString()}원</b>을 빼드렸습니다.
                         </div>
                         ` : ''}
-                        ${showDeductNotice ? `
-                        <div style="font-size:13px; font-weight:800; color:#2e7d32; margin-top:-4px; margin-bottom:8px;">
-                            (이전에 주문한 상품 가격 및 배달비를 제외한 금액입니다.)
+                        ${extraItems.length > 0 ? `
+                        <div style="font-size:12.5px; font-weight:700; color:#888; margin-top:-2px; margin-bottom:8px; line-height:1.6; word-break:keep-all;">
+                            이전 주문 ${extraItems.filter(it => it.name !== '배달비').length}건도 같은 날 함께 배달됩니다.<br>위 금액은 <b style="color:#666;">이번 주문 건</b>에 대한 금액입니다.
                         </div>
                         ` : ''}
                         
                         <div style="font-size:16px; font-weight:800; color:var(--nego-orange); margin-bottom:4px;">
                             ${(currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? '오후 3시까지 입금 부탁드립니다.' : '당일 24시까지 입금 부탁드립니다.'}
                         </div>
+                        <!-- [수정] 입금자명 안내는 사다드림만이 아니라 모든 입금 주문에 해당하므로 기본 안내로 뺐다 -->
+                        <div style="font-size:14px; font-weight:700; color:#666; margin-top:2px; margin-bottom:8px; word-break:keep-all;">
+                            입금자명을 <b style="color:var(--item-black);">닉네임과 같게</b> 보내주세요.
+                        </div>
                         <div style="font-size:16px; font-weight:800; color:#d32f2f; margin-top:6px; margin-bottom:10px;">
                             🚨 미입금시 주문이 자동으로 취소됩니다.
                         </div>
+                        ${hasSadaInGuide ? `
+                        <div style="background:#fff4e9; border:1px solid #ffd9b3; border-radius:10px; padding:10px 12px; margin:0 6px 10px 6px; text-align:left; line-height:1.7; word-break:keep-all;">
+                            <div style="font-size:13px; font-weight:900; color:#c2610a; margin-bottom:4px;">🛵 사다드림 안내</div>
+                            <div style="font-size:13px; font-weight:700; color:var(--item-black);">사다드림은 <b style="color:var(--nego-orange);">당일 입금</b>이 확인되어야 주문이 확정됩니다.</div>
+                        </div>
+                        ` : ''}
 
                         <!-- 주문 상품 내역 렌더링 -->
                         <div style="border-top:1px dashed #eee; padding-top:12px; margin-top:5px; text-align:left;">
@@ -8871,12 +8946,15 @@
                                     if (it.name === "배달비") return '';
                                     return `
                                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; background:#f8f9fa; padding:6px 8px; border-radius:6px; border:1px solid #f1f3f5;">
-                                            <span style="font-weight:700; color:var(--item-black); flex:1; padding-right:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                                                ${it.isExtra ? '<span style="color:var(--main-blue); font-size:10px; margin-right:4px; font-weight:900;">[합산]</span>' : ''}
-                                                ${it.name}
+                                            <span style="font-weight:700; color:${it.isExtra ? '#999' : 'var(--item-black)'}; flex:1; padding-right:10px; min-width:0;">
+                                                <span style="display:block; white-space:normal; word-break:keep-all; line-height:1.4;">
+                                                    ${it.isExtra ? '<span style="color:#999; font-size:10px; margin-right:4px; font-weight:900;">[이전 주문]</span>' : ''}
+                                                    ${it.name}
+                                                </span>
+                                                ${it.optionText ? `<span style="display:block; font-size:11.5px; font-weight:600; color:#c2610a; margin-top:2px; white-space:normal; word-break:keep-all;">└ ${it.optionText}</span>` : ''}
                                             </span>
                                             <span style="font-weight:800; color:#666; margin-right:10px; flex-shrink:0;">${it.qty}개</span>
-                                            <span style="font-weight:800; color:var(--nego-orange); flex-shrink:0;">${(it.price * it.qty).toLocaleString()}원</span>
+                                            <span style="font-weight:800; color:${it.isExtra ? '#bbb' : 'var(--nego-orange)'}; flex-shrink:0;">${(it.price * it.qty).toLocaleString()}원</span>
                                         </div>
                                     `;
                                 }).join('')}
@@ -9160,7 +9238,8 @@
                     shippingMethod: shippingMethod,
                     name: name,
                     rawTimestamp: tempTimestamp,
-                    matchKey: it.date
+                    matchKey: it.date,
+                    optionText: it.optionText || "" // [신규] 고른 상세옵션
                 }));
 
                 const cacheKey_hist = `history_cache_${name}_${phone}`;
@@ -9231,7 +9310,9 @@
                         pickupDate: jsFormatPickup(getDisplayDate(it)),
                         cashReceipt: cashReceipt,
                         cashReceiptType: (cashReceipt === '발행') ? cashReceiptType : "",
-                        cashReceiptPhone: (cashReceipt === '발행') ? receiptPhone : ""
+                        cashReceiptPhone: (cashReceipt === '발행') ? receiptPhone : "",
+                        // [신규] 손님이 고른 상세옵션 (상품명은 그대로 두고 별도 항목으로 저장)
+                        optionText: it.optionText || ""
                     };
                     if (it.isExtra) {
                         if (it.paid !== undefined) itemPayload.paid = it.paid;
@@ -9354,14 +9435,14 @@
                 const hasSadaDream = allItems.some(it => it.name !== "배달비" && (String(it.name).includes('사다드림') || it.matchKey === '사다드림' || it.date === '사다드림'));
 
                 if (hasSadaDream) {
-                    showSystemModal("주문이 완료되었습니다!", 'alert', () => {
-                        const notice = document.getElementById('bank-modal-notice');
-                        if (notice) notice.style.display = 'block';
-                        window.isSadaOrderFinished = true;
-                        document.getElementById('bank-modal').style.display = 'flex';
-                        checkScrollLock();
-                    });
+                    // [수정] 사다드림도 배달과 같은 입금 안내 화면(계좌 + 금액 + 상품내역)을 보여준다.
+                    //  기존에는 계좌번호만 있고 얼마를 입금할지 안 나와서 손님이 직접 계산해야 했다.
+                    window.isSadaOrderFinished = true;
+                    setBankModalNotice('sada');
+                    showPaymentGuide(allItems, name, phone, shippingMethod, true, { opt: cashReceipt, phone: receiptPhone, type: cashReceiptType });
                 } else if (shippingMethod === '배달주문') {
+                    // [신규] 배달 주문도 계좌 안내를 볼 수 있도록 기록해 둔다 (메뉴 > 계좌번호 안내에서 배달 안내 표시)
+                    window.isDeliveryOrderFinished = true;
                     // [수정] 배달 주문일 때만 완료 후 입금 안내 모달 표시
                     showPaymentGuide(allItems, name, phone, shippingMethod, true, { opt: cashReceipt, phone: receiptPhone, type: cashReceiptType });
                 } else {
