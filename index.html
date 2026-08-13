@@ -1960,14 +1960,16 @@
                     <button class="date-btn" id="status-cancel" onclick="filterStatus('cancel')"
                         style="height:32px; font-size:17px; padding:0; font-weight:900;">취소</button>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px;">
-                    <button class="date-btn active" id="filter-all" onclick="filterHistory('all')"
-                        style="height:32px; font-size:17px; padding:0; font-weight:800;">전체</button>
-                    <button class="date-btn" id="filter-week" onclick="filterHistory('week')"
-                        style="height:32px; font-size:17px; padding:0; font-weight:800;">1주일</button>
-                    <button class="date-btn" id="filter-2weeks" onclick="filterHistory('2weeks')"
-                        style="height:32px; font-size:17px; padding:0; font-weight:800;">2주일</button>
-                    <div style="display:flex; gap:4px;">
+                <!-- [수정] 기간은 왼쪽 작은 버튼 하나로 바꾸고(1주일→1달→전체 순환),
+                     남은 자리에 주문순 / 픽업날짜순 탭을 둔다. -->
+                <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: stretch;">
+                    <button class="date-btn" id="btn-period" onclick="cyclePeriodFilter()"
+                        style="height:32px; flex:0 0 54px; font-size:12px; padding:0; font-weight:800; white-space:nowrap;">1주일 ▾</button>
+                    <button class="date-btn active" id="btn-sort-order" onclick="changeSortMode('timestamp')"
+                        style="height:32px; flex:0.8 1 0; font-size:14px; padding:0; font-weight:900; white-space:nowrap;">주문순</button>
+                    <button class="date-btn" id="btn-sort-pickup" onclick="changeSortMode('pickupDate')"
+                        style="height:32px; flex:1.4 1 0; font-size:12px; padding:0; font-weight:900; white-space:nowrap;">픽업(배송)날짜순</button>
+                    <div style="display:flex; gap:4px; flex:0 0 66px;">
                         <button class="date-btn" id="btn-sort-dir" onclick="toggleSortDir()"
                             style="height: 32px; flex:1; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1989,15 +1991,6 @@
                                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
                             </svg>
                         </button>
-                    </div>
-                </div>
-                <div id="sort-controls-row"
-                    style="display: none; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 0; border-top: 1.5px solid #eee; padding-top: 8px;">
-                    <div style="grid-column: 1 / 4; display: flex; gap: 6px;">
-                        <button class="date-btn active" id="btn-sort-order" onclick="changeSortMode('timestamp')"
-                            style="height:32px; font-size:17px; flex:1; padding:0; font-weight:900;">주문일별 정렬</button>
-                        <button class="date-btn" id="btn-sort-pickup" onclick="changeSortMode('pickupDate')"
-                            style="height:32px; font-size:17px; flex:1; padding:0; font-weight:900;">픽업일별 정렬</button>
                     </div>
                 </div>
             </div>
@@ -2332,7 +2325,7 @@
 
             const key = String(targetKey || "").trim();
             const hasSadaInList = Array.isArray(filteredData)
-                && filteredData.some(p => String(p.name || "").includes("사다드림"));
+                && filteredData.some(gIsSadaProduct);
 
             let html = "";
 
@@ -2952,7 +2945,10 @@
             
             for (const itemName in cart) {
                 if (cart[itemName] > 0) {
-                    const pData = productsData.find(p => p.name === itemName);
+                    // [버그수정] 장바구니 키는 상세옵션이 있으면 "상품명@@OPT@@옵션"이라 상품명과 직접 비교하면 못 찾는다.
+                    //  못 찾으면 배달일이 오늘/내일로 남아 같은 날 합배송 대상을 놓치고 배달비도 다시 붙었다.
+                    //  아래 checkCombinedDelivery()와 같은 방식(gFindCartProduct)으로 통일한다.
+                    const pData = gFindCartProduct(itemName);
                     if (pData && pData.matchKey) {
                         const mKey = pData.matchKey;
                         if (/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(mKey)) {
@@ -3031,7 +3027,7 @@
                 if (cart[name] > 0) {
                     const p = productsData.find(pd => pd.name === gCartName(name));
                     if (p) {
-                        const isSada = name.includes("사다드림") || p.matchKey === "사다드림";
+                        const isSada = gIsSadaProduct(p);
                         const price = gCartUnitPrice(p, name) * cart[name]; // [수정] 선택한 옵션 금액 포함
                         const pDate = _normFeeDate(p.matchKey) || _normFeeDate(p.date);
                         if (isSada) {
@@ -3075,37 +3071,53 @@
 
             // 1. 사다드림 기존 주문 내역 및 배달비 조회
             //    (사다드림 금액은 기준 계산에서 빠지므로 기존 주문 금액은 합산하지 않고 배달비 부과 여부만 확인)
-            const pendingSadaItems = mergeSadaFee ? [] : getPendingItemsByDate("사다드림");
+            // [버그수정] 예전에는 조회 날짜로 "사다드림"이라는 글자를 넘겼는데, 함수는 주문의 pickupDate(실제 날짜)와
+            //  비교하므로 절대 일치하지 않았다. 그래서 같은 날 이미 배달비를 냈어도 못 찾고 매번 다시 부과했다.
+            //  사다드림의 실제 배달일로 조회한다.
+            const sadaLookupDate = sadaDeliveryDate || deliveryDate;
+            const pendingSadaItems = mergeSadaFee ? [] : getPendingItemsByDate(sadaLookupDate, true);
+
+            // [신규] 무료배달(15,000원) 판정에 쓰는 금액 합계.
+            //  - 배달비 자체와 사다드림 금액은 기준에서 뺀다.
+            //  - 픽업 주문은 배달과 상관없으므로 뺀다. (같은 날이라도 차가 나가는 것과 무관)
+            const sumFreeShipBase = (items) => items.reduce((acc, it) => {
+                if (it.item === "배달비") return acc;
+                if (gIsSadaOrder(it)) return acc;
+                if (!String(it.shippingMethod || "").includes("배달")) return acc;
+                return acc + parseInt(it.price || 0) * parseInt(it.qty || 0);
+            }, 0);
+
             let hasExistingSadaFee = false;
             pendingSadaItems.forEach(item => {
                 if (item.item === "배달비") hasExistingSadaFee = true;
             });
+            // 사다드림 배달일에 이미 잡혀 있는 '배달' 주문 금액 (같은 차로 나가는 건)
+            const existingSadaDateShipBase = sumFreeShipBase(pendingSadaItems);
 
             // 2. 예약구매 기존 주문 내역 및 배달비 조회 (합산 시 같은 날 사다드림 주문도 포함)
             const pendingReserveItems = getPendingItemsByDate(deliveryDate, mergeSadaFee);
-            let existingReserveTotal = 0;
             let hasExistingReserveFee = false;
             let existingReserveFeeItem = null;
             pendingReserveItems.forEach(item => {
                 if (item.item === "배달비") {
                     hasExistingReserveFee = true;
                     existingReserveFeeItem = item;
-                } else {
-                    // [수정] 기존 주문 중 사다드림 상품 금액도 최소금액 계산에서 제외
-                    const isSadaItem = String(item.item || "").includes("사다드림") || item.matchKey === "사다드림";
-                    if (isSadaItem) return;
-                    existingReserveTotal += parseInt(item.price || 0) * parseInt(item.qty || 0);
                 }
             });
+            const existingReserveTotal = sumFreeShipBase(pendingReserveItems);
 
             // 3. 사다드림 배달비 부과 여부 판별
-            //    [수정] 사다드림 금액은 최소금액 계산에 포함되지 않으므로 항상 기준 미달로 본다.
+            //    사다드림 금액 자체는 무료배달 기준에 넣지 않는다. 다만 같은 날 이미 나가는 배달에 얹히는 것이라
+            //    그 배달이 이미 무료 기준을 넘겼다면 배달비를 또 받지 않는다.
             let needSadaFeePrompt = false;
             if (hasSadaInCart) {
                 if (hasExistingSadaFee) {
                     // 같은 배달 건에 이미 배달비가 부과되어 있으면 중복 부과하지 않음
                     window.isSadaDeliveryFeeAdded = false;
-                } else if (!window.isSadaDeliveryFeeAdded && pendingSadaItems.length === 0) {
+                } else if (existingSadaDateShipBase >= 15000) {
+                    // [신규] 그날 배달이 이미 무료 기준을 넘겨 잡혀 있으면 같은 차로 나가므로 배달비 없음
+                    window.isSadaDeliveryFeeAdded = false;
+                } else if (!window.isSadaDeliveryFeeAdded) {
                     needSadaFeePrompt = true;
                 }
             } else {
@@ -3113,17 +3125,21 @@
             }
 
             // 4. 예약구매 배달비 부과 여부 판별
+            //    [수정] 합배송으로 함께 나가는 기존 주문 금액과 이번 주문 금액을 합쳐서 판단한다.
+            //     합쳐서 15,000원을 넘으면 배달비가 아예 붙지 않으므로 안내도 띄우지 않는다.
             let needReserveFeePrompt = false;
             if (hasReserveInCart) {
-                if (existingReserveTotal >= 15000) {
-                    window.isReserveDeliveryFeeAdded = false;
-                } else if (hasExistingReserveFee) {
-                    const combined = existingReserveTotal + reserveTotal;
-                    if (combined >= 15000 && existingReserveFeeItem) {
+                const combinedShipBase = existingReserveTotal + reserveTotal;
+                if (combinedShipBase >= 15000) {
+                    // 합쳐서 무료 기준을 넘겼다. 앞서 낸 배달비가 있으면 없애 준다.
+                    if (hasExistingReserveFee && existingReserveFeeItem) {
                         await deleteExistingFee(existingReserveFeeItem, nameVal, phoneVal);
                     }
                     window.isReserveDeliveryFeeAdded = false;
-                } else if (reserveTotal < 15000 && !window.isReserveDeliveryFeeAdded && pendingReserveItems.length === 0) {
+                } else if (hasExistingReserveFee) {
+                    // 같은 날짜에 이미 배달비를 냈으면 또 받지 않는다.
+                    window.isReserveDeliveryFeeAdded = false;
+                } else if (!window.isReserveDeliveryFeeAdded) {
                     needReserveFeePrompt = true;
                 }
             } else {
@@ -3158,6 +3174,8 @@
                 ? `<div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:9px 12px; margin-top:10px; font-size:13px; font-weight:700; color:#2e7d32; line-height:1.6; word-break:keep-all; text-align:center;">💡 같은 날짜 상품을 ${`<b>${shortfall.toLocaleString()}원</b>`}만 더 담으면 배달비가 무료예요.</div>`
                 : ``;
 
+            // [수정] 배달비 안내가 가장 먼저 나온다. 대신 위에서 합배송분을 합쳐 계산했으므로
+            //  실제로 배달비가 붙는 경우에만 여기까지 온다. (붙지 않으면 안내 없이 그냥 지나간다)
             if (needSadaFeePrompt && needReserveFeePrompt) {
                 showSystemModal(
                     feeModal(
@@ -3315,11 +3333,10 @@
             // [추가] 공동구매 상품과 일반(상시/과일) 상품 혼합 주문 시 안내 (최우선순위)
             if (hasReserve && hasAnyRegular) {
                 const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 합배송 안내]</span><span style="display:block; white-space:nowrap; font-size:0.9em;">구매상품중 가장늦은 입고일에 합배송 됩니다.</span>${maxDateStr ? `<span style="display:block; white-space:nowrap; margin-top:2px;">[배달예정일 : ${maxDateStr}]</span>` : ''}`;
-                showSystemModal(msg + "<br><br>주문하시겠습니까?", 'confirm', () => {
-                    holidayConfirmedStatus = true;
-                    cutoffConfirmedStatus = true;
-                    checkCombinedDelivery();
-                });
+                // [수정] 안내창을 따로 띄우지 않고 합배송 목록과 한 창에 묶어서 보여준다.
+                holidayConfirmedStatus = true;
+                cutoffConfirmedStatus = true;
+                checkCombinedDelivery(msg);
                 return;
             }
 
@@ -3335,11 +3352,9 @@
                 }
                 const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>${holidayTerm}에 주문하신 상품은 <span style="color:var(--nego-orange);">\n다음 평일</span>에 배달됩니다.`;
 
-                showSystemModal(holidayMsg + "<br><br>배달주문 하시겠습니까?", 'confirm', () => {
-                    holidayConfirmedStatus = true;
-                    cutoffConfirmedStatus = true;
-                    checkCombinedDelivery();
-                });
+                holidayConfirmedStatus = true;
+                cutoffConfirmedStatus = true;
+                checkCombinedDelivery(holidayMsg);
                 return;
             }
 
@@ -3370,16 +3385,17 @@
             }
  
             if (showModal) {
-                showSystemModal(msg + "<br><br>주문하시겠습니까?", 'confirm', () => {
-                    cutoffConfirmedStatus = true;
-                    checkCombinedDelivery();
-                });
+                cutoffConfirmedStatus = true;
+                checkCombinedDelivery(msg);
             } else {
                 cutoffConfirmedStatus = false;
                 checkCombinedDelivery();
             }
 
-            function checkCombinedDelivery() {
+            // [수정] 배달 안내와 이전 주문 합배송 목록을 한 창에 묶어서 보여준다.
+            //  예전에는 "합배송 됩니다" 안내창을 확인한 뒤 곧바로 "예약된 상품이 있어 같이 갑니다" 창이
+            //  또 떠서 같은 말을 두 번 읽게 됐다. noticeHtml 은 앞 단계에서 넘겨받은 배달 안내 문구다.
+            function checkCombinedDelivery(noticeHtml) {
                 // [신규] 장바구니 상품의 배달 기준일 계산
                 let targetDateObj = new Date(now);
                 if (currentDeliveryType === 'reserve' || currentHour >= 15) targetDateObj.setDate(targetDateObj.getDate() + 1);
@@ -3411,23 +3427,33 @@
                     }
                 }
 
-                const pendingItems = getPendingItemsByDate(deliveryDate);
-                if (pendingItems.length > 0) {
-                    let itemNames = pendingItems.map(it => `• ${it.item} (${it.qty}개)`).join('<br>');
-                    let msg = `해당 배달 날짜에 예약된 상품이 있어 같이 합배송 됩니다.<br><div style="background:#f5f5f5; padding:10px; border-radius:8px; margin:10px 0; text-align:left; font-size:14px; font-weight:700; color:var(--item-black);">${itemNames}</div>`;
+                // [수정] 배달일이 같으면 사다드림도 함께 배달된다. 안내·목록에는 포함한다.
+                //  (배달비 계산에서 사다드림 금액을 빼는 것은 별개 로직이라 영향받지 않는다)
+                const pendingItems = getPendingItemsByDate(deliveryDate, true);
 
-                    showSystemModal(msg, 'alert', () => {
-                        selectedShippingMethod = '배달주문';
-                        combinedDeliveryItems = pendingItems;
-                        closeModal('shipping-overlay');
-                        openConfirm();
-                    });
-                } else {
+                const proceed = () => {
                     selectedShippingMethod = '배달주문';
-                    combinedDeliveryItems = [];
+                    combinedDeliveryItems = pendingItems;
                     closeModal('shipping-overlay');
                     openConfirm();
+                };
+
+                let body = noticeHtml || "";
+                if (pendingItems.length > 0) {
+                    const itemNames = pendingItems.map(it => `• ${it.item} (${it.qty}개)`).join('<br>');
+                    // 앞에 붙은 안내가 없으면 이 목록만으로도 무슨 창인지 알 수 있게 제목을 세운다
+                    if (!body) {
+                        body = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 합배송 안내]</span>`;
+                    }
+                    body += `<span style="display:block; margin-top:12px; font-size:0.9em;">같은 날짜에 예약하신 아래 상품과 함께 배달됩니다.</span>` +
+                            `<div style="background:#f5f5f5; padding:10px; border-radius:8px; margin:6px 0 0; text-align:left; font-size:14px; font-weight:700; color:var(--item-black);">${itemNames}</div>`;
                 }
+
+                if (!body) {
+                    proceed();
+                    return;
+                }
+                showSystemModal(body + "<br><br>주문하시겠습니까?", 'confirm', proceed);
             }
         }
 
@@ -3554,10 +3580,15 @@
             return fullHistoryData.filter(item => {
                 const isDeliveryFee = (item.item === "배달비");
 
+                // [버그수정] 이 함수는 배달 합배송(같이 나가는 상품·기존 배달비)을 찾는 데만 쓴다.
+                //  픽업 주문은 손님이 매장에서 받아가므로 같은 날이어도 배달차에 실리지 않는다.
+                //  예전에는 픽업 주문까지 '같이 합배송됩니다' 목록에 끼어 들어갔다.
+                if (!String(item.shippingMethod || "").includes("배달")) return false;
+
                 // [수정] 사다드림(신선식품)은 사다드림 전용 합배송에서만 묶여야 함.
                 // 사다드림 주문은 pickupDate가 실제 배달일로 기록되어 일반 상품 배달일과 겹칠 수 있는데,
                 // 그 경우 일반 날짜 합배송에 사다드림이 딸려 들어가면 안 되므로 여기서 제외한다.
-                const isSadaItem = String(item.item || "").includes("사다드림") || item.matchKey === "사다드림";
+                const isSadaItem = gIsSadaOrder(item);
                 if (targetDate !== "사다드림" && isSadaItem && !includeSada) return false;
 
                 // parseKRDate를 사용하여 한글 날짜 형식(예: 2026년 7월 14일 (화))을 YYYY-MM-DD로 안전하게 파싱하여 비교
@@ -3881,7 +3912,7 @@
             return items.some(it => {
                 const nm = String(it.name || "");
                 if (nm === "배달비") return false;
-                if (nm.includes('사다드림') || it.matchKey === '사다드림') return false; // 사다드림은 선택한 배달일을 따로 기록
+                if (gIsSadaOrder(it)) return false; // 사다드림은 선택한 배달일을 따로 기록
                 const ds = gNormReserveDate(it.date, it.matchKey);
                 return !!ds && ds > todayStr;
             });
@@ -3910,7 +3941,7 @@
                 total++;
                 const p = gFindCartProduct(nm);
                 if (!p) continue;
-                if (String(nm).includes('사다드림') || p.matchKey === '사다드림') continue;
+                if (gIsSadaProduct(p)) continue;
                 const ds = gNormReserveDate(p.date, p.matchKey);
                 if (ds && ds > todayStr) reserveCnt++;
             }
@@ -4155,10 +4186,11 @@
                 btnOk.style.fontSize = btnFont;
                 btnOk.innerText = '확인';
 
-                btnOk.onclick = () => {
+                btnOk.onclick = async () => {
                     modal.style.display = 'none';
                     checkScrollLock();
-                    if (yesCallback) yesCallback();
+                    // [수정] 확인 후 실제 처리(주문 저장 등)를 하는 곳이 있어 완료를 기다린다
+                    if (yesCallback) await yesCallback();
                 };
                 btnDiv.appendChild(btnOk);
             } else if (type === 'loading') {
@@ -4747,8 +4779,8 @@
                 // 버튼 클래스 초기화 (중복 활성화 방지)
                 document.querySelectorAll('#history-modal .date-btn').forEach(btn => btn.classList.remove('active'));
                 document.getElementById('btn-sort-order')?.classList.add('active');
-                document.getElementById('filter-week')?.classList.add('active');
                 document.getElementById('status-all')?.classList.add('active');
+                updatePeriodButton();
 
                 title.innerHTML = `<span class="name-badge" style="margin-right:0;">${displayName}</span><span>님의 주문내역</span>`;
                 modal.style.display = 'flex';
@@ -4831,31 +4863,47 @@
             }
             currentSortBy = mode;
             currentHistoryLimit = 10; // 초기화
-            // [수정] 모든 모드에서 기본 내림차순(desc) 적용
-            currentSortDir = 'desc';
+            // [수정] 주문순은 최신 주문부터, 픽업날짜순은 가까운 픽업일부터가 보기 편하다
+            currentSortDir = (mode === 'pickupDate') ? 'asc' : 'desc';
 
             document.getElementById('btn-sort-order').classList.toggle('active', mode === 'timestamp');
             document.getElementById('btn-sort-pickup').classList.toggle('active', mode === 'pickupDate');
             renderHistory();
         }
 
+        // [신규] 기간은 버튼 하나로 1주일 → 1달 → 전체를 돌려가며 고른다.
+        const HISTORY_PERIODS = [
+            { key: 'week', label: '1주일' },
+            { key: 'month', label: '1달' },
+            { key: 'all', label: '전체' }
+        ];
+
+        function updatePeriodButton() {
+            const btn = document.getElementById('btn-period');
+            if (!btn) return;
+            const cur = HISTORY_PERIODS.find(p => p.key === currentFilter) || HISTORY_PERIODS[0];
+            btn.innerText = cur.label + ' ▾';
+        }
+
+        function cyclePeriodFilter() {
+            const idx = HISTORY_PERIODS.findIndex(p => p.key === currentFilter);
+            const next = HISTORY_PERIODS[(idx + 1) % HISTORY_PERIODS.length];
+            filterHistory(next.key);
+        }
+
         function filterHistory(type) {
             currentFilter = type;
             currentHistoryLimit = 10; // 초기화
-            currentSortDir = 'desc'; // [추가] 필터 변경 시 내림차순 기본 적용
-            // 버튼 활성화 처리
-            const buttons = ['all', 'week', '2weeks', 'month'];
-            buttons.forEach(b => {
-                const btn = document.getElementById('filter-' + b);
-                if (btn) btn.classList.toggle('active', b === type);
-            });
+            // [수정] 기간을 바꿨다고 보던 순서까지 뒤집히지 않게, 탭에 맞는 기본 방향으로 맞춘다
+            currentSortDir = (currentSortBy === 'pickupDate') ? 'asc' : 'desc';
+            updatePeriodButton();
             renderHistory();
         }
 
         function filterStatus(status) {
             currentStatusFilter = status;
             currentHistoryLimit = 10; // 초기화
-            currentSortDir = 'desc'; // [추가] 상태 변경 시 내림차순 기본 적용
+            currentSortDir = (currentSortBy === 'pickupDate') ? 'asc' : 'desc'; // 탭에 맞는 기본 방향
             // 버튼 활성화 처리
             const statuses = ['all', 'order', 'cancel', 'stocked', 'pickup'];
             statuses.forEach(s => {
@@ -4922,6 +4970,173 @@
             return s;
         }
 
+        // [신규] 픽업날짜순 보기 — 같은 픽업일끼리 한 카드에 모은다.
+        //  주문일이 언제였든 상관없이 '언제 받는지'로 묶어서 본다.
+        //  지난 날짜 중 아직 못 받은 건은 맨 위 '미픽업'으로 모으고,
+        //  그 아래로는 오늘 포함 앞으로의 날짜만 보여준다. (이미 받은 지난 건은 주문순 탭에서 본다)
+        function gPickupDateKey(pickupDate) {
+            const d = parseKRDate(pickupDate);
+            if (!d || isNaN(d.getTime())) return "";
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        function buildPickupDateHtml(filtered) {
+            const now = new Date();
+            const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+            const groups = [];
+            const getGroup = (key, sortKey, label) => {
+                let g = groups.find(x => x.key === key);
+                if (!g) {
+                    g = { key: key, sortKey: sortKey, label: label, items: [], totalPrice: 0, count: 0 };
+                    groups.push(g);
+                }
+                return g;
+            };
+
+            filtered.forEach(item => {
+                // [수정] 취소된 건은 이 탭에서 아예 빼고 본다. (취소 내역은 주문순 탭이나 '취소' 상태에서 확인)
+                if (isOrderCancelled(item)) return;
+
+                const raw = String(item.pickupDate || "").trim();
+                const dateKey = gPickupDateKey(raw);
+                let g;
+
+                if (dateKey && dateKey < todayKey) {
+                    // 지난 픽업일 — 아직 못 받은 것만 '미픽업'으로 모은다
+                    if (isOrderReceived(item) || isOrderDelivered(item)) return;
+                    g = getGroup('__unpicked', '0', '미픽업');
+                } else if (dateKey) {
+                    const pd = parseKRDate(raw);
+                    const w = ['일', '월', '화', '수', '목', '금', '토'][pd.getDay()];
+                    const label = `${pd.getMonth() + 1}월 ${pd.getDate()}일 (${w})` + (dateKey === todayKey ? ' · 오늘' : '');
+                    g = getGroup(dateKey, dateKey, label);
+                } else {
+                    // 상시판매·현장판매처럼 날짜가 아닌 것은 맨 뒤에 따로
+                    g = getGroup(raw || '정보없음', '9', raw || '정보없음');
+                }
+
+                g.items.push(item);
+                g.count++;
+                g.totalPrice += parseInt(item.total || 0);
+            });
+
+            groups.sort((a, b) => {
+                // 미픽업은 항상 맨 위
+                if (a.key === '__unpicked') return -1;
+                if (b.key === '__unpicked') return 1;
+                if (a.sortKey === b.sortKey) return 0;
+                return currentSortDir === 'desc'
+                    ? (a.sortKey < b.sortKey ? 1 : -1)
+                    : (a.sortKey < b.sortKey ? -1 : 1);
+            });
+
+            if (groups.length === 0) {
+                return '<div style="text-align:center; color:#455464; padding:50px 0;">표시할 픽업 예정 내역이 없습니다.</div>';
+            }
+
+            let html = '';
+            groups.slice(0, currentHistoryLimit).forEach(group => {
+                const isUnpicked = (group.key === '__unpicked');
+                const domKey = 'pk_' + fSafeKey(group.key);
+                const borderColor = isUnpicked ? 'rgba(211, 47, 47, 0.35)' : 'rgba(59, 130, 246, 0.35)';
+                const leftBorder = isUnpicked ? '4px solid #d32f2f' : '4px solid #3b82f6';
+                const headerBg = isUnpicked ? '#fff5f5' : '#eff6ff';
+
+                html += `
+                    <div style="background:var(--white); border: 1.5px solid ${borderColor}; border-left: ${leftBorder}; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
+                        <div onclick="toggleHistoryGroup('${domKey}', this)" style="background:${headerBg}; padding:12px 15px; cursor:pointer;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="flex:1; padding-right:10px; min-width:0;">
+                                    <div style="font-size:11px; color:#999; margin-bottom:2px;">${isUnpicked ? '지난 날짜' : '픽업/배달 예정일'}</div>
+                                    <div style="font-size:16px; font-weight:800; color:${isUnpicked ? '#d32f2f' : 'var(--item-black)'};">${group.label}</div>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:13px; font-weight:700; color:#455464;">${group.count}건</span>
+                                    <span style="font-size:16px; font-weight:900; color:var(--nego-orange);">${group.totalPrice.toLocaleString()}원</span>
+                                    <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.3s; transform: rotate(180deg);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="${domKey}" style="display:block; padding:10px 15px 15px 15px; border-top:1px dashed #eee; background:#fff;">
+                `;
+
+                group.items.forEach((order, idx) => {
+                    if (order.deliveryPhoto) {
+                        window.deliveryPhotos = window.deliveryPhotos || {};
+                        window.deliveryPhotos[order.phone + "_" + order.orderKey] = order.deliveryPhoto;
+                    }
+                    const isCombined = (order.item && order.item.includes('[배달합산]'));
+                    const isCancelled = isOrderCancelled(order);
+                    const isProcessing = order.isProcessing === true;
+                    const isReceived = isOrderReceived(order);
+                    const isStocked = isOrderStocked(order);
+                    const isDelivered = isOrderDelivered(order);
+
+                    let statusText = '', statusColor = '';
+                    if (isProcessing) { statusText = '취소중...'; statusColor = '#666'; }
+                    else if (isCombined || isCancelled) { statusText = '취소완료'; statusColor = '#999'; }
+                    else if (isDelivered) { statusText = '배달완료'; statusColor = '#4CAF50'; }
+                    else if (isReceived) { statusText = '픽업완료'; statusColor = '#4CAF50'; }
+                    else if (isStocked) { statusText = '입고완료'; statusColor = 'var(--nego-orange)'; }
+                    else { statusText = '미입고'; statusColor = '#AAA'; }
+
+                    const isDeliveryItem = order.shippingMethod === '배달주문';
+                    const isBadgeTarget = isDeliveryItem || gIsSadaOrder(order) || order.item === '배달비';
+                    const isPaid = (order.paid === true || order.paid === "true" || String(order.paid).toUpperCase() === "TRUE");
+                    let payBadgeHtml = '';
+                    if (isBadgeTarget && !isCancelled && !isCombined) {
+                        payBadgeHtml = isPaid
+                            ? `<span style="padding: 2px 7px; background: #e8f5e9; color: #2e7d32; border: 1px solid #c5e0b4; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">입금완료</span>`
+                            : `<span style="padding: 2px 7px; background: #ffd8d8; color: #d32f2f; border: 1px solid #ffb8b8; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">미입금</span>`;
+                    }
+
+                    // 주문순 카드와 달리 여기선 주문일이 카드에 없으므로 항목마다 적어 준다
+                    let orderTimeShort = '';
+                    const od = parseKRDate(order.timestamp);
+                    if (od && !isNaN(od.getTime())) {
+                        orderTimeShort = `${od.getMonth() + 1}월 ${od.getDate()}일 주문`;
+                    }
+
+                    html += `
+                        <div style="padding: 10px 0; ${idx !== group.items.length - 1 ? 'border-bottom: 1px dashed #eee;' : ''} ${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="flex:1;">
+                                    <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.3; margin-bottom:4px;">
+                                        ${isDeliveryItem
+                                            ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:5px; font-weight:900;">배달</span>'
+                                            : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:5px; font-weight:900;">픽업</span>'}
+                                        <span>${order.item}</span>
+                                        ${gOptionLinesHtml(order.optionText)}
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                        <div style="font-size:13px; font-weight:700; color:#455464;">${order.qty}개</div>
+                                        <div style="font-size:13px; font-weight:700; color:var(--item-black);">${parseInt(order.total || 0).toLocaleString()}원</div>
+                                        ${orderTimeShort ? `<div style="font-size:12px; font-weight:600; color:#9aa5b1;">${orderTimeShort}</div>` : ''}
+                                    </div>
+                                </div>
+                                <div style="text-align:right; min-width:80px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:3px;">
+                                    ${payBadgeHtml}
+                                    ${statusText !== '배달완료' ? `<div style="font-size:14px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div></div>`;
+            });
+
+            if (groups.length > currentHistoryLimit) {
+                html += `
+                    <div style="text-align:center; padding:20px 0;">
+                        <button onclick="loadMoreHistory()" style="background:#f5f5f5; border:none; border-radius:var(--btn-radius); padding:10px 25px; font-weight:800; color:#555; cursor:pointer;">더보기 +</button>
+                    </div>
+                `;
+            }
+            return html;
+        }
+
         function renderHistory() {
             window.deliveryPhotos = {};
             const list = document.getElementById('history-list');
@@ -4969,8 +5184,8 @@
                 if (currentFilter === '2weeks') return diffDays <= 14;
                 if (currentFilter === 'month') return diffDays <= 30;
 
-                // 3. '전체' 필터 (최대 1개월로 제한)
-                if (currentFilter === 'all') return diffDays <= 31;
+                // [수정] '전체'는 말 그대로 전부 보여준다. (예전엔 31일로 잘려 있었다)
+                if (currentFilter === 'all') return true;
 
                 return false;
             });
@@ -5012,6 +5227,12 @@
                 const timeB = parseKRDate(b.timestamp);
                 return timeB - timeA;
             });
+
+            // [신규] 픽업날짜순 탭은 카드 묶는 기준이 달라서 따로 그린다. (주문순 카드는 아래 그대로 유지)
+            if (currentSortBy === 'pickupDate') {
+                list.innerHTML = buildPickupDateHtml(filtered);
+                return;
+            }
 
             // [그룹화] 주문 시간(timestamp) 단위로 1차 그룹화
             const groupedTransactions = [];
@@ -5241,7 +5462,7 @@
                         else if (isStocked) { statusText = '입고완료'; statusColor = 'var(--nego-orange)'; }
                         else { statusText = '미입고'; statusColor = '#AAA'; }
 
-                        const isSadaItem = order.item && (order.item.includes('사다드림') || order.matchKey === '사다드림');
+                        const isSadaItem = gIsSadaOrder(order);
                         const isDeliveryItem = order.shippingMethod === '배달주문';
                         const isBadgeTarget = isDeliveryItem || isSadaItem || order.item === '배달비';
                         const isPaid = (order.paid === true || order.paid === "true" || String(order.paid).toUpperCase() === "TRUE");
@@ -5399,7 +5620,7 @@
                 let activeCount = 0;
                 items.forEach(o => {
                     if (o.item !== '배달비') {
-                        const isSadaItem = String(o.item || "").includes("사다드림") || o.matchKey === "사다드림";
+                        const isSadaItem = gIsSadaOrder(o);
                         if (!isSadaItem) activeTotal += parseInt(o.total || 0);
                         activeCount++;
                     }
@@ -5520,19 +5741,8 @@
 
             const canceledTotal = targetOrders.reduce((a, o) => a + (parseInt(o.total) || 0), 0);
 
-            // 같은 주문(타임스탬프)에서 취소되지 않고 남은 금액.
-            // 이번 취소로 새로 붙은 배달비는 타임스탬프가 달라 여기 안 잡히므로 따로 더한다.
-            let remainingTotal = 0;
-            fullHistoryData.forEach(d => {
-                const rowDigitTime = normD(d.timestamp);
-                const isTimeMatch = rowDigitTime === targetDigitTime ||
-                    (rowDigitTime.length > targetDigitTime.length ? rowDigitTime.endsWith(targetDigitTime) : targetDigitTime.endsWith(rowDigitTime));
-                if (!isTimeMatch) return;
-                if (isOrderCancelled(d)) return;
-                if (d.item && d.item.includes('[배달합산]')) return;
-                remainingTotal += parseInt(d.total) || 0;
-            });
-            remainingTotal += addedFee;
+            // [수정] 이 안내는 주문 카드를 통째로 취소할 때만 뜬다. 어차피 전액 취소라
+            //  '남은 결제 금액'은 늘 0이거나 이번에 새로 붙은 배달비뿐이라 따로 보여주지 않는다.
 
             const row = (label, value, opt = {}) => `
                 <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; ${opt.mt ? 'margin-top:7px;' : ''}">
@@ -5544,28 +5754,21 @@
             // 안내문은 normal로 되돌리지 않으면 들여쓰기·줄바꿈이 그대로 여백으로 찍힌다.
             let msg = `<div style="text-align:left; display:flex; flex-direction:column; gap:14px; white-space:normal;">
                 <div style="text-align:center; font-size:18px; font-weight:800; color:var(--item-black);">
-                    ${remainingTotal > 0 ? '주문이 취소되었습니다' : '주문이 모두 취소되었습니다'}
+                    주문이 모두 취소되었습니다
                 </div>
 
                 <div style="background:#fff9f2; padding:14px; border-radius:12px; border:1px solid #ffe8cc;">
                     ${row('취소한 금액', '-' + won(canceledTotal))}
                     ${addedFee > 0 ? row('추가된 배달비', '+' + won(addedFee), { mt: true, color: '#d32f2f' }) : ''}
-                    <div style="border-top:1px dashed #ffdfc0; margin:11px 0 0; padding-top:11px;">
-                        ${row(remainingTotal > 0 ? '남은 결제 금액' : '남은 금액', won(remainingTotal), { strong: true, color: 'var(--nego-orange)' })}
-                    </div>
                 </div>`;
 
             if (addedFee > 0) {
                 msg += `
                 <div style="background:#fff5f5; border:1px solid #ffd8d8; border-radius:10px; padding:11px 12px; font-size:13px; font-weight:700; color:#d32f2f; line-height:1.6; word-break:keep-all;">
                     ⚠️ 남은 주문 금액이 무료배송 기준(15,000원) 미만이 되어 배달비 ${won(addedFee)}이 추가되었습니다.
-                </div>`;
-            }
-
-            if (remainingTotal > 0) {
-                msg += `
+                </div>
                 <div style="font-size:14px; font-weight:700; color:var(--item-black); line-height:1.6; text-align:center; word-break:keep-all;">
-                    취소된 금액을 제외한 <span style="color:var(--nego-orange); font-weight:900;">${won(remainingTotal)}</span>을 입금해 주세요.
+                    배달비 <span style="color:var(--nego-orange); font-weight:900;">${won(addedFee)}</span>을 입금해 주세요.
                     <div style="font-size:12px; font-weight:600; color:#9a8b7a; margin-top:6px;">이미 입금하셨다면 차액은 환불해 드립니다.</div>
                 </div>`;
             } else {
@@ -5634,7 +5837,7 @@
                 if (hasActiveDeliveryFee) continue;
                 
                 // [수정] 사다드림 상품 금액은 배달비 기준 계산에서 제외 (USER 요청)
-                const isSadaOrder = (o) => String(o.item || "").includes("사다드림") || o.matchKey === "사다드림";
+                const isSadaOrder = (o) => gIsSadaOrder(o);
 
                 let currentActiveTotal = 0;
                 dayOrders.forEach(o => {
@@ -6565,7 +6768,7 @@
                                 }
                             } else {
                                 // 공동구매 카테고리 상품의 경우 해당 날짜 오후 3시(15시) 이후에는 미노출 처리
-                                const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
+                                const isReserveDate = gIsDateOnlyKey(s);
                                 if (isReserveDate) {
                                     const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                     if (new Date() >= cutoffDate) {
@@ -6937,6 +7140,20 @@
             renderList(window.lastRenderedTargetKey || '');
         }
 
+        // [신규] 목록 키(targetKey)가 주문관리의 '분류탭 설정' 값 중 어느 것에 해당하는지 알려준다.
+        //  주문관리에 저장하는 값과 같은 문자열을 돌려주므로 그대로 비교하면 된다.
+        function gTabKeyOfTarget(targetKey) {
+            const k = String(targetKey || '').trim();
+            if (!k) return '';
+            if (k === '사다드림') return 'sada';
+            if (k === 'costco' || k.includes('코스트코')) return 'costco';
+            if (k.startsWith('onsite-')) return k;                       // onsite-frozen / -refrigerated / -room
+            if (k === 'today-reserve') return 'today-reserve';
+            if (k.startsWith('today-fruit') || k === 'today-veg-only') return 'today-fruit';
+            if (k === '전체상품_예약' || /^\d{4}-\d{2}-\d{2}$/.test(k)) return 'reserve';
+            return '';
+        }
+
         function renderList(targetKey) {
             const container = document.getElementById('product-list');
             container.innerHTML = '';
@@ -7065,7 +7282,7 @@
                                 }
                             } else {
                                 // 공동구매 카테고리 상품의 경우 해당 날짜 오후 3시(15시) 이후에는 미노출 처리
-                                const isReserveDate = dateRegex.test(s) && !s.includes("상시판매") && !s.includes("현장판매") && !s.includes("코스트코");
+                                const isReserveDate = gIsDateOnlyKey(s);
                                 if (isReserveDate) {
                                     const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
                                     if (new Date() >= cutoffDate) {
@@ -7173,7 +7390,7 @@
                     return s.includes("상온") || s.includes("실온") || st.includes("상온") || st.includes("실온");
                 });
             } else if (targetKey === '사다드림') {
-                filteredData = visibleProducts.filter(p => p.name.includes("사다드림"));
+                filteredData = visibleProducts.filter(gIsSadaProduct);
             } else {
                 filteredData = targetKey === '전체상품_예약'
                 ? visibleProducts.filter(p => {
@@ -7183,7 +7400,7 @@
                     //  '날짜 없는 빈 그룹'으로 섞여 보이던 문제 방지.
                     if (!s) return false;
                     // [신규] 사다드림은 별도 대분류 탭으로 분리 → 공동구매 전체상품에서 제외
-                    if (String(p.name || "").includes("사다드림") || s === "사다드림") return false;
+                    if (gIsSadaProduct(p)) return false;
                     // [수정] 온사이트 및 과채류를 명확히 제외하고 나머지는 모두 공동구매 전체보기에 포함
                     const onSiteKeywords = ["냉동", "냉장", "상온", "실온", "현장판매", "상시판매"];
                     const fvKeywords = ["야채", "과일"];
@@ -7285,13 +7502,34 @@
                                     : visibleProducts.filter(p => {
                                         if (p.matchKey !== targetKey) return false;
                                         // [신규] 공동구매 날짜 탭에서도 사다드림은 제외 (별도 대분류 탭에서만 노출)
-                                        if (currentMainTab === 'reserve' && String(p.name || "").includes("사다드림")) return false;
+                                        if (currentMainTab === 'reserve' && gIsSadaProduct(p)) return false;
                                         const s = String(p.matchKey).trim();
                                         const isVeg = p.name.includes('[야채]') || p.name.includes('[야채구매]') || p.name.includes('[채소]') || p.name.includes('[채소구매]') || s.includes("야채") || s.includes("채소");
                                         const isFruit = p.name.includes('[과일]') || p.name.includes('[과일구매]') || s.includes("과일");
                                         const isEtc = p.name.includes('[기타]') || p.name.includes('[기타구매]') || s.includes("기타");
                                         return !((currentMainTab === 'reserve' || currentMainTab === 'on-site') && (isVeg || isFruit || isEtc));
                                     });
+            }
+
+            // [신규] 주문관리의 '분류탭 설정'(displayTab)이 지정된 상품은 그 값이 기존 분류보다 우선한다.
+            //  · 다른 탭으로 지정된 상품은 여기서 빼고
+            //  · 이 탭으로 지정된 상품은 기존 규칙에 안 걸렸어도 넣는다.
+            //  지정이 없는 상품(displayTab 빈 값)은 위에서 계산한 기존 결과 그대로다.
+            //  검색 중에는 탭과 무관하게 찾는 것이 목적이므로 건드리지 않는다.
+            if (!_searchQ) {
+                const _tabKey = gTabKeyOfTarget(targetKey);
+                if (_tabKey) {
+                    filteredData = filteredData.filter(p => !p.displayTab || p.displayTab === _tabKey);
+                    // 날짜별 하위 탭에는 끼워 넣지 않는다 (날짜는 상품이 가진 날짜로만 묶여야 하므로)
+                    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(targetKey))) {
+                        visibleProducts.forEach(p => {
+                            if (p.displayTab === _tabKey && !filteredData.includes(p)) filteredData.push(p);
+                        });
+                    }
+                } else {
+                    // 어느 탭인지 못 정한 목록에서는 '지정된 상품'만 빼둔다 (엉뚱한 곳에 겹쳐 보이지 않도록)
+                    filteredData = filteredData.filter(p => !p.displayTab);
+                }
             }
 
             // [수정] 상단 안내 문구는 한 곳에서 결정한다 (탭을 바꿔도 이전 안내가 남지 않게)
@@ -7565,8 +7803,33 @@
             return `${y}-${String(parseInt(m[2])).padStart(2, '0')}-${String(parseInt(m[3])).padStart(2, '0')}`;
         }
 
+        // [신규] 분류(matchKey)가 '날짜 그 자체'인지. 공동구매 마감(그날 오후 3시) 판정에 쓴다.
+        //  예전에는 문자열 어디든 날짜꼴이 있으면 잡는 정규식이라 '코스트코 8/14' 같은 값이 날짜로 오인돼,
+        //  상시판매·현장판매·코스트코를 따로 빼주는 조건이 붙어 있었다. 전체 일치로 바꿔 그 예외를 없앴다.
+        function gIsDateOnlyKey(s) {
+            const t = String(s || '').trim();
+            return /^(?:\d{2,4})[./-]\d{1,2}[./-]\d{1,2}$/.test(t) || /^\d{1,2}[./-]\d{1,2}$/.test(t);
+        }
+
+        // [신규] 주문 기록(또는 주문 항목)이 사다드림인지.
+        //  주문할 때 상품의 isSada 값을 함께 저장하므로, 저장된 값이 있으면 그것을 따른다.
+        //  값이 없는 예전 주문만 예전처럼 상품명으로 판단한다.
+        function gIsSadaOrder(o) {
+            if (!o) return false;
+            if (o.isSada === true || o.isSada === 'true') return true;
+            if (o.isSada === false || o.isSada === 'false') return false;
+            const nm = String(o.item || o.name || "");
+            return nm.includes("사다드림") || o.matchKey === "사다드림";
+        }
+
+        // [수정] 사다드림 판정 기준을 상품등록의 '사다드림' 체크(isSada)로 바꾼다.
+        //  예전에는 상품명에 '사다드림'이 들어갔는지로만 봐서, 이름을 조금만 고쳐도 판정이 뒤집혔다.
+        //  isSada 값이 저장된 상품은 그 값을 그대로 따르고, 아직 값이 없는 예전 상품만 이름으로 판단한다.
         function gIsSadaProduct(p) {
-            return !!p && (String(p.name || "").includes("사다드림") || p.matchKey === "사다드림");
+            if (!p) return false;
+            if (p.isSada === true || p.isSada === 'true') return true;
+            if (p.isSada === false || p.isSada === 'false') return false;
+            return String(p.name || "").includes("사다드림") || p.matchKey === "사다드림";
         }
 
         function gFormatDateKey(key, p) {
@@ -7586,7 +7849,7 @@
 
             for (const n in cart) {
                 if (!cart[n]) continue;
-                const p = productsData.find(pd => pd.name === n);
+                const p = gFindCartProduct(n); // [버그수정] 상세옵션 상품은 장바구니 키가 달라 이름 직접 비교로는 못 찾는다
                 if (!p) continue;
                 const d = gGetDeliveryDateKey(p);
                 const isSada = gIsSadaProduct(p);
@@ -9109,7 +9372,7 @@
 
                         // [수정] 사다드림 상품의 배달일은 matchKey("사다드림")가 아니라 상품 date(예: 8월 7일)에 담겨 있음.
                         // 선택한 날짜를 그대로 기록하도록 별도 처리 (다음영업일 강제 이월/덮어쓰기 방지).
-                        const _isSada = itemName.includes('사다드림') || mKey === '사다드림';
+                        const _isSada = gIsSadaProduct(pData);
                         const _sadaDate = _isSada ? normalizeDateString(pData.date) : "";
                         const isSadaWithDate = _isSada && /^\d{4}-\d{2}-\d{2}$/.test(_sadaDate);
 
@@ -9180,7 +9443,7 @@
                         // [합배송 처리] 공동구매 입고일이 있는 경우, 다른 모든 일반 상품의 배송일을 가장 늦은 공동구매일로 맞춤
                         // [수정] 픽업주문은 합배송(날짜 통합) 제외 → 각 상품이 자기 날짜로 따로 처리됨. 배달주문에만 적용.
                         if (unifiedReserveDate && shippingMethod === '배달주문') {
-                            const isSadaItem = itemName.includes('사다드림') || mKey === '사다드림';
+                            const isSadaItem = _isSada;
                             if ((unifiedReserveDate > todayStr || !isTodayOffOrAfterCutoff) && !isSadaItem) {
                                 finalDate = unifiedReserveDate;
                             }
@@ -9194,7 +9457,9 @@
                         const agencyFee = gCartAgencyFee(pData, cartKey);
                         const currentPrice = gCartPaidUnitPrice(pData, cartKey);
 
-                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee });
+                        // [신규] 사다드림 여부를 주문 항목에도 실어 보낸다. 주문 뒤 처리(취소·입금 안내 등)가
+                        //  상품명 대신 이 값을 보게 되어, 이름을 바꿔도 판정이 흔들리지 않는다.
+                        allItems.push({ name: itemName, qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada });
                     }
                 }
 
@@ -9202,7 +9467,7 @@
                 if (shippingMethod === '배달주문') {
                     if (window.isSadaDeliveryFeeAdded) {
                         // [수정] 사다드림 배달비 날짜를 사다드림 상품의 실제 배달일(예: 8월 7일)에 맞춤
-                        const sadaProd = allItems.find(it => it.name !== "배달비" && (it.name.includes("사다드림") || it.matchKey === "사다드림"));
+                        const sadaProd = allItems.find(it => it.name !== "배달비" && gIsSadaOrder(it));
                         const sadaFeeDate = (sadaProd && sadaProd.date) ? sadaProd.date : "사다드림";
                         const sadaFeeCategorized = !/^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(String(sadaFeeDate));
                         allItems.push({
@@ -9219,7 +9484,7 @@
                         });
                     }
                     if (window.isReserveDeliveryFeeAdded) {
-                        const resItem = allItems.find(it => !it.name.includes("사다드림") && it.matchKey !== "사다드림" && it.name !== "배달비");
+                        const resItem = allItems.find(it => it.name !== "배달비" && !gIsSadaOrder(it));
                         const resDate = resItem ? resItem.date : (maxReserveDate || todayStr);
                         allItems.push({
                             name: "배달비",
@@ -9297,7 +9562,7 @@
                         let maxReserveDate = null;
                         allItems.forEach(it => {
                             if (it.name === "배달비") return;
-                            const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                            const isSadaItem = gIsSadaOrder(it);
                             if (isSadaItem) return;
 
                             const d = String(it.date || "");
@@ -9319,7 +9584,7 @@
 
                         if (maxReserveDate) {
                             allItems.forEach(it => {
-                                const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                                const isSadaItem = gIsSadaOrder(it);
                                 if (isSadaItem || it.name === "배달비") return;
                                 it.date = maxReserveDate;
                                 it.isCategorized = false;
@@ -9330,7 +9595,7 @@
                         const reserveDates = [];
                         allItems.forEach(it => {
                             if (it.name === "배달비") return;
-                            const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                            const isSadaItem = gIsSadaOrder(it);
                             if (isSadaItem) return;
 
                             const d = String(it.date || "");
@@ -9359,7 +9624,7 @@
                                 const m = String(it.matchKey || "");
                                 const isDateItem = /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(d) || 
                                                    /^(?:\d{4}|\d{2})[.-]\d{1,2}[.-]\d{1,2}$/.test(m);
-                                const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                                const isSadaItem = gIsSadaOrder(it);
                                 if (!isDateItem && it.name !== "배달비" && !isSadaItem) {
                                     it.date = minReserveDate;
                                     it.isCategorized = false;
@@ -9392,7 +9657,7 @@
 
                     const uniqueDates = new Set();
                     allItems.forEach(it => {
-                        const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                        const isSadaItem = gIsSadaOrder(it);
                         if (isSadaItem || it.name === "배달비") return;
 
                         let d = it.date || "";
@@ -9640,7 +9905,10 @@
 
             msg += `</div>`;
 
-            showSystemModal(msg, 'confirm', async () => {
+            // [수정] 취소 버튼을 없애고 확인만 남긴다.
+            //  바로 앞 주문확인창에서 이미 주문 여부를 확인했으므로, 이 창은 입금 계좌와 금액을
+            //  확인하고 넘어가는 자리다. 여기서 또 취소를 묻던 것이 흐름을 끊었다.
+            showSystemModal(msg, 'alert', async () => {
                 if (isFinal) {
                     gReloadKeepingView();
                     return true;
@@ -9650,19 +9918,7 @@
                 const phoneVal = document.getElementById('receipt-phone-input')?.value || "";
                 await executeOrder(allItems, name, phone, shippingMethod, opt, phoneVal, type);
                 return true;
-            }, () => {
-                if (isFinal) {
-                    gReloadKeepingView();
-                    return;
-                }
-                isHistoryProcessing = false;
-                const submitBtn = document.getElementById('btn-submit-order');
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.innerText = "주문확정";
-                    submitBtn.style.opacity = "1";
-                }
-            }, true);
+            }, null, true);
         }
 
 
@@ -9716,7 +9972,7 @@
                     
                     allItems.forEach(it => {
                         if (it.name === "배달비") return;
-                        const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                        const isSadaItem = gIsSadaOrder(it);
                         if (isSadaItem) return;
 
                         // 공동구매 상품인지 검증 (date가 날짜 형식이거나 matchKey가 날짜 형식인 경우)
@@ -9741,7 +9997,7 @@
                     // 만약 공동구매 날짜가 존재한다면, 모든 상품(배달비 포함, 사다드림 제외)의 날짜를 이 최대 날짜로 덮어씀
                     if (maxReserveDate) {
                         allItems.forEach(it => {
-                            const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                            const isSadaItem = gIsSadaOrder(it);
                             if (isSadaItem) return;
                             it.date = maxReserveDate;
                             it.isCategorized = false;
@@ -9756,7 +10012,7 @@
 
                     allItems.forEach(it => {
                         if (it.name === "배달비") return;
-                        const isSadaItem = it.name.includes('사다드림') || it.matchKey === '사다드림';
+                        const isSadaItem = gIsSadaOrder(it);
                         if (isSadaItem) return;
 
                         const d = String(it.date || "");
@@ -9782,7 +10038,7 @@
             }
 
             // [안전장치] 배달비 항목의 날짜를 일반 상품의 날짜와 일치시킴 (단, 사다드림 배달비는 사다드림 날짜 유지)
-            const mainItem = allItems.find(it => it.name !== "배달비" && !it.name.includes("사다드림") && it.matchKey !== "사다드림");
+            const mainItem = allItems.find(it => it.name !== "배달비" && !gIsSadaOrder(it));
             if (mainItem && mainItem.date) {
                 allItems.forEach(it => {
                     if (it.name === "배달비" && it.matchKey !== "사다드림") {
@@ -9861,7 +10117,23 @@
                     return d;
                 };
 
-                const newHistoryItems = allItems.map(it => ({
+                // [수정] 합배송 방식 변경 — 이전 주문은 건드리지 않는다.
+                //  예전에는 같은 날 미완료 주문을 끌어와 새 주문 시각으로 다시 쓰고 원본을 지웠다.
+                //  그래서 (1) 처음 주문한 시각이 사라지고 (2) 주문 키가 '시각+상품명'이라 같은 상품이
+                //  겹치면 덮어써져 개수가 늘지 않았다.
+                //  이제 이번에 담은 것만 저장하고, 이전 주문은 자기 기록 그대로 남는다.
+                //  같은 상품을 또 주문해도 합치지 않고 '과일 1개 / 과일 1개'처럼 각각 남는다.
+                const saveItems = allItems.filter(it => !it.isExtra);
+
+                // 한 주문 안에 같은 상품명이 두 줄 이상이면(옵션만 다른 경우) 주문 키가 겹치므로 번호를 붙여 구분한다
+                const _keyCount = {};
+                saveItems.forEach(it => {
+                    const base = String(it.name);
+                    _keyCount[base] = (_keyCount[base] || 0) + 1;
+                    it.__keySuffix = _keyCount[base] > 1 ? `_${_keyCount[base]}` : '';
+                });
+
+                const newHistoryItems = saveItems.map(it => ({
                     timestamp: jsFormatDate(new Date(tempTimestamp)),
                     item: it.name,
                     qty: it.qty,
@@ -9875,7 +10147,8 @@
                     name: name,
                     rawTimestamp: tempTimestamp,
                     matchKey: it.date,
-                    optionText: it.optionText || "" // [신규] 고른 상세옵션
+                    optionText: it.optionText || "", // [신규] 고른 상세옵션
+                    isSada: (it.isSada === true)     // [신규] 사다드림 여부 (로컬 주문내역에도 함께 보관)
                 }));
 
                 const cacheKey_hist = `history_cache_${name}_${phone}`;
@@ -9931,9 +10204,10 @@
                 }
 
                 // 1. Firebase 주문 데이터 전송 (병렬 실행 및 대기)
-                const fbPromises = allItems.map(async it => {
+                //  [수정] 같은 상품을 합친 saveItems로 저장한다 (키 겹침 방지)
+                const fbPromises = saveItems.map(async it => {
                     const formattedTimestamp = jsFormatDate(new Date(tempTimestamp));
-                    const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(it.name);
+                    const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(it.name) + (it.__keySuffix || '');
                     const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
 
                     const itemPayload = {
@@ -9952,7 +10226,9 @@
                         // [신규] 손님이 고른 상세옵션 (상품명은 그대로 두고 별도 항목으로 저장)
                         optionText: it.optionText || "",
                         // [신규] 상품 금액에 합쳐 청구한 사다드림 대행료 (정산 확인용)
-                        agencyFee: it.agencyFee || 0
+                        agencyFee: it.agencyFee || 0,
+                        // [신규] 사다드림 여부 (상품명 대신 이 값으로 판단)
+                        isSada: (it.isSada === true)
                     };
                     if (it.isExtra) {
                         if (it.paid !== undefined) itemPayload.paid = it.paid;
@@ -9988,7 +10264,9 @@
                 await Promise.all(fbPromises);
 
                 // 2. Firebase 재고 차감 (병렬 실행 및 대기)
-                const stockPromises = allItems.map(async it => {
+                // [버그수정] 이전 주문(isExtra)까지 넣으면 그때 이미 깎은 재고를 또 깎는다.
+                //  이번에 담은 것(saveItems)만 차감한다.
+                const stockPromises = saveItems.map(async it => {
                     if (it.name === "배달비") return;
 
                     // 상품 정보 찾기
@@ -10028,33 +10306,15 @@
                 });
                 await Promise.all(stockPromises);
 
-                // [추가] 픽업 합산된 항목들의 원본 행 상태 변경 및 Firebase 데이터 삭제 (GAS 비동기 대기 없이 즉시 병렬 실행)
-                allItems.forEach(async it => {
-                    if (it.isExtra && it.originalData) {
-                        try {
-                            // 2. Firebase 실시간 데이터베이스에서 기존 개별 주문 삭제
-                            const origPhone = String(it.originalData.phone || phone).replace(/\D/g, "");
-                            const origOrderKey = fSafeKey(it.originalData.timestamp) + "_" + fSafeKey(it.originalData.item);
-                            const origFbUrl = `${FIREBASE_DB_URL}orders/${origPhone}/${origOrderKey}.json`;
-                            fetch(origFbUrl, { method: 'DELETE' })
-                                .then(() => {
-                                    // 로컬 캐시(fullHistoryData)에서도 삭제하여 UI 싱크 맞춤
-                                    if (typeof fullHistoryData !== 'undefined' && Array.isArray(fullHistoryData)) {
-                                        fullHistoryData = fullHistoryData.filter(h => h.timestamp !== it.originalData.timestamp || h.item !== it.originalData.item);
-                                        const cacheKey = `history_cache_${name}_${cleanPhone}`;
-                                        localStorage.setItem(cacheKey, JSON.stringify(fullHistoryData));
-                                    }
-                                    console.log(`[합배송 처리] 이전 개별 주문 Firebase 삭제 완료: ${it.originalData.item}`);
-                                })
-                                .catch(e => console.error("Firebase 합산 원본 삭제 실패:", e));
-                        } catch (e) { console.error("합산 실패:", e); }
-                    }
-                });
+                // [수정] 이전 주문 원본은 지우지 않는다.
+                //  예전에는 합배송으로 딸려온 주문을 새 주문 시각으로 다시 쓰고 원본을 지웠는데,
+                //  처음 주문한 시각이 사라지고 같은 상품이 덮어써지는 문제가 있었다.
+                //  이제 이전 주문은 자기 기록 그대로 두고, 같은 날짜라 함께 배달된다는 것만 안내한다.
 
                 // 4. 로컬 상태 업데이트 및 완료 안내 (Firebase 기록 완료 시 바로 표시)
                 isHistoryProcessing = false;
 
-                allItems.forEach(it => {
+                saveItems.forEach(it => {
                     if (it.name === "배달비") return;
                     const targetKey = it.matchKey || it.date;
                     const p = productsData.find(pd => pd.matchKey === targetKey && pd.name === it.name);
@@ -10072,7 +10332,7 @@
 
                 // 최종 완료 처리 (GAS 완료를 기다리지 않고 바로 표시)
                 document.getElementById('system-modal').style.display = 'none';
-                const hasSadaDream = allItems.some(it => it.name !== "배달비" && (String(it.name).includes('사다드림') || it.matchKey === '사다드림' || it.date === '사다드림'));
+                const hasSadaDream = allItems.some(it => it.name !== "배달비" && (gIsSadaOrder(it) || it.date === '사다드림'));
 
                 if (hasSadaDream) {
                     // [수정] 사다드림도 배달과 같은 입금 안내 화면(계좌 + 금액 + 상품내역)을 보여준다.
