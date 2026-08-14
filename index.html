@@ -923,7 +923,8 @@
             display: flex;
             flex-direction: column;
             align-items: stretch;
-            gap: 12px;
+            /* [수정] 수량 박스와 담기 버튼 사이가 떠 보여 여백을 30% 줄였다 (14px → 10px) */
+            gap: 8px;
             /* 기본 여백 (안내문 없을 때) */
             box-sizing: border-box;
             transition: transform 0.2s ease;
@@ -948,13 +949,16 @@
         .card-top {
             display: flex;
             gap: 10px;
-            align-items: flex-start;
+            /* [수정] 수량 박스가 정보칸에 들어와 칸이 길어지므로, 썸네일도 같은 높이로 늘여
+               나란히 놓이게 한다. (예전엔 썸네일만 110px로 고정돼 아래가 비어 보였다) */
+            align-items: stretch;
             width: 100%;
         }
 
         .thumb {
             width: 110px;
-            height: 110px;
+            height: auto;
+            min-height: 110px;
             flex-shrink: 0;
             border-radius: var(--common-radius);
             background-color: #f9f9f9;
@@ -1042,10 +1046,11 @@
             flex-direction: column;
             justify-content: space-between;
             /* 위아래 끝으로 배치하여 가격 위치 고정 */
-            height: 110px;
-            /* 썸네일 높이와 동일하게 설정 */
+            /* [수정] 수량 박스가 이 칸 안으로 들어와서, 썸네일 높이를 최소로만 맞추고 내용만큼 늘어나게 한다 */
+            min-height: 110px;
+            gap: 6px;
             min-width: 0;
-            align-items: flex-start;
+            align-items: stretch;
             text-align: left;
             padding-bottom: 2px;
             box-sizing: border-box;
@@ -1072,9 +1077,39 @@
         .qty-group {
             display: flex;
             flex-direction: column;
-            align-items: center;
+            /* [수정] 수량 박스를 담기 버튼과 같은 너비로 채우기 위해 stretch */
+            align-items: stretch;
             gap: 6px;
             flex: 1.08;
+            /* 안에 든 input의 기본 너비가 칸을 밀어내 카드 밖으로 삐져나가므로 풀어 준다 */
+            min-width: 0;
+        }
+
+        /* [신규] 썸네일 옆 정보칸에 놓이는 수량 박스.
+           너비는 아래 '장바구니 담기' 버튼과 같게 맞추므로(JS: gSyncQtyStepperWidths)
+           오른쪽 끝에 붙여 두 칸의 오른쪽 선이 맞게 한다. */
+        .qty-stepper.wide {
+            width: 100%;
+            box-sizing: border-box;
+            justify-content: space-between;
+            align-self: flex-end;
+            padding: 2px;
+            gap: 0;
+        }
+
+        .qty-stepper.wide .qty-step-btn {
+            width: 34px;
+            height: 23px;
+            font-size: 16px;
+        }
+
+        /* input은 기본 너비(size 속성)가 커서 min-width를 0으로 풀어 줘야 칸 안으로 들어온다.
+           안 그러면 카드 밖으로 삐져나간다. */
+        .qty-stepper.wide .qty-sel {
+            flex: 1 1 0;
+            min-width: 0;
+            width: auto;
+            font-size: 15px;
         }
 
         .stock-status {
@@ -1082,6 +1117,7 @@
             font-weight: 800;
             letter-spacing: -0.03em;
             white-space: nowrap;
+            text-align: center;
         }
 
         .item-name {
@@ -1109,6 +1145,8 @@
             justify-content: space-between;
             gap: 8px;
             width: 100%;
+            /* [수정] 상품명과 금액이 붙어 답답해 보여 사이를 띄웠다 */
+            margin-top: 12px;
         }
 
         .qty-stepper {
@@ -1185,6 +1223,15 @@
         .add-cart-wrap.selected .btn-add-cart {
             background: var(--nego-orange);
             border-color: var(--nego-orange);
+        }
+
+        /* [신규] 품절 — 초록 버튼을 흐리게 두는 대신 회색 '품절' 버튼으로 바꾼다 */
+        .btn-add-cart.soldout,
+        .add-cart-wrap.selected .btn-add-cart.soldout {
+            background: #eef1f4;
+            border-color: #e2e8f0;
+            color: #9aa5b1;
+            cursor: default;
         }
 
         .btn-add-cart:active {
@@ -1594,7 +1641,7 @@
             <div class="input-group" style="margin-bottom: 20px;">
                 <strong>환불계좌 <span style="color:#999; font-weight:700; font-size:0.85em;">(선택)</span></strong>
                 <input id="input-refund-account" type="text" class="modal-input" placeholder="예: 카카오뱅크 3333-00-0000000 홍길동">
-                <div class="input-hint">환불이 필요할 때 사용됩니다. 입력하지 않아도 주문할 수 있습니다.</div>
+                <div class="input-hint">입력하지 않아도 주문할 수 있습니다.</div>
             </div>
 
             <button id="btn-kakao-login" class="btn-common btn-kakao" onclick="loginWithKakao()">
@@ -1960,18 +2007,21 @@
                     <button class="date-btn" id="status-cancel" onclick="filterStatus('cancel')"
                         style="height:32px; font-size:17px; padding:0; font-weight:900;">취소</button>
                 </div>
-                <!-- [수정] 기간은 왼쪽 작은 버튼 하나로 바꾸고(1주일→1달→전체 순환),
-                     남은 자리에 주문순 / 픽업날짜순 탭을 둔다. -->
-                <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: stretch;">
+                <!-- [수정] 기간은 왼쪽 버튼 하나로 바꾸고(1주일→1달→전체 순환),
+                     남은 자리에 주문순 / 날짜순 탭을 둔다.
+                     [수정] 위 '전체/입고/픽업/취소' 줄과 칸·글자 크기를 똑같이 맞추려고 같은 4칸 그리드를 쓴다.
+                     마지막 칸('취소' 버튼 자리)에는 정렬방향·새로고침 아이콘 두 개를 나눠 넣는다. -->
+                <div
+                    style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; align-items: stretch;">
                     <button class="date-btn" id="btn-period" onclick="cyclePeriodFilter()"
-                        style="height:32px; flex:0 0 54px; font-size:12px; padding:0; font-weight:800; white-space:nowrap;">1주일 ▾</button>
+                        style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">1주일 ▾</button>
                     <button class="date-btn active" id="btn-sort-order" onclick="changeSortMode('timestamp')"
-                        style="height:32px; flex:0.8 1 0; font-size:14px; padding:0; font-weight:900; white-space:nowrap;">주문순</button>
+                        style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">주문순</button>
                     <button class="date-btn" id="btn-sort-pickup" onclick="changeSortMode('pickupDate')"
-                        style="height:32px; flex:1.4 1 0; font-size:12px; padding:0; font-weight:900; white-space:nowrap;">픽업(배송)날짜순</button>
-                    <div style="display:flex; gap:4px; flex:0 0 66px;">
+                        style="height:32px; font-size:17px; padding:0; font-weight:900; white-space:nowrap;">날짜순</button>
+                    <div style="display:flex; gap:6px; min-width:0;">
                         <button class="date-btn" id="btn-sort-dir" onclick="toggleSortDir()"
-                            style="height: 32px; flex:1; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
+                            style="height: 32px; flex:1 1 0; min-width:0; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="4" y1="6" x2="13" y2="6"></line>
@@ -1983,8 +2033,8 @@
                             </svg>
                         </button>
                         <button class="date-btn" id="btn-refresh-history" onclick="openHistoryModal(true)"
-                            style="height: 32px; flex:1; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            style="height: 32px; flex:1 1 0; min-width:0; padding: 0; background: #fafafa; border: 1.5px solid #eee; border-radius: var(--btn-radius); color: #455464; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="23 4 23 10 17 10"></polyline>
                                 <polyline points="1 20 1 14 7 14"></polyline>
@@ -2987,24 +3037,9 @@
                 }
             }
 
-            // 헬퍼: 기존 특정 배달비 삭제 처리 함수
-            async function deleteExistingFee(feeItem, nVal, pVal) {
-                const cleanPhone = pVal.replace(/\D/g, "");
-                const orderKey = fSafeKey(feeItem.timestamp) + "_" + fSafeKey(feeItem.item);
-                const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
-                
-                showSystemModal("기존 주문 배달비 조정 중입니다...", 'loading');
-                try {
-                    await fetch(fbItemUrl, { method: 'DELETE' });
-                    // 로컬 캐시에서도 삭제하여 UI 싱크 맞춤
-                    fullHistoryData = fullHistoryData.filter(it => it.timestamp !== feeItem.timestamp || it.item !== feeItem.item);
-                    localStorage.setItem(`history_cache_${nVal}_${cleanPhone}`, JSON.stringify(fullHistoryData));
-                } catch (e) {
-                    console.error("Existing fee deletion failed:", e);
-                }
-                document.getElementById('system-modal').style.display = 'none';
-                checkScrollLock();
-            }
+            // [수정] 기존 배달비를 지우거나 취소하는 처리는 없앴다.
+            //  배달비가 붙고 빠지는 것은 언제나 '새 줄'로 기록하고 손님에게도 보여준다.
+            //  (아래 5번에서 '배달비 차감' 줄을 이번 주문에 넣는다)
 
             // 장바구니 품목 분리 (사다드림 vs 예약구매)
             let sadaTotal = 0;
@@ -3081,29 +3116,38 @@
             //  - 배달비 자체와 사다드림 금액은 기준에서 뺀다.
             //  - 픽업 주문은 배달과 상관없으므로 뺀다. (같은 날이라도 차가 나가는 것과 무관)
             const sumFreeShipBase = (items) => items.reduce((acc, it) => {
-                if (it.item === "배달비") return acc;
+                if (gIsFeeRow(it.item)) return acc;   // 배달비·배달비 차감은 상품 금액이 아니다
                 if (gIsSadaOrder(it)) return acc;
                 if (!String(it.shippingMethod || "").includes("배달")) return acc;
                 return acc + parseInt(it.price || 0) * parseInt(it.qty || 0);
             }, 0);
 
-            let hasExistingSadaFee = false;
-            pendingSadaItems.forEach(item => {
-                if (item.item === "배달비") hasExistingSadaFee = true;
-            });
+            // [신규] 그 날짜에 '아직 살아 있는' 배달비를 센다.
+            //  배달비 1건을 받았다가 나중에 차감해 준 경우, 배달비(+1) 와 배달비 차감(-1) 이 상쇄되어 0이 된다.
+            //  이렇게 세야 세 번째 주문에서 또 차감해 주는 일이 없다.
+            //  입금 여부는 보지 않는다. 아직 안 냈으면 낼 금액에서, 이미 냈으면 이번 금액에서
+            //  빠지므로 손님이 실제로 내는 총액은 어느 쪽이든 같다.
+            const scanFees = (items) => {
+                let charged = 0, refunded = 0, feeRow = null;
+                items.forEach(it => {
+                    const nm = String(it.item || "").trim();
+                    if (nm === FEE_REFUND_NAME) { refunded++; return; }
+                    if (nm !== "배달비") return;
+                    charged++;
+                    if (!feeRow) feeRow = it;
+                });
+                return { outstanding: charged - refunded, feeRow: feeRow };
+            };
+
+            const sadaFeeScan = scanFees(pendingSadaItems);
+            const hasExistingSadaFee = sadaFeeScan.outstanding > 0;
             // 사다드림 배달일에 이미 잡혀 있는 '배달' 주문 금액 (같은 차로 나가는 건)
             const existingSadaDateShipBase = sumFreeShipBase(pendingSadaItems);
 
             // 2. 예약구매 기존 주문 내역 및 배달비 조회 (합산 시 같은 날 사다드림 주문도 포함)
             const pendingReserveItems = getPendingItemsByDate(deliveryDate, mergeSadaFee);
-            let hasExistingReserveFee = false;
-            let existingReserveFeeItem = null;
-            pendingReserveItems.forEach(item => {
-                if (item.item === "배달비") {
-                    hasExistingReserveFee = true;
-                    existingReserveFeeItem = item;
-                }
-            });
+            const reserveFeeScan = scanFees(pendingReserveItems);
+            const hasExistingReserveFee = reserveFeeScan.outstanding > 0;
             const existingReserveTotal = sumFreeShipBase(pendingReserveItems);
 
             // 3. 사다드림 배달비 부과 여부 판별
@@ -3128,16 +3172,13 @@
             //    [수정] 합배송으로 함께 나가는 기존 주문 금액과 이번 주문 금액을 합쳐서 판단한다.
             //     합쳐서 15,000원을 넘으면 배달비가 아예 붙지 않으므로 안내도 띄우지 않는다.
             let needReserveFeePrompt = false;
+            const combinedShipBase = existingReserveTotal + reserveTotal;
             if (hasReserveInCart) {
-                const combinedShipBase = existingReserveTotal + reserveTotal;
                 if (combinedShipBase >= 15000) {
-                    // 합쳐서 무료 기준을 넘겼다. 앞서 낸 배달비가 있으면 없애 준다.
-                    if (hasExistingReserveFee && existingReserveFeeItem) {
-                        await deleteExistingFee(existingReserveFeeItem, nameVal, phoneVal);
-                    }
+                    // 합쳐서 무료 기준을 넘겼으니 이번엔 배달비를 받지 않는다.
                     window.isReserveDeliveryFeeAdded = false;
                 } else if (hasExistingReserveFee) {
-                    // 같은 날짜에 이미 배달비를 냈으면 또 받지 않는다.
+                    // 같은 날짜에 이미 배달비가 붙어 있으면 또 받지 않는다.
                     window.isReserveDeliveryFeeAdded = false;
                 } else if (!window.isReserveDeliveryFeeAdded) {
                     needReserveFeePrompt = true;
@@ -3146,7 +3187,20 @@
                 window.isReserveDeliveryFeeAdded = false;
             }
 
-            // 5. 종합 안내 또는 개별 안내 팝업
+            // 5. [신규] 이미 받은 배달비를 이번 주문에서 빼줄지 판정
+            //  합배송으로 그날 배달이 무료 기준(15,000원)을 넘겼는데 앞서 받은 배달비가 남아 있으면,
+            //  이전 주문 기록은 그대로 두고 이번 주문에 '배달비 차감' 줄을 넣어 정산한다.
+            //  기록을 지우거나 취소하지 않으므로 "받았다가 빼줬다"가 그대로 남는다.
+            //  입금 여부와 상관없이 같은 방식으로 처리한다.
+            window.pendingFeeRefund = 0;
+            if (combinedShipBase >= 15000 && hasExistingReserveFee
+                && !window.isReserveDeliveryFeeAdded && !window.isSadaDeliveryFeeAdded) {
+                const feeRow = reserveFeeScan.feeRow;
+                const amt = parseInt((feeRow && (feeRow.total || feeRow.price)) || deliveryFee) || 0;
+                window.pendingFeeRefund = Math.max(0, amt);
+            }
+
+            // 6. 종합 안내 또는 개별 안내 팝업
             // [신규] 배달비 안내 팝업 공통 서식 — 모바일에서 읽기 쉽도록 금액은 표처럼, 강조는 주황색으로 통일
             const feeRow = (label, value) =>
                 `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:6px 0;">` +
@@ -3439,8 +3493,10 @@
                 };
 
                 let body = noticeHtml || "";
-                if (pendingItems.length > 0) {
-                    const itemNames = pendingItems.map(it => `• ${it.item} (${it.qty}개)`).join('<br>');
+                // 배달비·배달비 차감 줄은 상품이 아니므로 합배송 목록에는 넣지 않는다
+                const pendingGoods = pendingItems.filter(it => !gIsFeeRow(it.item));
+                if (pendingGoods.length > 0) {
+                    const itemNames = pendingGoods.map(it => `• ${it.item} (${it.qty}개)`).join('<br>');
                     // 앞에 붙은 안내가 없으면 이 목록만으로도 무슨 창인지 알 수 있게 제목을 세운다
                     if (!body) {
                         body = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 합배송 안내]</span>`;
@@ -4580,6 +4636,28 @@
             localStorage.setItem('moket_order_history', JSON.stringify(history));
         }
 
+        // [신규] 주문내역 캐시 정리.
+        //  (1) 연락처가 온전치 않은 키는 예전에 '전체 고객 주문'을 통째로 받아 저장한 흔적이다.
+        //      한 건에 수백 KB라 저장 공간(보통 5MB)을 금방 채운다.
+        //  (2) 지금 쓰는 연락처가 아닌 캐시는 다시 볼 일이 없으므로 지운다.
+        function gCleanupHistoryCaches() {
+            try {
+                const myPhone = String(localStorage.getItem('moket_user_phone') || '').replace(/\D/g, "");
+                const drop = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (!k || k.indexOf('history_cache_') !== 0) continue;
+                    const phonePart = k.substring(k.lastIndexOf('_') + 1).replace(/\D/g, "");
+                    if (phonePart.length < 8) { drop.push(k); continue; }          // 잘못 만들어진 캐시
+                    if (myPhone && phonePart !== myPhone) drop.push(k);            // 남의 번호 캐시
+                }
+                drop.forEach(k => localStorage.removeItem(k));
+                if (drop.length) console.log(`주문내역 캐시 ${drop.length}건 정리`);
+            } catch (e) {
+                console.warn("주문내역 캐시 정리 실패:", e);
+            }
+        }
+
         // [주문내역] 자동 삭제 (픽업일 기준 8일째 자정)
         function cleanExpiredOrders() {
             const history = JSON.parse(localStorage.getItem('moket_order_history') || '[]');
@@ -4802,6 +4880,18 @@
             }
 
             const cleanPhone = phone.replace(/\D/g, "");
+
+            // [버그수정] 연락처에 숫자가 없으면 조회 주소가 orders/.json 이 되어 '전체 고객 주문'이 통째로 내려온다.
+            //  남의 주문까지 받아 캐시에 쌓이면서(수백 KB) 저장 공간이 금방 찼다. 아예 요청하지 않는다.
+            if (cleanPhone.length < 8) {
+                if (!isSilent) {
+                    showSystemModal("연락처를 정확히 입력해 주세요.", 'alert', () => {
+                        openSideModal('profile-modal');
+                    });
+                }
+                return;
+            }
+
             const cacheKey = `history_cache_${name}_${cleanPhone}`;
             const cached = localStorage.getItem(cacheKey);
 
@@ -5021,6 +5111,33 @@
                 g.totalPrice += parseInt(item.total || 0);
             });
 
+            // [신규] 배달비와 배달비 차감은 서로 상쇄시키고 남은 것만 보여준다.
+            //  이 탭은 '그날 뭘 받고 얼마인지'를 보는 곳이라, 붙었다 빠진 내역까지 늘어놓을 필요가 없다.
+            //  (주고받은 내역 그대로는 주문순 탭에서 볼 수 있다)
+            groups.forEach(g => {
+                const feeRows = g.items.filter(it => String(it.item || "").trim() === "배달비");
+                const refundRows = g.items.filter(it => String(it.item || "").trim() === FEE_REFUND_NAME);
+                if (!feeRows.length || !refundRows.length) return;
+
+                const amountOf = (it) => Math.abs(parseInt(it.total !== undefined ? it.total : it.price) || 0);
+                const dropped = new Set();
+                refundRows.forEach(rr => {
+                    // 같은 금액의 배달비를 찾아 둘 다 감춘다. 짝이 없으면 그대로 남겨 둔다.
+                    const match = feeRows.find(fr => !dropped.has(fr) && amountOf(fr) === amountOf(rr));
+                    if (match) { dropped.add(match); dropped.add(rr); }
+                });
+                if (!dropped.size) return;
+
+                g.items = g.items.filter(it => !dropped.has(it));
+                g.count = g.items.length;
+                g.totalPrice = g.items.reduce((a, it) => a + (parseInt(it.total) || 0), 0);
+            });
+
+            // 상쇄 결과 아무것도 남지 않은 날짜는 카드를 만들지 않는다
+            for (let i = groups.length - 1; i >= 0; i--) {
+                if (groups[i].items.length === 0) groups.splice(i, 1);
+            }
+
             groups.sort((a, b) => {
                 // 미픽업은 항상 맨 위
                 if (a.key === '__unpicked') return -1;
@@ -5061,7 +5178,8 @@
                         <div id="${domKey}" style="display:block; padding:10px 15px 15px 15px; border-top:1px dashed #eee; background:#fff;">
                 `;
 
-                group.items.forEach((order, idx) => {
+                const groupItems = gSortFeeLast(group.items); // 배달비·차감은 맨 아래로
+                groupItems.forEach((order, idx) => {
                     if (order.deliveryPhoto) {
                         window.deliveryPhotos = window.deliveryPhotos || {};
                         window.deliveryPhotos[order.phone + "_" + order.orderKey] = order.deliveryPhoto;
@@ -5082,7 +5200,8 @@
                     else { statusText = '미입고'; statusColor = '#AAA'; }
 
                     const isDeliveryItem = order.shippingMethod === '배달주문';
-                    const isBadgeTarget = isDeliveryItem || gIsSadaOrder(order) || order.item === '배달비';
+                    // 배달비 차감도 입금 표시 대상이다. 이 줄까지 묶어야 손님이 낼 총액이 맞는다.
+                    const isBadgeTarget = isDeliveryItem || gIsSadaOrder(order) || gIsFeeRow(order.item);
                     const isPaid = (order.paid === true || order.paid === "true" || String(order.paid).toUpperCase() === "TRUE");
                     let payBadgeHtml = '';
                     if (isBadgeTarget && !isCancelled && !isCombined) {
@@ -5099,7 +5218,7 @@
                     }
 
                     html += `
-                        <div style="padding: 10px 0; ${idx !== group.items.length - 1 ? 'border-bottom: 1px dashed #eee;' : ''} ${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
+                        <div style="padding: 10px 0; ${idx !== groupItems.length - 1 ? 'border-bottom: 1px dashed #eee;' : ''} ${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <div style="flex:1;">
                                     <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.3; margin-bottom:4px;">
@@ -5146,9 +5265,9 @@
             const sortDirBtn = document.getElementById('btn-sort-dir');
             if (sortDirBtn) {
                 if (currentSortDir === 'desc') {
-                    sortDirBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="13" y2="6"></line><line x1="4" y1="10" x2="11" y2="10"></line><line x1="4" y1="14" x2="9" y2="14"></line><line x1="4" y1="18" x2="7" y2="18"></line><polyline points="15 15 18 18 21 15"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>`;
+                    sortDirBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="13" y2="6"></line><line x1="4" y1="10" x2="11" y2="10"></line><line x1="4" y1="14" x2="9" y2="14"></line><line x1="4" y1="18" x2="7" y2="18"></line><polyline points="15 15 18 18 21 15"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>`;
                 } else {
-                    sortDirBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="7" y2="6"></line><line x1="4" y1="10" x2="9" y2="10"></line><line x1="4" y1="14" x2="11" y2="14"></line><line x1="4" y1="18" x2="13" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>`;
+                    sortDirBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="7" y2="6"></line><line x1="4" y1="10" x2="9" y2="10"></line><line x1="4" y1="14" x2="11" y2="14"></line><line x1="4" y1="18" x2="13" y2="18"></line><polyline points="15 9 18 6 21 9"></polyline><line x1="18" y1="6" x2="18" y2="18"></line></svg>`;
                 }
             }
 
@@ -5269,7 +5388,10 @@
                 // 2차 그룹화 (픽업일 기준)
                 let pDateKey = (item.pickupDate || '정보없음').trim();
                 if (pDateKey.includes("상시판매") || pDateKey.includes("현장판매")) pDateKey = (item.pickupDate || "").trim();
-                if (item.item === "배달비") pDateKey = "배달비"; // 배달비는 별도 그룹 또는 상단 고정 가능
+                // [수정] 배달비를 '기타(배달비)'라는 별도 묶음으로 빼내던 것을 없앴다.
+                //  배달비도 자기 배달일이 기록돼 있으므로, 배달비 차감처럼 그 날짜 묶음에 같이 들어간다.
+                //  (날짜가 없는 예전 기록만 아래 '정보없음'으로 남는다)
+                if (gIsFeeRow(item.item) && !pDateKey) pDateKey = '정보없음';
 
                 if (!group.pickupGroups[pDateKey]) group.pickupGroups[pDateKey] = [];
                 group.pickupGroups[pDateKey].push(item);
@@ -5311,11 +5433,17 @@
                 let hasDeliveredPhoto = false;
                 let deliveredPhotoKey = '';
                 let nonCanceledCount = 0;
+                // [신규] 카드 머리에 취소 상태를 표시하기 위한 집계.
+                //  예전에는 펼쳐서 항목을 봐야 취소된 줄 알 수 있었다. (사장님이 취소한 건도 마찬가지)
+                let canceledCount = 0;
+                let totalCount = 0;
 
                 Object.values(group.pickupGroups).forEach(items => {
                     items.forEach(order => {
                         const isCombined = (order.item && order.item.includes('[배달합산]'));
                         const isCancelled = isOrderCancelled(order);
+                        totalCount++;
+                        if (isCancelled) canceledCount++;
                         const isProcessing = order.isProcessing === true;
                         const isReceived = isOrderReceived(order);
                         const isStocked = isOrderStocked(order);
@@ -5360,9 +5488,12 @@
                 });
                 const showDeliveredBadge = (nonCanceledCount > 0 && allDelivered);
                 const isDeliveryCard = (group.shippingMethod === '배달주문');
-                const cardBorderColor = isDeliveryCard ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)';
-                const cardLeftBorder = isDeliveryCard ? '4px solid #10b981' : '4px solid #3b82f6';
-                const cardHeaderBg = isDeliveryCard ? '#f0fdf4' : '#eff6ff';
+                // [신규] 전부 취소된 주문은 카드 자체를 회색으로 눕혀 한눈에 알아보게 한다
+                const allCanceled = (totalCount > 0 && canceledCount === totalCount);
+                const someCanceled = (canceledCount > 0 && !allCanceled);
+                const cardBorderColor = allCanceled ? 'rgba(148, 163, 184, 0.4)' : (isDeliveryCard ? 'rgba(16, 185, 129, 0.35)' : 'rgba(59, 130, 246, 0.35)');
+                const cardLeftBorder = allCanceled ? '4px solid #94a3b8' : (isDeliveryCard ? '4px solid #10b981' : '4px solid #3b82f6');
+                const cardHeaderBg = allCanceled ? '#f5f6f8' : (isDeliveryCard ? '#f0fdf4' : '#eff6ff');
 
                 htmlBuffer += `
                     <div style="background:var(--white); border: 1.5px solid ${cardBorderColor}; border-left: ${cardLeftBorder}; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
@@ -5385,7 +5516,17 @@
                                     <span style="display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;">${displaySummary}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:6px;">
-                                    <span style="font-size:16px; font-weight:900; color:var(--nego-orange);">${group.totalPrice.toLocaleString()}원</span>
+                                    <span style="font-size:16px; font-weight:900; color:${allCanceled ? '#94a3b8' : 'var(--nego-orange)'};">${group.totalPrice.toLocaleString()}원</span>
+                                    ${allCanceled ? `
+                                        <span style="padding: 4px 8px; background:#eef1f4; color:#64748b; border:1px solid #e2e8f0; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
+                                            취소완료
+                                        </span>
+                                    ` : ''}
+                                    ${someCanceled ? `
+                                        <span style="padding: 4px 8px; background:#fff5f5; color:#d32f2f; border:1px solid #ffd8d8; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
+                                            ${canceledCount}건 취소
+                                        </span>
+                                    ` : ''}
                                     ${hasCancelable ? `
                                         <button onclick="event.stopPropagation(); deleteOrderCard('${escapeArg(orderTimeFull)}')" 
                                              style="padding: 4px 10px; background:#ffd8d8; color:#d32f2f; border:1px solid #ffb8b8; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; transition: all 0.2s;">
@@ -5412,12 +5553,13 @@
 
                 // 2차 그룹 (픽업일별 소카드) 렌더링
                 const sortedPKeys = Object.keys(group.pickupGroups).sort((a, b) => {
-                    if (a === "배달비") return 1; if (b === "배달비") return -1;
+                    // 날짜를 못 읽는 묶음(정보없음·상시판매 등)은 맨 뒤로
+                    if (a === "정보없음") return 1; if (b === "정보없음") return -1;
                     return parseKRDate(a) - parseKRDate(b);
                 });
 
                 sortedPKeys.forEach(pKey => {
-                    const items = group.pickupGroups[pKey];
+                    const items = gSortFeeLast(group.pickupGroups[pKey]); // 배달비·차감은 맨 아래로
                     let pDisp = pKey;
                     if (pDisp.match(/^\d{4}-\d{2}-\d{2}$/)) {
                         const pd = new Date(pDisp);
@@ -5426,8 +5568,6 @@
                         const pday = pd.getDate();
                         const pw = ['일', '월', '화', '수', '목', '금', '토'][pd.getDay()];
                         pDisp = `${py}년 ${pm}월 ${pday}일 (${pw})`;
-                    } else if (pDisp === "배달비") {
-                        pDisp = "기타(배달비)";
                     } else {
                         pDisp = pDisp.replace(/^20(\d{2}년)/, '$1');
                     }
@@ -5464,7 +5604,8 @@
 
                         const isSadaItem = gIsSadaOrder(order);
                         const isDeliveryItem = order.shippingMethod === '배달주문';
-                        const isBadgeTarget = isDeliveryItem || isSadaItem || order.item === '배달비';
+                        // 배달비 차감도 입금 표시 대상이다. 이 줄까지 묶어야 손님이 낼 총액이 맞는다.
+                        const isBadgeTarget = isDeliveryItem || isSadaItem || gIsFeeRow(order.item);
                         const isPaid = (order.paid === true || order.paid === "true" || String(order.paid).toUpperCase() === "TRUE");
 
                         let payBadgeHtml = '';
@@ -5571,10 +5712,81 @@
             return canceledCount;
         }
 
+        // [신규] 배달비/배달비 차감 줄을 새로 하나 기록한다. (기존 기록은 절대 고치지 않는다)
+        //  isRefund=true 면 마이너스 금액의 '배달비 차감' 줄이 된다.
+        async function gAppendFeeRow(cleanPhone, custName, baseOrder, pDate, amount, isRefund) {
+            const amt = Math.abs(parseInt(amount) || 0);
+            if (amt <= 0) return false;
+
+            const rowName = isRefund ? FEE_REFUND_NAME : "배달비";
+            const signed = isRefund ? -amt : amt;
+            const tempTimestamp = Date.now();
+            const formattedTimestamp = gFormatOrderTimestamp(new Date(tempTimestamp));
+            const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(rowName);
+            const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
+
+            const payload = {
+                header: 'order',
+                name: baseOrder.name,
+                phone: baseOrder.phone,
+                address: baseOrder.address || "",
+                addressDetail: baseOrder.addressDetail || "",
+                entrance: baseOrder.entrance || "",
+                shippingMethod: baseOrder.shippingMethod,
+                cashReceipt: baseOrder.cashReceipt || "미발행",
+                cashReceiptType: baseOrder.cashReceiptType || "",
+                cashReceiptPhone: baseOrder.cashReceiptPhone || "",
+                kakaoName: baseOrder.kakaoName || "",
+                kakaoRealName: baseOrder.kakaoRealName || "",
+                kakaoPhone: baseOrder.kakaoPhone || "",
+                gender: baseOrder.gender || "미선택",
+                ageGroup: baseOrder.ageGroup || "미선택",
+                timestamp: formattedTimestamp,
+                item: rowName,
+                qty: 1,
+                price: signed,
+                total: signed,
+                pickupDate: pDate,
+                received: false,
+                delivered: false,
+                canceled: false,
+                rawTimestamp: tempTimestamp,
+                matchKey: pDate,
+                isSada: false
+            };
+
+            let saved = false;
+            for (let a = 1; a <= 5 && !saved; a++) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!res.ok) throw new Error(`서버 응답 ${res.status}`);
+                    saved = true;
+                } catch (e) {
+                    console.warn(`${rowName} 기록 재시도 ${a}/5:`, e.message);
+                    await new Promise(r => setTimeout(r, 400 * a));
+                }
+            }
+            if (!saved) {
+                console.error(`${rowName} 기록 최종 실패:`, orderKey);
+                return false;
+            }
+
+            // 실제 저장 키를 들고 있어야 나중에 이 줄을 취소할 때 키가 어긋나지 않는다
+            payload.__fbKey = orderKey;
+            fullHistoryData.push(payload);
+            localStorage.setItem(`history_cache_${custName}_${cleanPhone}`, JSON.stringify(fullHistoryData));
+            renderHistory();
+            return true;
+        }
+
         // [수정] 자체 안내창을 띄우지 않고 처리 결과만 돌려준다.
         // 취소 완료 안내와 배달비 안내가 따로 두 번 뜨던 것을 deleteOrderCard의 통합 안내 하나로 합치기 위함.
         async function checkAndApplyDeliveryFeeAfterCustomerCancellation(cleanPhone, name) {
-            const feeResult = { addedFeeTotal: 0, addedFeeDates: [], canceledFeeCount: 0 };
+            const feeResult = { addedFeeTotal: 0, addedFeeDates: [], canceledFeeCount: 0, refundedFeeTotal: 0, refundedFeeDates: [] };
 
             // 1. 해당 고객의 전체 history 중에서 취소되지 않은 active 주문들을 분류
             // 이때 배달주문(shippingMethod === '배달주문')이고 아직 배달완료/픽업완료/취소완료되지 않은 날짜별로 그룹화
@@ -5594,138 +5806,51 @@
                 }
             });
 
-            // 2. 날짜별로 체크
+            // 2. 날짜별로 배달비를 다시 맞춘다.
+            // [수정] 예전에는 '배달비가 없으면 붙이기'만 했다. 그래서 취소로 금액이 줄면 붙일 수는 있어도,
+            //  반대로 남은 금액이 무료배달 기준을 넘어도 이미 붙은 배달비를 빼주지 못했다.
+            //  이제 주문할 때와 똑같은 기준으로 '있어야 할 배달비'와 '지금 붙어 있는 배달비'를 비교해
+            //  모자라면 배달비를, 넘치면 배달비 차감을 새 줄로 기록한다.
             for (const pDate in activeOrdersByDate) {
                 const items = activeOrdersByDate[pDate];
 
-                // [신규] 상품이 전부 취소되고 배달비만 덩그러니 남은 경우 → 남은 배달비도 같이 취소.
-                // 배달비는 부분취소 뒤 별도 타임스탬프로 새로 생성되기 때문에, 그 뒤 남은 상품을
-                // 모두 취소해도 배달비 카드만 살아남아 고객에게 청구되던 문제를 정리함.
-                const feeItems = items.filter(o => o.item === '배달비');
-                const productItems = items.filter(o => o.item !== '배달비');
+                const feeItems = items.filter(o => String(o.item || "").trim() === '배달비');
+                const refundItems = items.filter(o => String(o.item || "").trim() === FEE_REFUND_NAME);
+                const productItems = items.filter(o => !gIsFeeRow(o.item));
+
+                // 상품이 전부 취소되고 배달비만 덩그러니 남은 경우 → 남은 배달비·차감도 같이 취소.
                 if (productItems.length === 0) {
-                    if (feeItems.length > 0) {
-                        feeResult.canceledFeeCount += await cancelLeftoverDeliveryFees(cleanPhone, name, feeItems);
+                    const leftovers = feeItems.concat(refundItems);
+                    if (leftovers.length > 0) {
+                        feeResult.canceledFeeCount += await cancelLeftoverDeliveryFees(cleanPhone, name, leftovers);
                     }
                     continue;
                 }
 
-                // 이미 활성 배달비가 있는지 체크
-                const hasActiveDeliveryFee = feeItems.length > 0;
-                if (hasActiveDeliveryFee) continue;
-
-                // 일반 상품들의 금액 합산
-                // [수정] 사다드림 상품 금액은 배달비 기준 계산에서 제외 (USER 요청)
+                // 그 날짜에 최종적으로 남은 상품 금액 (사다드림 금액은 무료배달 기준에서 제외)
                 let activeTotal = 0;
-                let activeCount = 0;
-                items.forEach(o => {
-                    if (o.item !== '배달비') {
-                        const isSadaItem = gIsSadaOrder(o);
-                        if (!isSadaItem) activeTotal += parseInt(o.total || 0);
-                        activeCount++;
-                    }
+                productItems.forEach(o => {
+                    if (!gIsSadaOrder(o)) activeTotal += parseInt(o.total || 0);
                 });
 
-                if (activeCount === 0) continue;
+                // 지금 실제로 붙어 있는 배달비 (붙은 것 - 빼준 것)
+                const amountOf = (o) => Math.abs(parseInt(o.total || 0));
+                const currentFee = feeItems.reduce((a, o) => a + amountOf(o), 0)
+                                 - refundItems.reduce((a, o) => a + amountOf(o), 0);
+                const neededFee = (activeTotal >= 15000) ? 0 : (window.deliveryFee || 3000);
+                const diff = neededFee - currentFee;
 
-                // [수정] 주문 시 기준과 동일하게 15,000원 미만인 경우 배달비 부과 (USER 요청)
-                if (activeTotal < 15000) {
-                    try {
-                        const baseOrder = items.find(o => o.item !== '배달비');
-                        if (!baseOrder) continue;
-
-                        const dFee = window.deliveryFee || 3000;
-
-                        // 새 배달비 주문 생성 및 Firebase PUT
-                        const tempTimestamp = Date.now();
-                        const formattedTimestamp = gFormatOrderTimestamp(new Date(tempTimestamp));
-                        const orderKey = fSafeKey(formattedTimestamp) + "_배달비";
-                        const url = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
-
-                        const deliveryFeePayload = {
-                            header: 'order',
-                            name: baseOrder.name,
-                            phone: baseOrder.phone,
-                            address: baseOrder.address || "",
-                            addressDetail: baseOrder.addressDetail || "",
-                            entrance: baseOrder.entrance || "",
-                            shippingMethod: baseOrder.shippingMethod,
-                            cashReceipt: baseOrder.cashReceipt || "미발행",
-                            cashReceiptType: baseOrder.cashReceiptType || "",
-                            cashReceiptPhone: baseOrder.cashReceiptPhone || "",
-                            kakaoName: baseOrder.kakaoName || "",
-                            kakaoRealName: baseOrder.kakaoRealName || "",
-                            kakaoPhone: baseOrder.kakaoPhone || "",
-                            gender: baseOrder.gender || "미선택",
-                            ageGroup: baseOrder.ageGroup || "미선택",
-                            timestamp: formattedTimestamp,
-                            item: "배달비",
-                            qty: 1,
-                            price: dFee,
-                            total: dFee,
-                            pickupDate: pDate,
-                            received: false,
-                            delivered: false,
-                            canceled: false,
-                            rawTimestamp: tempTimestamp,
-                            matchKey: pDate
-                        };
-
-                        const res = await fetch(url, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(deliveryFeePayload)
-                        });
-
-                        if (!res.ok) throw new Error("배달비 Firebase 저장 실패");
-
-                        // 구글 시트 동기화
-                        const gasPayload = {
-                            header: 'order',
-                            timestamp: formattedTimestamp,
-                            name: baseOrder.name,
-                            phone: cleanPhone,
-                            shippingMethod: baseOrder.shippingMethod,
-                            cashReceipt: baseOrder.cashReceipt || "미발행",
-                            cashReceiptType: baseOrder.cashReceiptType || "",
-                            cashReceiptPhone: baseOrder.cashReceiptPhone || "",
-                            kakaoName: baseOrder.kakaoName || "",
-                            kakaoRealName: baseOrder.kakaoRealName || "",
-                            kakaoPhone: baseOrder.kakaoPhone || "",
-                            gender: baseOrder.gender || "미선택",
-                            ageGroup: baseOrder.ageGroup || "미선택",
-                            items: [{
-                                name: "배달비",
-                                qty: 1,
-                                price: dFee,
-                                subtotal: dFee,
-                                date: pDate,
-                                matchKey: pDate,
-                                isCategorized: false,
-                                isFV: false,
-                                isOnSite: false,
-                                isPushedByCutoff: false
-                            }],
-                            rawTimestamp: tempTimestamp
-                        };
-
-                        // GAS 동기화 생략
-
-                        // 로컬 메모리 및 캐시 갱신
-                        // [추가] 실제 저장된 Firebase 키를 들고 있어야 나중에 이 배달비를 취소할 때
-                        // 키를 다시 계산하다 어긋나는 일이 없음 (deleteOrderCard와 동일한 이유)
-                        deliveryFeePayload.__fbKey = orderKey;
-                        fullHistoryData.push(deliveryFeePayload);
-                        localStorage.setItem(`history_cache_${name}_${cleanPhone}`, JSON.stringify(fullHistoryData));
-                        
-                        // 화면 리렌더링
-                        renderHistory();
-
-                        // [수정] 안내는 호출한 쪽(deleteOrderCard)에서 통합 안내로 한 번에 보여준다
-                        feeResult.addedFeeTotal += dFee;
-                        feeResult.addedFeeDates.push(pDate);
-                    } catch (e) {
-                        console.error("배달비 부과 실패:", e);
+                if (diff !== 0) {
+                    const baseOrder = productItems[0];
+                    const ok = await gAppendFeeRow(cleanPhone, name, baseOrder, pDate, Math.abs(diff), diff < 0);
+                    if (ok) {
+                        if (diff > 0) {
+                            feeResult.addedFeeTotal += diff;
+                            feeResult.addedFeeDates.push(pDate);
+                        } else {
+                            feeResult.refundedFeeTotal += Math.abs(diff);
+                            feeResult.refundedFeeDates.push(pDate);
+                        }
                     }
                 }
             }
@@ -5738,6 +5863,7 @@
         function buildCancelResultMessage(targetOrders, targetDigitTime, feeResult) {
             const won = (n) => (parseInt(n) || 0).toLocaleString() + "원";
             const addedFee = (feeResult && feeResult.addedFeeTotal) || 0;
+            const refundedFee = (feeResult && feeResult.refundedFeeTotal) || 0;
 
             const canceledTotal = targetOrders.reduce((a, o) => a + (parseInt(o.total) || 0), 0);
 
@@ -5760,9 +5886,19 @@
                 <div style="background:#fff9f2; padding:14px; border-radius:12px; border:1px solid #ffe8cc;">
                     ${row('취소한 금액', '-' + won(canceledTotal))}
                     ${addedFee > 0 ? row('추가된 배달비', '+' + won(addedFee), { mt: true, color: '#d32f2f' }) : ''}
+                    ${refundedFee > 0 ? row('빼드린 배달비', '-' + won(refundedFee), { mt: true, color: '#2e7d32' }) : ''}
                 </div>`;
 
-            if (addedFee > 0) {
+            if (refundedFee > 0) {
+                // 취소하고 남은 금액이 무료배달 기준을 넘어 배달비를 도로 빼드린 경우
+                msg += `
+                <div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:11px 12px; font-size:13px; font-weight:700; color:#2e7d32; line-height:1.6; word-break:keep-all;">
+                    남은 주문 금액이 무료배송 기준(15,000원)을 넘어 배달비 ${won(refundedFee)}을 빼드렸습니다.
+                </div>
+                <div style="font-size:13px; font-weight:600; color:#9a8b7a; line-height:1.6; text-align:center;">
+                    이미 입금하셨다면 환불해 드립니다.
+                </div>`;
+            } else if (addedFee > 0) {
                 msg += `
                 <div style="background:#fff5f5; border:1px solid #ffd8d8; border-radius:10px; padding:11px 12px; font-size:13px; font-weight:700; color:#d32f2f; line-height:1.6; word-break:keep-all;">
                     ⚠️ 남은 주문 금액이 무료배송 기준(15,000원) 미만이 되어 배달비 ${won(addedFee)}이 추가되었습니다.
@@ -7704,18 +7840,12 @@
                 }
 
                 const isSoldOut = stock <= 0;
-                const isLowStock = !isSoldOut && stock <= 2;
 
                 let stockText = "";
                 let stockColor = "#455464";
                 if (isFinite(stock)) {
-                    if (isSoldOut) {
-                        stockText = "품절";
-                        stockColor = "#ff0000";
-                    } else if (isLowStock) {
-                        stockText = "품절임박";
-                        stockColor = "#ff0000";
-                    }
+                    // [수정] '품절임박'은 쓰지 않기로 해서 뺐다.
+                    //  품절도 따로 글씨를 쓰지 않고 아래 '장바구니 담기' 버튼을 '품절'로 바꿔 보여준다.
 
                     // [추가] 관리자 모드일 때는 남은 수량을 정확하게 표시
                     if (isAdminMode) {
@@ -7738,24 +7868,27 @@
                     `</div>` +
                     `<div class="item-info-top">` +
                     `<div class="item-name">${p.name.replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.9em;">[$1]</span>') + '<br>' : '')}</div>` +
-                    // [신규] 금액 앞에 담을 수량 선택 (- 1 +)
                     `<div class="item-price-row">` +
-                    `<div class="qty-stepper" style="${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
+                    `<div class="item-price-val">${gCardPriceLabel(p)}</div>` +
+                    `</div>` +
+                    // [수정] 수량 선택(- 1 +)은 썸네일 옆 정보칸 안에 둔다.
+                    //  아래 버튼줄에 따로 한 줄을 차지하면 카드가 길어지고 썸네일이 작아 보인다.
+                    `<div class="qty-stepper wide" style="${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
                     `<button class="qty-step-btn" onclick="stepQty(this, -1)">-</button>` +
                     `<input class="qty-sel" value="1" readonly>` +
                     `<button class="qty-step-btn" onclick="stepQty(this, 1)">+</button>` +
-                    `</div>` +
-                    `<div class="item-price-val">${parseInt(p.price || 0).toLocaleString()}원</div>` +
                     `</div>` +
                     `</div></div>` +
                     `<div class="item-controls-bottom-v">` +
                     `<button class="btn-detail" onclick="openDetail('${escapeArg(p.name)}')">상세보기</button>` +
                     `<div class="qty-group">` +
-                    `<div class="stock-status" style="color:${stockColor}; font-weight:800;">${stockText}</div>` +
+                    (stockText ? `<div class="stock-status" style="color:${stockColor}; font-weight:800;">${stockText}</div>` : '') +
                     // [수정] 수량 조절(- 0 +) 대신 '담기' 버튼. 누를 때마다 1개씩 늘어난다.
-                    `<div class="add-cart-wrap ${currentQty > 0 ? 'selected' : ''}" style="${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
+                    `<div class="add-cart-wrap ${currentQty > 0 ? 'selected' : ''}" style="${isSoldOut ? 'pointer-events:none;' : ''}">` +
                     `<input type="hidden" class="qty-num" value="${currentQty}" data-name="${p.name}" data-price="${p.price}" data-stock="${stock}">` +
-                    `<button class="btn-add-cart" onclick="addSelectedToCart(this)">${currentQty > 0 ? `🛒 담김 <b>${currentQty}</b>개` : '🛒 장바구니 담기'}</button>` +
+                    // [수정] 품절이면 이 버튼이 '품절'을 대신 알린다 (따로 글씨를 쓰지 않는다)
+                    // [수정] 옵션 상품은 바로 담기지 않고 옵션 선택창이 뜨므로 버튼 글자도 '옵션 선택'으로 알려준다.
+                    `<button class="btn-add-cart${isSoldOut ? ' soldout' : ''}" onclick="addSelectedToCart(this)">${isSoldOut ? '품절' : (currentQty > 0 ? `🛒 담김 <b>${currentQty}</b>개` : (gHasChoiceOptions(p) ? '🛒 옵션 선택' : '🛒 장바구니 담기'))}</button>` +
                     `</div>` +
                     `</div></div>`;
 
@@ -7790,11 +7923,77 @@
                     }
                 }
             });
+
+            // [신규] 카드를 다 그린 뒤 수량 박스 너비를 담기 버튼에 맞춘다
+            requestAnimationFrame(() => gSyncQtyStepperWidths(container));
         }
 
         // ===== [신규] 사다드림 합배송 불가 안내 =====
         //  사다드림은 지정된 날짜에만 배달되므로, 그보다 늦은 날짜의 예약구매 상품과는 함께 배달될 수 없다.
         //  장바구니에 담는 순간 각각 배달된다는 점을 안내한다.
+        // [신규] 상품 금액 표기. 0원인 상품은 옵션을 고를 때 값이 정해지므로 '0원~'처럼 물결을 붙여
+        //  '이 금액부터 시작한다'는 뜻이 드러나게 한다.
+        function gPriceLabel(price) {
+            const v = parseInt(price) || 0;
+            return v.toLocaleString() + '원' + (v === 0 ? '~' : '');
+        }
+
+        // [신규] 고를 수 있는 옵션(선택옵션)이 실제로 있는 상품인지.
+        //  금액제한·1인당제한만 켜진 상품은 고를 항목이 없으므로 여기서는 옵션 상품으로 보지 않는다.
+        function gHasChoiceOptions(p) {
+            if (!p || !gBool(p.useOptions, true)) return false;
+            if (!gBool(p.useChoiceOptions) || !Array.isArray(p.options)) return false;
+            return p.options.some(g => Array.isArray(g.items) && g.items.length > 0);
+        }
+
+        // [신규] 옵션을 골랐을 때 더해지는 '가장 적은 금액'.
+        //  단일선택 그룹은 반드시 하나를 골라야 하므로 그 그룹에서 가장 싼 항목 금액을 더한다.
+        //  중복선택 그룹은 안 골라도 되므로 더하지 않되, 필수 옵션이 하나도 없으면
+        //  전체 항목 중 가장 싼 값(0원 항목 제외)을 기준으로 잡아 '0원~'으로 보이지 않게 한다.
+        function gMinOptionAdd(p) {
+            const groups = (p && Array.isArray(p.options)) ? p.options : [];
+            let required = 0;
+            let cheapest = null;
+            groups.forEach(g => {
+                const items = Array.isArray(g.items) ? g.items : [];
+                if (items.length === 0) return;
+                const prices = items.map(it => parseInt(it.price) || 0);
+                const gMin = Math.min(...prices);
+                if (g.selectType !== 'multi') required += gMin;
+                prices.forEach(v => { if (v > 0 && (cheapest === null || v < cheapest)) cheapest = v; });
+            });
+            if (required > 0) return required;
+            return cheapest || 0;
+        }
+
+        // [신규] 상품카드·상세보기에 보여줄 금액.
+        //  옵션 상품은 고를 수 있는 가장 싼 조합 금액에 '~'를 붙여 '이 금액부터 시작한다'는 뜻을 드러낸다.
+        function gCardPriceLabel(p) {
+            const base = parseInt(p && p.price) || 0;
+            if (!gHasChoiceOptions(p)) return gPriceLabel(base);
+            return (base + gMinOptionAdd(p)).toLocaleString() + '원~';
+        }
+
+        // [신규] 수량 박스 너비를 '장바구니 담기' 버튼과 똑같이 맞춘다.
+        //  두 칸이 서로 다른 영역(정보칸 / 버튼줄)에 있어 CSS만으로는 같은 너비를 낼 수 없다.
+        //  그려진 뒤 실제 버튼 너비를 재서 그대로 적용하고, 창 크기가 바뀌면 다시 맞춘다.
+        function gSyncQtyStepperWidths(root) {
+            const scope = root || document;
+            scope.querySelectorAll('.product-card').forEach(card => {
+                const stepper = card.querySelector('.qty-stepper.wide');
+                const cartBtn = card.querySelector('.btn-add-cart');
+                if (!stepper || !cartBtn) return;
+                const w = Math.round(cartBtn.getBoundingClientRect().width);
+                if (w > 0) stepper.style.width = w + 'px';
+            });
+        }
+
+        let _qtyWidthTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(_qtyWidthTimer);
+            _qtyWidthTimer = setTimeout(() => gSyncQtyStepperWidths(), 150);
+        });
+
         function gGetDeliveryDateKey(p) {
             const s = String((p && (p.matchKey || p.date)) || "").replace(/[.\/]/g, '-').trim();
             const m = s.match(/(\d{2,4})-(\d{1,2})-(\d{1,2})/);
@@ -7809,6 +8008,27 @@
         function gIsDateOnlyKey(s) {
             const t = String(s || '').trim();
             return /^(?:\d{2,4})[./-]\d{1,2}[./-]\d{1,2}$/.test(t) || /^\d{1,2}[./-]\d{1,2}$/.test(t);
+        }
+
+        // [신규] 배달비 정산 관련 공통 이름·판별.
+        //  배달비가 붙거나 빠지는 일은 기존 기록을 고치지 않고 항상 새 줄로 남긴다.
+        //  '배달비'(+) 와 '배달비 차감'(-) 이 짝을 이루면 그 날짜 배달비는 정산이 끝난 것이다.
+        //  입금 여부는 판정에 쓰지 않는다.
+        const FEE_REFUND_NAME = "배달비 차감";
+
+        function gIsFeeRow(itemName) {
+            const n = String(itemName || "").replace(/\[취소\]/g, "").trim();
+            return n === "배달비" || n === FEE_REFUND_NAME;
+        }
+
+        // [신규] 주문내역에서 배달비·배달비 차감은 상품 뒤에 오도록 정렬한다.
+        //  상품을 먼저 보고 마지막에 배달비를 확인하는 순서가 읽기 좋다.
+        function gSortFeeLast(items) {
+            return items.slice().sort((a, b) => {
+                const fa = gIsFeeRow(a.item) ? 1 : 0;
+                const fb = gIsFeeRow(b.item) ? 1 : 0;
+                return fa - fb;
+            });
         }
 
         // [신규] 주문 기록(또는 주문 항목)이 사다드림인지.
@@ -8156,8 +8376,9 @@
                 `<div class="modal-content" style="width:90%; max-width:460px; max-height:85vh; display:flex; flex-direction:column; padding:0; overflow-y:auto; -webkit-overflow-scrolling:touch;">` +
                 `<div style="padding:16px 20px; border-bottom:1px solid #f0f0f0; display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">` +
                 `<div style="min-width:0; text-align:left;">` +
+                // [수정] '기본 0원~' 표기는 뺐다. 아래에서 옵션을 고르면 합계가 바로 보이고,
+                //  상품카드에는 이미 최저 금액이 '1,000원~'처럼 적혀 있어 오히려 헷갈린다.
                 `<div style="font-size:15px; font-weight:900; color:var(--item-black); line-height:1.4; word-break:keep-all;">${p.name}</div>` +
-                `<div style="font-size:13px; font-weight:800; color:var(--nego-orange); margin-top:4px;">기본 ${(parseInt(p.price) || 0).toLocaleString()}원</div>` +
                 `</div>` +
                 `<span onclick="closeOptionModal()" style="flex:0 0 auto; font-size:24px; font-weight:800; color:#bbb; cursor:pointer; line-height:1;">&times;</span>` +
                 `</div>` +
@@ -8541,7 +8762,7 @@
 
             // [신규] '담기' 버튼이면 담긴 수량을 버튼 글자에 표시
             if (btn.classList && btn.classList.contains('btn-add-cart')) {
-                btn.innerHTML = val > 0 ? `🛒 담김 <b>${val}</b>개` : '🛒 장바구니 담기';
+                btn.innerHTML = val > 0 ? `🛒 담김 <b>${val}</b>개` : (gHasChoiceOptions(p) ? '🛒 옵션 선택' : '🛒 장바구니 담기');
             }
 
             // 수량에 따라 배경색(클래스) 토글
@@ -8741,7 +8962,7 @@
             activeProductName = p.name;
 
             document.getElementById('detail-title').innerHTML = p.name.replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.85em;">[$1]</span>') + '<br>' : '');
-            document.getElementById('detail-price').innerText = parseInt(p.price || 0).toLocaleString() + '원';
+            document.getElementById('detail-price').innerText = gCardPriceLabel(p);
             document.getElementById('detail-desc').style.whiteSpace = 'pre-wrap';
             document.getElementById('detail-desc').innerText = p.desc || "상세 설명이 없습니다.";
             const slider = document.getElementById('slider-area');
@@ -8977,6 +9198,25 @@
                         totalQty += 1;
                     }
                 }
+                // [신규] 앞서 받은 배달비를 빼주는 경우도 확인창에서 미리 보여준다.
+                //  주문하기 전에 얼마가 빠지는지 손님이 알 수 있어야 한다.
+                if (window.pendingFeeRefund > 0) {
+                    // 날짜 묶음이 여러 개면 배달비가 붙은 묶음에, 없으면 가장 마지막(늦은) 묶음에 넣는다.
+                    //  실제로 배달이 나가는 묶음에 붙어야 읽는 순서가 맞는다.
+                    const nonSadaKeys = Object.keys(grouped).filter(k => k && !k.includes("사다드림") && k !== "배달비");
+                    const refKey = nonSadaKeys.find(k => grouped[k].some(x => x.name === "배달비"))
+                                || nonSadaKeys[nonSadaKeys.length - 1];
+                    if (refKey) {
+                        grouped[refKey].push({
+                            name: FEE_REFUND_NAME,
+                            price: -window.pendingFeeRefund,
+                            qty: 1,
+                            displayDate: refKey,
+                            matchKey: grouped[refKey][0]?.matchKey || refKey
+                        });
+                        totalSum -= window.pendingFeeRefund;
+                    }
+                }
             }
 
             const sortedDates = Object.keys(grouped).filter(d => d !== "배달비").sort((a, b) => {
@@ -9001,11 +9241,16 @@
                         <div style="padding: 10px 12px 10px 12px;">
                 `;
 
-                grouped[date].forEach((p, idx) => {
+                // 배달비·배달비 차감은 상품 뒤에 오도록 맞춘다 (읽는 순서: 상품 → 배달비 → 차감)
+                const rows = grouped[date].slice().sort((a, b) => {
+                    const rank = (n) => (n === FEE_REFUND_NAME ? 2 : (n === "배달비" ? 1 : 0));
+                    return rank(a.name) - rank(b.name);
+                });
+                rows.forEach((p, idx) => {
                     // 대행료가 나눠떨어지지 않는 수량에서도 실제 청구액과 같도록 줄 합계를 그대로 쓴다
                     const sub = (p.lineTotal !== undefined) ? p.lineTotal : p.qty * parseInt(p.price || 0);
                     groupHtml += `
-                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px; padding: 8px 0; ${idx !== grouped[date].length - 1 ? 'border-bottom: 1px dashed #eee;' : ''}">
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px; padding: 8px 0; ${idx !== rows.length - 1 ? 'border-bottom: 1px dashed #eee;' : ''}">
                             <span style="color:var(--item-black); font-weight:800; flex:1; padding-right:10px; word-break:keep-all; line-height:1.2; white-space: pre-wrap;">${p.name.replace(/^(\[.*?\](?:\s*\[.*?\])*)/, '<span style="color:var(--nego-orange); font-size: 0.9em;">$1</span><br>')}${gOptionLinesHtml(p.optionText)}</span>
                             <div style="display:flex; align-items:center; min-width:90px; justify-content:flex-end; flex-shrink:0;">
                                 <span style="color:#455464; font-size:15px; font-weight:700; text-align:right;">${p.qty}개</span>
@@ -9013,6 +9258,12 @@
                                 <span style="color:var(--item-black); font-weight:800; text-align:right;">${sub.toLocaleString()}원</span>
                             </div>
                         </div>`;
+
+                    // [신규] 차감 줄만 보면 왜 빠지는지 알 수 없어서, 바로 밑에 이유를 적어 준다.
+                    if (p.name === FEE_REFUND_NAME) {
+                        groupHtml += `
+                        <div style="margin:0 0 8px; padding:7px 10px; background:#f1fbf5; border:1px solid #cfe6d8; border-radius:8px; font-size:12px; font-weight:700; color:#2e7d32; line-height:1.55; word-break:keep-all; text-align:left;">이전 주문과 <b>합배송</b>되어 무료배달 기준(15,000원)을 넘어, 먼저 붙었던 배달비 <b>${Math.abs(sub).toLocaleString()}원</b>을 빼드립니다.</div>`;
+                    }
                 });
                 groupHtml += `</div></div>`;
                 list.innerHTML += groupHtml;
@@ -9043,6 +9294,7 @@
         function openShippingSelection() {
             cutoffConfirmedStatus = false; // [추가] 주문 시작 시 마감 확인 상태 초기화
             holidayConfirmedStatus = false; // [추가] 주말/공휴일 확인 상태 초기화
+            window.pendingFeeRefund = 0; // [신규] 배달비 차감액도 주문마다 다시 계산한다
             if (Object.keys(cart).length === 0) {
                 showSystemModal("상품이 없습니다. 상품을 선택해 주세요.", 'alert');
                 return;
@@ -9087,10 +9339,12 @@
         // [신규] 주문 확정 단계에서 GAS 호출(3~5초 대기)을 건너뛰고 파이어베이스 실시간 재고/상태 정보로만 초고속 검증(0.1초)하는 함수
         async function loadDataFirebaseOnly() {
             try {
-                const [stockRes, statusRes, pubRes] = await Promise.all([
+                // [수정] 여기서 published_products(약 330KB)까지 받고 있었는데, 받아 놓고 쓰지 않았다.
+                //  아래에서 화면을 갱신할 때 쓰는 값은 globalAdjustments(재고)와 이미 갖고 있는 productsData뿐이다.
+                //  주문확정을 누를 때마다 330KB가 그냥 버려지고 있어서 뺐다. 재고 확인에는 영향이 없다.
+                const [stockRes, statusRes] = await Promise.all([
                     fetch(`${FIREBASE_DB_URL}global_stock.json?t=${Date.now()}`).catch(e => { console.error("Firebase 로드 실패:", e); return { ok: false }; }),
-                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; }),
-                    fetch(`${FIREBASE_DB_URL}published_products.json?t=${Date.now()}`).catch(e => { console.error("Firebase published_products 로드 실패:", e); return { ok: false }; })
+                    fetch(`${FIREBASE_DB_URL}product_list_enabled.json?t=${Date.now()}`).catch(e => { console.error("공개상태 로드 실패:", e); return { ok: false }; })
                 ]);
 
                 if (statusRes && statusRes.ok) {
@@ -9098,17 +9352,12 @@
                     isProductListEnabled = (statusData === null) ? true : !!statusData;
                 }
 
-                let publishedProducts = [];
-                if (pubRes && pubRes.ok) {
-                    publishedProducts = await pubRes.json() || [];
-                }
-
                 if (stockRes && stockRes.ok) {
                     globalAdjustments = await stockRes.json() || {};
                 }
 
                 // [중요 수정] productsData 원본을 파괴적으로 변형(in-place mutation)하지 않고
-                // 최신 publishedProducts 및 globalAdjustments 데이터로 안전하게 화면 수량을 갱신
+                // 최신 globalAdjustments(재고) 데이터로 안전하게 화면 수량을 갱신
                 if (productsData && productsData.length > 0) {
                     processAndRender(productsData, false);
                 }
@@ -9499,6 +9748,25 @@
                             isPushedByCutoff: false
                         });
                     }
+
+                    // [신규] 합배송으로 무료배달 기준을 넘겨 앞서 받은 배달비를 빼주는 경우.
+                    //  이전 기록은 그대로 두고 이번 주문에 마이너스 줄로 남긴다.
+                    if (window.pendingFeeRefund > 0) {
+                        const refItem = allItems.find(it => !gIsFeeRow(it.name) && !gIsSadaOrder(it));
+                        const refDate = refItem ? refItem.date : (maxReserveDate || todayStr);
+                        allItems.push({
+                            name: FEE_REFUND_NAME,
+                            qty: 1,
+                            price: -window.pendingFeeRefund,
+                            subtotal: -window.pendingFeeRefund,
+                            date: refDate,
+                            matchKey: refDate,
+                            isCategorized: false,
+                            isFV: false,
+                            isOnSite: false,
+                            isPushedByCutoff: false
+                        });
+                    }
                 }
 
                 if (shippingMethod === '배달주문' && extraItems && extraItems.length > 0) {
@@ -9745,23 +10013,12 @@
             const extraItems = allItems.filter(it => it.isExtra);
             const total = thisItems.reduce((acc, it) => acc + it.subtotal, 0);
 
-            // [신규] 기존 주문에서 이미 배달비를 냈고, 그 주문과 이번 주문을 합쳐 무료배달 기준을 넘으면
-            //  이번 결제 금액에서 그 배달비만큼 빼준다. (기존 배달비는 주문 처리 쪽에서 삭제됨)
-            const isPaidFlag = (it) => (it.paid === true || it.paid === "true"
-                || it.originalData?.paid === true || it.originalData?.paid === "true");
-
-            const extraGoodsTotal = extraItems.filter(it => it.name !== '배달비').reduce((a, it) => a + it.subtotal, 0);
-            const thisGoodsTotal = thisItems.filter(it => it.name !== '배달비').reduce((a, it) => a + it.subtotal, 0);
-            const paidExtraFee = extraItems.filter(it => it.name === '배달비' && isPaidFlag(it))
-                                           .reduce((a, it) => a + it.subtotal, 0);
-
-            let paidFeeDeduct = 0;
-            if (paidExtraFee > 0 && (extraGoodsTotal + thisGoodsTotal) >= 15000) {
-                paidFeeDeduct = paidExtraFee;
-            }
-
-            let displayTotal = Math.max(0, total - paidFeeDeduct);
-            let showDeductNotice = paidFeeDeduct > 0;
+            // [수정] 배달비 차감은 이번 주문의 '배달비 차감' 줄(마이너스 금액)로 이미 반영돼 있다.
+            //  여기서 또 빼면 두 번 빠진다.
+            const displayTotal = Math.max(0, total);
+            // [신규] 차감액이 이번 상품값보다 크면 남는 차액이 생긴다. 0원으로만 안내하고 끝내면
+            //  그 돈이 손님 몫인지 알 수 없으므로, 얼마를 돌려드리는지 금액으로 밝힌다.
+            const overRefund = Math.max(0, -total);
 
             let receiptOpt = "미발행", receiptType = "개인", receiptPhone = phone;
             if (isFinal && finalReceiptData) {
@@ -9812,9 +10069,11 @@
                                 ${displayTotal.toLocaleString()}원
                             </div>
                         </div>
-                        ${showDeductNotice ? `
+                        <!-- [수정] 배달비 차감 설명은 바로 앞 주문확인창에서 이미 읽었으므로 여기선 뺐다.
+                             다만 빼드릴 금액이 주문 금액보다 커서 돌려드릴 돈이 생기는 경우만 알린다. -->
+                        ${overRefund > 0 ? `
                         <div style="font-size:12.5px; font-weight:700; color:#2e7d32; background:#f1fbf5; border:1px solid #cfe6d8; border-radius:8px; padding:8px 11px; margin-top:10px; line-height:1.6; word-break:keep-all; text-align:left;">
-                            이전 주문과 합쳐 무료배달 기준을 넘어<br>이미 내신 배달비 <b>${paidFeeDeduct.toLocaleString()}원</b>을 빼드렸습니다.
+                            빼드릴 배달비가 이번 주문 금액보다 <b>${overRefund.toLocaleString()}원</b> 많습니다. 이전 주문 입금 전이라면 그 금액에서 빼고 보내주시고, 이미 입금하셨다면 <b>${overRefund.toLocaleString()}원</b>을 환불해 드립니다.
                         </div>
                         ` : ''}
                         ${extraItems.length > 0 ? `
@@ -9844,7 +10103,11 @@
                         <div style="border-top:1px dashed #eee; padding-top:12px; margin-top:5px; text-align:left;">
                             <div style="font-size:13px; font-weight:800; color:#455464; margin-bottom:8px; text-align:center;">[ 주문 상품 내역 ]</div>
                             <div style="display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto; padding-right:2px;">
-                                ${allItems.map(it => {
+                                ${allItems.slice().sort((a, b) => {
+                                    // 이번 주문 상품 → 이전 주문(합배송) → 배달비 차감 순으로 읽히게 한다
+                                    const rank = (it) => (it.name === FEE_REFUND_NAME ? 2 : (it.isExtra ? 1 : 0));
+                                    return rank(a) - rank(b);
+                                }).map(it => {
                                     if (it.name === "배달비") return '';
                                     return `
                                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; background:#f8f9fa; padding:6px 8px; border-radius:6px; border:1px solid #f1f3f5;">
@@ -10267,7 +10530,7 @@
                 // [버그수정] 이전 주문(isExtra)까지 넣으면 그때 이미 깎은 재고를 또 깎는다.
                 //  이번에 담은 것(saveItems)만 차감한다.
                 const stockPromises = saveItems.map(async it => {
-                    if (it.name === "배달비") return;
+                    if (gIsFeeRow(it.name)) return; // 배달비·배달비 차감은 재고와 무관
 
                     // 상품 정보 찾기
                     const pData = productsData.find(pd => pd.name === it.name);
@@ -10390,6 +10653,9 @@
 
             // [추가] 시간 기반 카테고리 순서 동적 설정 및 기본 탭 설정
             initMainTabs(true);
+
+            // [신규] 쓸모없는 주문내역 캐시 정리 (아래 함수 설명 참고)
+            gCleanupHistoryCaches();
 
             // 데이터 로드와 프로필 로드를 병렬로 시작
             loadData();
