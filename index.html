@@ -1888,6 +1888,28 @@
             transform: none;
         }
 
+        /* 5. 상세보기 · 수량 · 담기를 아래 한 줄로 */
+        .item-controls-bottom-v { align-items: center; gap: 8px; }
+        .item-controls-bottom-v .btn-detail {
+            flex: 0 0 auto;
+            height: 38px;
+            padding: 0 13px;
+            font-size: 14px;
+            font-weight: 700;
+            border-color: #e4e8de;
+            background: #fff;
+        }
+        .item-controls-bottom-v .qty-stepper.wide {
+            flex: 0 0 auto;
+            width: auto;
+            height: 38px;
+            align-self: center;
+        }
+        .item-controls-bottom-v .qty-stepper.wide .qty-sel { width: 34px; }
+        .item-controls-bottom-v .qty-group { flex: 1; min-width: 0; }
+        .item-controls-bottom-v .btn-add-cart { height: 38px; font-size: 15px; }
+        /* 수량 박스와 담기 단추 너비를 맞추던 손질은 한 줄이 된 지금은 필요 없다 */
+
         /* 2. 안내문 접기 — 첫 줄만 두고 '자세히'로 편다 */
         .notice-more[hidden] { display: none !important; }
         .notice-toggle {
@@ -2088,9 +2110,9 @@
     <div class="sticky-header-group">
         <!-- [신규] 배송 유형 대분류 탭 영역 -->
         <div class="delivery-type-tabs">
-            <button class="delivery-type-btn active" data-type="today" onclick="switchDeliveryType('today')">🚚 당일판매</button>
-            <button class="delivery-type-btn" data-type="onsite" onclick="switchDeliveryType('onsite')">🏪 상시판매</button>
-            <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">🗓️ 예약판매</button>
+            <button class="delivery-type-btn active" data-type="today" onclick="switchDeliveryType('today')">당일판매</button>
+            <button class="delivery-type-btn" data-type="onsite" onclick="switchDeliveryType('onsite')">상시판매</button>
+            <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">예약판매</button>
         </div>
         <!-- [신규] 대분류 탭 영역 -->
         <div class="main-tabs" id="main-tabs-container">
@@ -2163,7 +2185,7 @@
     <div id="cart-detail-overlay" class="modal-overlay" style="display: none; z-index: 1100;">
         <div class="modal-content" style="padding: 20px; display: flex; flex-direction: column; max-height: 80vh; box-sizing: border-box; width: 90%; max-width: 450px;">
             <div style="border-bottom: 2px solid var(--nego-orange); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 id="cart-detail-title" style="font-size: 18px; font-weight: 900; color: var(--item-black); margin: 0; display: flex; align-items: center; gap: 6px;">🛒 장바구니 담은 목록</h3>
+                <h3 id="cart-detail-title" style="font-size: 18px; font-weight: 900; color: var(--item-black); margin: 0; display: flex; align-items: center; gap: 6px;">장바구니 담은 목록</h3>
                 <span style="font-size: 24px; font-weight: 800; cursor: pointer; color: #aaa; line-height: 1;" onclick="closeCartDetailModal()">&times;</span>
             </div>
             <div id="cart-detail-list" style="flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 5px 0; margin-bottom: 15px;">
@@ -2271,7 +2293,7 @@
         </div>
         <div style="display:flex; gap:10px;">
             <!-- [수정] 왼쪽 버튼을 '초기화' 대신 '장바구니'로 (비우기는 장바구니 화면 안에 있음) -->
-            <button class="main-reset-btn" onclick="openCartDetailModal()">🛒 장바구니</button>
+            <button class="main-reset-btn" onclick="openCartDetailModal()">장바구니</button>
             <button class="main-submit-btn" onclick="openShippingSelection()">주문하기</button>
         </div>
     </div>
@@ -2863,9 +2885,8 @@
             return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
         }
 
-        /* [ver3] 안내문을 접는다.
-           네 줄이 매번 크게 자리를 잡고 있었다. 처음 오신 분에게만 필요한 내용이라
-           첫 줄만 두고 '자세히'를 누르면 나머지가 펴지게 했다. 한 번 편 것은 그 화면에서 그대로 남는다. */
+        /* [ver3] 판매유형 안내는 펴 둔 채로 시작하고, '접기'를 누르면 첫 줄만 남는다.
+           (처음에는 접어 두었는데, 손님이 읽어야 할 내용이라 펴 두는 쪽으로 바꿨다) */
         function gToggleNotice(btn) {
             const box = btn && btn.closest('[data-notice]');
             const more = box && box.querySelector('.notice-more');
@@ -2885,12 +2906,13 @@
             const rest = lines.slice(1);
             return `<div data-notice style="background:${gRgba(accent, 0.055)}; border:1px solid ${gRgba(accent, 0.2)}; border-radius:14px; padding:12px 14px; text-align:left; word-break:keep-all;">` +
                 `<div style="display:flex; align-items:center; gap:8px;">` +
-                `<span style="flex:0 0 auto; width:28px; height:28px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` +
+                // [ver3] 그림글자를 뺐다. 아이콘을 안 넘기면 자리도 잡지 않는다.
+                (icon ? `<span style="flex:0 0 auto; width:28px; height:28px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` : '') +
                 `<span style="font-size:15.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
-                (rest.length ? `<button type="button" class="notice-toggle" style="margin-left:auto; color:${accent};" onclick="gToggleNotice(this)">자세히</button>` : '') +
+                (rest.length ? `<button type="button" class="notice-toggle" style="margin-left:auto; color:${accent};" onclick="gToggleNotice(this)">접기</button>` : '') +
                 `</div>` +
                 (first ? row(first) : '') +
-                (rest.length ? `<div class="notice-more" hidden>${rest.map(row).join('')}</div>` : '') +
+                (rest.length ? `<div class="notice-more">${rest.map(row).join('')}</div>` : '') +
                 `</div>`;
         }
 
@@ -2914,7 +2936,7 @@
                 // 상시판매 탭이면 하위 분류와 상관없이 항상 노출.
                 // [수정] 품절 경고만 크게 떠 있어 '상시판매가 뭔지'는 알 수 없었다. 판매 특징을 함께 적는다.
                 // [수정] 문구를 짧게 다듬었다. 품절 안내의 빨간 강조는 그대로 둔다.
-                html = gTypeNoticeCard('🏪', '상시판매', '#047857', '#eafaf2', [
+                html = gTypeNoticeCard('', '상시판매', '#3d8f19', '#eef7e7', [
                     `늘 파는 상품이라 언제든 담으실 수 있어요`,
                     `당일·예약 판매와 같이 주문하시면 함께 나가요`,
                     `<b style="color:#ff4d4d;">매장에서도 함께 판매해 품절될 수 있어요</b>`
@@ -2931,7 +2953,7 @@
                 // [수정] 다른 안내(당일·상시·예약판매)와 같은 카드 모양·같은 말투로 맞춘다. 내용은 그대로.
                 //  대행료 안내는 여기 두지 않는다. 대행료는 상세옵션에서 주문금액에 따라
                 //  계산되므로, 실제로 금액이 매겨지는 장바구니 담기(옵션 선택창)에서 설명한다.
-                html = gTypeNoticeCard('🛵', '사다드림', '#3d8f19', '#eef7e7', [
+                html = gTypeNoticeCard('', '사다드림', '#3d8f19', '#eef7e7', [
                     `무료배달 기준 금액(15,000원)에 <b style="color:#3d8f19;">포함되지 않아요</b>`,
                     // [수정] '(배달·픽업 모두)'는 괄호째 붙어 있어야 읽히므로 중간에 줄이 바뀌지 않게 묶어 둔다
                     `주문마감 전까지 <b style="color:#3d8f19;">입금이 확인</b>되어야 주문이 확정돼요<span style="white-space:nowrap;">(배달·픽업 모두)</span>`,
@@ -2941,7 +2963,7 @@
                 kind = 'today';
                 // [신규] 당일판매 특징
                 // [수정] 문구를 짧게 다듬었다. 강조하던 '오후 3시'·'매일 새벽시장'은 그대로 색을 유지한다.
-                html = gTypeNoticeCard('🚚', '당일판매', '#3d8f19', '#eef7e7', [
+                html = gTypeNoticeCard('', '당일판매', '#3d8f19', '#eef7e7', [
                     `오늘 받을 수 있는 상품들이에요`,
                     `<b style="color:#3d8f19;">${gTodayCloseWords()}</b>까지 주문하면 <b style="color:#3d8f19;">오후 6시</b> 전에 받을 수 있어요`,
                     `<b style="color:#3d8f19;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
@@ -2951,7 +2973,7 @@
                 kind = 'reserve';
                 // [신규] 예약판매 특징
                 // [수정] 문구를 짧게 다듬었다. 합배송 안내의 강조는 그대로 둔다.
-                html = gTypeNoticeCard('🗓️', '예약판매', '#3d8f19', '#eef7e7', [
+                html = gTypeNoticeCard('', '예약판매', '#3d8f19', '#eef7e7', [
                     `정해진 날짜에 입고되는 상품들이에요`,
                     `위에 날짜를 고르시면 그날 상품만 보여요`,
                     `여러 날짜를 같이 담으면 <b style="color:#3d8f19;">가장 늦은 날로 합배송</b>돼요`,
@@ -9667,16 +9689,16 @@
                     gStorageBadge(p) +
                     `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div>` +
                     `</div>` +
-                    // [수정] 수량 선택(- 1 +)은 썸네일 옆 정보칸 안에 둔다.
-                    //  아래 버튼줄에 따로 한 줄을 차지하면 카드가 길어지고 썸네일이 작아 보인다.
+                    `</div></div>` +
+                    // [ver3] 수량(- 1 +)과 담기를 아래 한 줄로 모았다. 상세보기도 같은 줄 왼쪽에 둔다.
+                    //  (예전에는 수량이 사진 옆 정보칸, 담기가 아래 줄로 떨어져 있었다)
+                    `<div class="item-controls-bottom-v">` +
+                    `<button class="btn-detail" onclick="openDetail('${escapeArg(p.name)}')">상세보기</button>` +
                     `<div class="qty-stepper wide" style="${isSoldOut ? 'opacity:0.5; pointer-events:none;' : ''}">` +
                     `<button class="qty-step-btn" onclick="stepQty(this, -1)">-</button>` +
                     `<input class="qty-sel" value="1" readonly>` +
                     `<button class="qty-step-btn" onclick="stepQty(this, 1)">+</button>` +
                     `</div>` +
-                    `</div></div>` +
-                    `<div class="item-controls-bottom-v">` +
-                    `<button class="btn-detail" onclick="openDetail('${escapeArg(p.name)}')">상세보기</button>` +
                     `<div class="qty-group">` +
                     (stockText ? `<div class="stock-status" style="color:${stockColor}; font-weight:800;">${stockText}</div>` : '') +
                     // [수정] 수량 조절(- 0 +) 대신 '담기' 버튼. 누를 때마다 1개씩 늘어난다.
@@ -9684,7 +9706,7 @@
                     `<input type="hidden" class="qty-num" value="${currentQty}" data-name="${p.name}" data-price="${p.price}" data-stock="${stock}">` +
                     // [수정] 품절이면 이 버튼이 '품절'을 대신 알린다 (따로 글씨를 쓰지 않는다)
                     // [수정] 옵션 상품은 바로 담기지 않고 옵션 선택창이 뜨므로 버튼 글자도 '옵션 선택'으로 알려준다.
-                    `<button class="btn-add-cart${isSoldOut ? ' soldout' : ''}" onclick="addSelectedToCart(this)">${isSoldOut ? '품절' : (currentQty > 0 ? `🛒 담김 <b>${currentQty}</b>개` : (gHasChoiceOptions(p) ? '🛒 옵션 선택' : '🛒 장바구니 담기'))}</button>` +
+                    `<button class="btn-add-cart${isSoldOut ? ' soldout' : ''}" onclick="addSelectedToCart(this)">${isSoldOut ? '품절' : (currentQty > 0 ? `담김 <b>${currentQty}</b>개` : (gHasChoiceOptions(p) ? '옵션 선택' : '담기'))}</button>` +
                     `</div>` +
                     `</div></div>`;
 
@@ -9796,9 +9818,9 @@
             const s = String((p && p.matchKey) || "") + " " + String((p && p.storage) || "");
             let label, bg, fg;
             // [ver3] 뱃지 색을 한 가지 회색으로 모았다 (파랑·초록·주황 세 갈래가 값보다 눈에 띄었다)
-            if (/냉동/.test(s)) { label = '❄️ 냉동'; bg = '#f1f4f7'; fg = '#64748b'; }
-            else if (/냉장/.test(s)) { label = '🧊 냉장'; bg = '#f1f4f7'; fg = '#64748b'; }
-            else if (/상온|실온/.test(s)) { label = '📦 상온'; bg = '#f1f4f7'; fg = '#64748b'; }
+            if (/냉동/.test(s)) { label = '냉동'; bg = '#f1f4f7'; fg = '#64748b'; }
+            else if (/냉장/.test(s)) { label = '냉장'; bg = '#f1f4f7'; fg = '#64748b'; }
+            else if (/상온|실온/.test(s)) { label = '상온'; bg = '#f1f4f7'; fg = '#64748b'; }
             else return '';
             // [수정] 옆의 가격(22px)에 비해 너무 작아 눈에 안 띄었다. 가격 줄 높이에 맞춰 키운다.
             return `<span style="flex:0 0 auto; font-size:14px; font-weight:800; color:${fg}; background:${bg};` +
@@ -9979,7 +10001,7 @@
         //  사다드림(주황)과 구분되도록 초록으로 둔다.
         function gFreshMark(p, size) {
             if (!gIsFreshProduct(p)) return '';
-            return `<span style="color:#047857; font-size: ${size || '0.9em'};">[신선식품]</span><br>`;
+            return `<span style="color:#3d8f19; font-size: ${size || '0.9em'};">[신선식품]</span><br>`;
         }
 
         /* [신규] 할인 상품 말머리 [오늘의 특가].
@@ -10352,7 +10374,7 @@
                상품마다 빼기 버튼을 두니 여러 날짜가 겹칠 때 버튼이 수십 개로 늘어나
                무엇을 눌러야 할지 알기 어려웠다. 어차피 해결하려면 한 날짜를 통째로 빼야 한다. */
             const kindTag = (item) => item.isFresh
-                ? `<span style="display:inline-block; background:#eafaf2; color:#047857; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">신선식품</span>`
+                ? `<span style="display:inline-block; background:#eafaf2; color:#3d8f19; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">신선식품</span>`
                 : (item.isSada
                     ? `<span style="display:inline-block; background:#fff4e9; color:#c2610a; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">사다드림</span>`
                     : ``);
@@ -10393,7 +10415,7 @@
                 `<div style="line-height:1.7; word-break:keep-all;">` +
                 `<div style="font-weight:900; color:var(--nego-orange); font-size:1.05em; margin-bottom:10px;">🛵 함께 배달할 수 없어요</div>` +
                 `배달은 가장 늦은 입고일에<br>한 번에 나갑니다.<br><br>` +
-                `<b style="color:#c2610a;">사다드림</b>·<b style="color:#047857;">신선식품</b>은<br>당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
+                `<b style="color:#c2610a;">사다드림</b>·<b style="color:#3d8f19;">신선식품</b>은<br>당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
                 `<div style="background:#f8f9fa; border-radius:10px; padding:12px 14px; text-align:left;">` +
                 listHtml +
                 `</div><br>` +
@@ -10899,7 +10921,7 @@
                 (s.errors.length ? `<div style="font-size:12.5px; font-weight:700; color:#ff4d4d; background:#fff5f5; border:1px solid #ffd6d6; border-radius:10px; padding:9px 12px; margin-bottom:12px; line-height:1.6; text-align:left;">${s.errors.map(e => '· ' + e).join('<br>')}</div>` : ``) +
                 `<div style="display:flex; gap:10px;">` +
                 `<button onclick="closeOptionModal()" style="flex:1; height:48px; border:1.5px solid #e2e8f0; background:#fff; color:#555; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer;">취소</button>` +
-                `<button onclick="confirmOptionAdd()" ${canAdd ? '' : 'disabled'} style="flex:1.4; height:48px; border:none; background:${canAdd ? 'var(--moket-green)' : '#cfd6dc'}; color:#fff; border-radius:10px; font-size:15px; font-weight:800; cursor:${canAdd ? 'pointer' : 'not-allowed'};">🛒 장바구니 담기</button>` +
+                `<button onclick="confirmOptionAdd()" ${canAdd ? '' : 'disabled'} style="flex:1.4; height:48px; border:none; background:${canAdd ? 'var(--moket-green)' : '#cfd6dc'}; color:#fff; border-radius:10px; font-size:15px; font-weight:800; cursor:${canAdd ? 'pointer' : 'not-allowed'};">장바구니에 담기</button>` +
                 `</div>`;
         }
 
@@ -11071,7 +11093,7 @@
 
             // [신규] '담기' 버튼이면 담긴 수량을 버튼 글자에 표시
             if (btn.classList && btn.classList.contains('btn-add-cart')) {
-                btn.innerHTML = val > 0 ? `🛒 담김 <b>${val}</b>개` : (gHasChoiceOptions(p) ? '🛒 옵션 선택' : '🛒 장바구니 담기');
+                btn.innerHTML = val > 0 ? `담김 <b>${val}</b>개` : (gHasChoiceOptions(p) ? '옵션 선택' : '담기');
             }
 
             // 수량에 따라 배경색(클래스) 토글
@@ -11184,7 +11206,7 @@
             const titleEl = document.getElementById('cart-detail-title');
             if (titleEl) {
                 if (!hasItems) {
-                    titleEl.innerHTML = `🛒 장바구니 담은 목록`;
+                    titleEl.innerHTML = `장바구니 담은 목록`;
                 } else if (cartType === 'today') {
                     titleEl.innerHTML = `🚚 당일판매 장바구니 목록`;
                 } else {
