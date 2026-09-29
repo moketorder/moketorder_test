@@ -2272,7 +2272,11 @@
         .cf-sum small { font-size: 13px; font-weight: 500; color: #8b9682; margin-left: 4px; }
         .cf-sum b { font-size: 21px; font-weight: 700; color: var(--nego-orange); font-variant-numeric: tabular-nums; }
         #confirm-notice-area { border-top: 1px solid #eef1e9 !important; padding-top: 10px !important; }
-        .cf-notes { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 500; color: #4f5b46; line-height: 1.55; word-break: keep-all; }
+        .cf-notes { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; font-weight: 500; color: #4f5b46; line-height: 1.5; word-break: keep-all; }
+        .cf-notes > div { display: flex; gap: 10px; }
+        .cf-notes > div > span:first-child { flex: 0 0 64px; font-weight: 700; color: #8b9682; font-size: 13px; }
+        .cf-notes > div > span:last-child { flex: 1; min-width: 0; }
+        .cf-notes b { color: #16200f; font-weight: 700; }
         #order-note { border: 1px solid #e2e8da !important; border-radius: 8px !important; font-weight: 500 !important; }
         #order-note:focus { border-color: #4CAF20 !important; }
         #confirm-overlay label[for], #confirm-overlay label { font-weight: 600 !important; color: #16200f !important; }
@@ -2312,6 +2316,18 @@
             mask-image: linear-gradient(to right, #000 82%, transparent);
         }
         #detail-title .detail-lead { font-size: 13.5px; margin-bottom: 3px; }
+        /* 배달비 안내 창 안 접이식 합배송 안내 — 메뉴 '배송 안내'와 같은 본문, 여백만 좁게 */
+        .fold-guide .v3-grp { padding: 10px 0; }
+        .fold-guide .v3-grp h4 { font-size: 14px; margin-bottom: 4px; }
+        .fold-guide .v3-grp p { font-size: 13.5px; }
+        .fold-guide .v3-grp .k { flex-basis: 62px; min-width: 62px; font-size: 12.5px; }
+        /* [신규] 마감 시각 · 마감 날 카운트다운 */
+        .item-deadline { margin-top: 4px; font-size: 13px; font-weight: 600; color: #8b9682; font-variant-numeric: tabular-nums; }
+        .item-deadline.is-today { color: #3d8f19; }
+        .item-deadline.is-today b { font-weight: 700; letter-spacing: 0.02em; }
+        .item-deadline.is-urgent { color: #dc2626; }
+        .item-badges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; flex: 1 1 auto; }
+        .item-price-row .item-price-val { white-space: nowrap; flex: 0 0 auto; }   /* '13,800원~'의 ~가 떨어지지 않게 */
     </style>
 </head>
 
@@ -2656,7 +2672,7 @@
                 <label style="margin-bottom:15px; font-weight:700; font-size:14px; color:#4f5b46; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="confirm-notice-check"
                         style="width:18px; height:18px; margin:0; cursor:pointer;">
-                    <span>위 내용을 확인하였습니다.</span>
+                    <span>위 안내를 확인했어요</span>
                 </label>
                 <div style="display:flex; gap:10px;">
                     <button class="btn-common btn-close"
@@ -3414,7 +3430,7 @@
                 //  계산되므로, 실제로 금액이 매겨지는 장바구니 담기(옵션 선택창)에서 설명한다.
                 html = gTypeNoticeCard('', '사다드림', '#3d8f19', '#eef7e7', [
                     `모켓이 대신 사다 드리는 상품이에요`,
-                    `무료배달 기준 금액(15,000원)에 <b style="color:#3d8f19;">포함되지 않아요</b>`,
+                    `무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>`,
                     // [수정] '(배달·픽업 모두)'는 괄호째 붙어 있어야 읽히므로 중간에 줄이 바뀌지 않게 묶어 둔다
                     `주문마감 전까지 <b style="color:#3d8f19;">입금이 확인</b>되어야 주문이 확정돼요<span style="white-space:nowrap;">(배달·픽업 모두)</span>`,
                     `사다드림은 <b style="color:#3d8f19;">카드 결제가 안 돼요</b>`
@@ -4292,7 +4308,7 @@
                         feeModal(
                             `배달 최소주문금액 미달`,
                             feeRow('사다드림 주문금액', sadaTotal) + feeRow('예약판매 주문금액', reserveTotal),
-                            feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.'),
+                            feeNote('사다드림 상품 금액은 무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>.'),
                             `사다드림과 예약판매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
                             `<span style="display:block; text-align:center; margin-top:8px;">배달비 ${feeAmount(deliveryFee)} × 2 = ${feeAmount(deliveryFee * 2)}</span>`
                         ),
@@ -4315,7 +4331,7 @@
                         feeModal(
                             `배달비 안내`,
                             feeRow('사다드림 주문금액', sadaTotal),
-                            feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.'),
+                            feeNote('사다드림 상품 금액은 무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>.'),
                             `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>`
                         ),
                         'confirm',
@@ -4335,7 +4351,7 @@
                         feeModal(
                             `배달 최소주문금액 미달`,
                             feeRow('주문금액', reserveTotal) + feeRow('최소주문금액', 15000),
-                            cartHasSada ? feeNote('사다드림 상품 금액은 무료배달 기준 금액(15,000원)에 포함되지 않아요.') : ``,
+                            cartHasSada ? feeNote('사다드림 상품 금액은 무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>.') : ``,
                             `<span style="display:block; text-align:center;">배달비 ${feeAmount(deliveryFee)}이 추가됩니다.</span>` +
                             feeNudge(15000 - reserveTotal) +
                             gCombinedDeliveryFold('여러 번 나눠 주문해도 괜찮나요?')
@@ -4985,6 +5001,102 @@
         }
 
         // [수정] 사이클(날짜) 갱신 로직 제거: 수동 동기화 전까지 재고 누적 유지
+        /* [신규] 상품 마감 — 주문관리에서 [마감]을 누르면 product_closed/<재고 키> 에 true 가 적힌다.
+           재고·조정값과는 따로 논다. 마감된 상품은 목록에서 '마감'으로 보이고 담을 수 없으며,
+           주문확정 직전에도 그 칸만 다시 읽어 막는다. [마감 풀기]를 누르면 칸이 지워져 바로 다시 열린다. */
+        let gClosedMap = {};
+        async function gLoadClosed() {
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}product_closed.json?t=${Date.now()}`);
+                if (r.ok) gClosedMap = (await r.json()) || {};
+            } catch (e) { console.warn('마감 목록을 못 읽었습니다(주문에는 지장 없음):', e); }
+        }
+        function gIsClosedProduct(p) {
+            if (!p) return false;
+            if (gIsExpiredProduct(p)) return true;   // 노출일정의 마감 시각이 지났다
+            const k = fGetAdjKey(p.matchKey || p.date, p.name);
+            return gClosedMap[k] === true || gClosedMap[encodeURIComponent(k)] === true;
+        }
+
+        /* [신규] 노출일정 마감 시각(expireAt, 주문관리 '노출일정'에서 정한다).
+           · 시각 전 : 카드에 '10/1(목) 오후 6시 마감'
+           · 마감 날 : '마감까지 02:14:33' — 1초마다 흐르고, 1시간 안쪽이면 빨강
+           · 시각 뒤 : 마감(회색 카드 · 담기 막힘). 주문관리를 열어 두지 않아도 손님 화면이 스스로 막는다.
+           매주 노출 상품은 예약을 쓰지 않으므로 보지 않는다. */
+        function gExpireAt(p) {
+            const t = Number(p && p.expireAt) || 0;
+            return (t && p.showWeekly !== true && p.showWeekly !== 'true') ? t : 0;
+        }
+        function gIsExpiredProduct(p) {
+            const t = gExpireAt(p);
+            return !!(t && Date.now() >= t);
+        }
+        function gDeadlineText(t) {
+            const now = new Date(), d = new Date(t);
+            const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+            if (sameDay) {
+                const left = Math.max(0, Math.floor((t - now.getTime()) / 1000));
+                const hh = String(Math.floor(left / 3600)).padStart(2, '0');
+                const mm = String(Math.floor(left % 3600 / 60)).padStart(2, '0');
+                const ss = String(left % 60).padStart(2, '0');
+                return { today: true, urgent: left < 3600, html: `마감까지 <b>${hh}:${mm}:${ss}</b>` };
+            }
+            const W = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+            const h = d.getHours(), mi = d.getMinutes();
+            const clock = `${h < 12 ? '오전' : '오후'} ${h % 12 === 0 ? 12 : h % 12}시${mi ? ` ${mi}분` : ''}`;
+            // 하루 넘게 남았으면 날짜와 함께 달력 날짜로 며칠 남았는지 적는다
+            const dayDiff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+            return { today: false, urgent: false, html: `${d.getMonth() + 1}/${d.getDate()}(${W}) ${clock} 마감 · <b>${dayDiff}일 남음</b>` };
+        }
+        function gDeadlineHtml(p, closed) {
+            const t = gExpireAt(p);
+            if (!t || closed) return '';
+            const x = gDeadlineText(t);
+            return `<div class="item-deadline${x.today ? ' is-today' : ''}${x.urgent ? ' is-urgent' : ''}" data-exp="${t}">${x.html}</div>`;
+        }
+        // 1초마다 카운트다운을 고친다. 마감 시각이 되면 목록을 다시 그려 '마감'으로 바꾼다.
+        let _gDeadlineRerendered = 0;
+        setInterval(() => {
+            const els = document.querySelectorAll('.item-deadline[data-exp]');
+            if (!els.length) return;
+            let hit = false;
+            els.forEach(el => {
+                const t = Number(el.dataset.exp) || 0;
+                if (!t) return;
+                if (Date.now() >= t) { hit = true; return; }
+                const x = gDeadlineText(t);
+                if (el.innerHTML !== x.html) el.innerHTML = x.html;
+                el.classList.toggle('is-today', x.today);
+                el.classList.toggle('is-urgent', x.urgent);
+            });
+            if (hit && Date.now() - _gDeadlineRerendered > 3000 && typeof renderList === 'function') {
+                _gDeadlineRerendered = Date.now();
+                try { renderList(gCurrentListKey()); } catch (e) { }
+            }
+        }, 1000);
+        // 주문확정 직전에 서버의 마감 시각을 다시 본다 (그 사이 바꿨을 수 있다)
+        async function gFetchLiveExpired(pData) {
+            const idx = pData && pData.__pubIdx;
+            if (idx === undefined || idx === null) return gIsExpiredProduct(pData);
+            try {
+                const [nRes, eRes] = await Promise.all([
+                    fetch(`${FIREBASE_DB_URL}published_products/${idx}/name.json?t=${Date.now()}`),
+                    fetch(`${FIREBASE_DB_URL}published_products/${idx}/expireAt.json?t=${Date.now()}`)
+                ]);
+                if (!nRes.ok || !eRes.ok) return gIsExpiredProduct(pData);
+                const norm = x => String(x || '').replace(/\s+/g, '');
+                if (norm(await nRes.json()) !== norm(pData.name)) return gIsExpiredProduct(pData);
+                const t = Number(await eRes.json()) || 0;
+                return !!(t && pData.showWeekly !== true && Date.now() >= t);
+            } catch (e) { return gIsExpiredProduct(pData); }
+        }
+        async function gFetchLiveClosed(adjKey) {
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}product_closed/${encodeURIComponent(adjKey)}.json?t=${Date.now()}`);
+                return r.ok ? (await r.json()) === true : false;
+            } catch (e) { return false; }
+        }
+
         function fGetAdjKey(mKey, name) {
             const s = String(mKey || "").trim();
             return fSafeKey(s) + "_" + fSafeKey(name);
@@ -5192,60 +5304,9 @@
         //  메뉴(전체 안내)와 주문 중 접이식 안내가 이 본문 하나를 같이 쓴다.
         //  금액·요일은 실제 설정값(deliveryFee·토요일 영업)을 읽어 쓰므로 설정을 바꾸면 안내도 따라 바뀐다.
         function gCombinedDeliveryGuideBody() {
-            const fee = (typeof deliveryFee !== 'undefined' ? deliveryFee : 3000);
-            const daysStr = (typeof isSundayAsWeekday !== "undefined" && isSundayAsWeekday) ? "월~일" : ((typeof isSaturdayAsWeekday !== "undefined" && isSaturdayAsWeekday) ? "월~토" : "월~금");
-            const O = (t) => `<b style="color:var(--nego-orange);">${t}</b>`;   // 금액·핵심 결과(주황)
-            const K = (t) => `<b style="color:var(--item-black);">${t}</b>`;     // 조건·이름(검정)
-
-            // 카드 하나 = 아이콘 + 제목 + 짧은 줄 몇 개. 네 가지(배달비·배송일·판매방식·합배송)를 같은 모양으로 맞춘다.
-            // [수정] 네 카드가 모두 주황 테두리라 눈이 피로했다. 테두리는 연한 회색으로 낮추고,
-            //  주제별 색은 아이콘 동그라미·제목·글머리 점에만 얹는다. (탭 색과 같은 계열로 맞춤)
-            const card = (icon, title, accent, tint, lines) =>
-                `<div style="background:${gRgba(accent, 0.055)}; border:1px solid ${gRgba(accent, 0.2)}; border-radius:14px; padding:12px 14px; margin-top:10px;">` +
-                `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">` +
-                
-                `<span style="font-size:15.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
-                `</div>` +
-                lines.map(t =>
-                    `<div style="display:flex; gap:7px; font-size:14.5px; font-weight:700; color:#4f5b46; line-height:1.65; margin-top:5px;">` +
-                    `<span style="flex:0 0 auto; width:4.5px; height:4.5px; border-radius:50%; background:${accent}; opacity:0.45; margin-top:8px;"></span>` +
-                    `<span style="min-width:0;">${t}</span></div>`
-                ).join('') +
-                `</div>`;
-
-            // 주제별 강조색 (주문서 탭 색과 같은 계열)
-            const C_FEE = ['#3d8f19', '#eef7e7'];      // 배달비 · 주황
-            const C_DATE = ['#047857', '#eafaf2'];     // 배송일 · 초록
-            const C_TAB = ['#3d8f19', '#eef7e7'];      // 판매방식 · 남색
-            const C_PACK = ['#c2410c', '#fff1e8'];     // 합배송 · 진주황
-
-            return `<div style="white-space:normal; text-align:left; word-break:keep-all;">` +
-
-                // [수정] 말투를 '해요체 + 존댓말(–시–)'로 통일한다. 명령형(받으세요)·설명체(쉽니다)가
-                //  섞여 있어 읽을 때 걸렸다. 모든 줄을 '~해요 / ~하실 수 있어요'로 맞춘다.
-                card('🛵', '배달비', C_FEE[0], C_FEE[1], [
-                    `배달비는 ${O(fee.toLocaleString() + '원')}이고, 같은 날 받는 상품이 ${O('15,000원 이상')}이면 무료예요`,
-                    `매장픽업은 배달비가 없어요`
-                ]) +
-
-                card('🗓️', '배송일', C_DATE[0], C_DATE[1], [
-                    `상품마다 ${K('받는 날짜')}가 정해져 있어요 (픽업/배달 예정일)`,
-                    `받는 날짜는 상품 목록과 주문내역에서 확인하실 수 있어요`
-                ]) +
-
-                card('🏪', '당일판매 · 예약판매', C_TAB[0], C_TAB[1], [
-                    `${K('당일판매')} — ${daysStr} ${O(gTodayCloseWords())}까지 주문하시면 그날 받으실 수 있어요 ${isSundayAsWeekday ? "(휴무일은 쉬어요)" : "(일요일·휴무일은 쉬어요)"}`,
-                    `${K('예약판매')} — 정해진 날짜에 들어오는 상품이라 그날 받으실 수 있어요`,
-                    `${K('상시판매')} — 늘 파는 상품이라 어느 쪽에 담으셔도 함께 나가요`
-                ]) +
-
-                card('📦', '합배송', C_PACK[0], C_PACK[1], [
-                    `날짜가 다른 상품을 ${K('같이 담아 주문')}하시면 ${O('가장 늦은 날짜에 한 번에')} 배달돼요 (배달비도 한 번만 붙어요)`,
-                    `${K('따로 주문')}하셔도 받는 날이 같으면 함께 나가고, 합쳐서 ${O('15,000원')}이 넘으면 먼저 내신 배달비를 빼드려요`,
-                    `매장픽업은 상품이 들어온 날에 각각 찾아가시면 돼요`
-                ]) +
-
-                `</div>`;
+            // [ver3] 색 상자 네 개를 걷고 메뉴 '배송 안내' 창과 같은 본문을 쓴다.
+            //  주문 도중에 펼쳐 보는 자리라 판매 방식 묶음은 빼고 배달비·받는 날·합배송만 둔다.
+            return `<div class="fold-guide">${gDeliveryGuideSheetBody(true)}</div>`;
         }
 
         // 안내창 안에 접어 넣는 형태. 모달을 새로 띄우지 않으므로 확인/취소 흐름을 끊지 않는다.
@@ -5255,13 +5316,13 @@
                 `<span>${label || '합배송이 뭔가요?'}</span>` +
                 `<span style="margin-left:auto; font-size:12px; font-weight:600; color:#8b9682;">자세히</span>` +
                 `</summary>` +
-                `<div style="margin-top:10px; padding-top:10px; border-top:1px solid #eef1e9;">${gCombinedDeliveryGuideBody()}</div>` +
+                `<div style="margin-top:8px; border-top:1px solid #eef1e9;">${gCombinedDeliveryGuideBody()}</div>` +
                 `</details>`;
         }
 
         // [ver3] 메뉴 '배송 안내' 창 본문. 배달비·요일·마감 시각은 실제 설정값을 읽는다
         //  (마감 시각 = 주문관리 일반 관리의 당일판매 마감). 주문 중 접이식 안내는 위 본문을 그대로 쓴다.
-        function gDeliveryGuideSheetBody() {
+        function gDeliveryGuideSheetBody(forFold) {
             const fee = (typeof deliveryFee !== 'undefined' ? deliveryFee : 3000);
             const daysStr = (typeof isSundayAsWeekday !== "undefined" && isSundayAsWeekday) ? "월~일" : ((typeof isSaturdayAsWeekday !== "undefined" && isSaturdayAsWeekday) ? "월~토" : "월~금");
             return `<div class="v3-grp"><h4>배달비</h4>` +
@@ -5273,10 +5334,10 @@
                 `<div class="v3-grp"><h4>합배송</h4>` +
                 `<p>따로 주문해도 받는 날이 같으면 함께 나갑니다. 합쳐서 <b>15,000원</b>이 넘으면 먼저 낸 배달비를 돌려드립니다.</p>` +
                 `<p>매장 픽업은 상품이 들어온 날마다 따로 찾아가시면 됩니다.</p></div>` +
-                `<div class="v3-grp"><h4>판매 방식</h4>` +
+                (forFold ? '' : `<div class="v3-grp"><h4>판매 방식</h4>` +
                 `<p class="kv"><span class="k">당일판매</span><span>${daysStr} <b>${gTodayCloseWords()}</b>까지 주문하면 그날 받습니다</span></p>` +
                 `<p class="kv"><span class="k">예약판매</span><span>정해진 날짜에 들어오는 상품입니다</span></p>` +
-                `<p class="kv"><span class="k">상시판매</span><span>늘 파는 상품이라 어느 쪽에 담아도 함께 나갑니다</span></p></div>`;
+                `<p class="kv"><span class="k">상시판매</span><span>늘 파는 상품이라 어느 쪽에 담아도 함께 나갑니다</span></p></div>`);
         }
 
         function showCombinedDeliveryGuide() {
@@ -8695,7 +8756,9 @@
                     fetchPromises.push(fetch(_pubUrl).catch(e => { console.error("Firebase published_products 로드 실패:", e); return { ok: false }; }));
                 }
 
+                const _closedP = gLoadClosed();   // [신규] 마감 표 (몇 바이트)
                 const results = await Promise.all(fetchPromises);
+                await _closedP;
                 const stockRes = results[0];
                 const statusRes = results[1];
                 const optStockRes = results[2];                     // [신규] 옵션 재고
@@ -10076,8 +10139,8 @@
 
                 const stockA = getStockVal(a);
                 const stockB = getStockVal(b);
-                const isSoldOutA = stockA <= 0;
-                const isSoldOutB = stockB <= 0;
+                const isSoldOutA = stockA <= 0 || gIsClosedProduct(a);
+                const isSoldOutB = stockB <= 0 || gIsClosedProduct(b);
 
                 // [강력 조건] 품절된 상품은 머릿말 우선순위와 상관없이 무조건 뒤로 보냄
                 if (isSoldOutA !== isSoldOutB) return isSoldOutA ? 1 : -1;
@@ -10253,7 +10316,8 @@
                     stock = Infinity;
                 }
 
-                const isSoldOut = stock <= 0;
+                const isClosed = gIsClosedProduct(p);   // [신규] 주문관리에서 마감한 상품
+                const isSoldOut = stock <= 0 || isClosed;
 
                 let stockText = "";
                 let stockColor = "#4f5b46";
@@ -10299,12 +10363,13 @@
                     gCardNameHtml(p) +
                     `</div>` +
                     gSaleNote(p) +
+                    gDeadlineHtml(p, isClosed) +   // [신규] 마감 시각 · 마감 날 카운트다운
                     // [신규] 할인 상품은 판매가 바로 위에 할인 전 금액을 작게 적어 준다.
                     (gOrigPriceLabel(p)
                         ? `<div class="item-orig-price"><span class="off">${gDiscLabelOf(p)}</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`
                         : '') +
                     `<div class="item-price-row">` +
-                    gStorageBadge(p) +
+                    `<div class="item-badges">` + gStorageBadge(p) + gTagBadges(p) + `</div>` +   // [신규] 냉동·냉장 옆 딱지
                     `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div>` +
                     `</div>` +
                     `</div></div>` +
@@ -10323,7 +10388,7 @@
                     `<input type="hidden" class="qty-num" value="${currentQty}" data-name="${p.name}" data-price="${p.price}" data-stock="${stock}">` +
                     // [수정] 품절이면 이 버튼이 '품절'을 대신 알린다 (따로 글씨를 쓰지 않는다)
                     // [수정] 옵션 상품은 바로 담기지 않고 옵션 선택창이 뜨므로 버튼 글자도 '옵션 선택'으로 알려준다.
-                    `<button class="btn-add-cart${isSoldOut ? ' soldout' : ''}" onclick="addSelectedToCart(this)">${isSoldOut ? '품절' : (currentQty > 0 ? `담김 <b>${currentQty}</b>개` : (gHasChoiceOptions(p) ? '옵션 선택' : '담기'))}</button>` +
+                    `<button class="btn-add-cart${isSoldOut ? ' soldout' : ''}" onclick="addSelectedToCart(this)">${isClosed ? '마감' : (isSoldOut ? '품절' : (currentQty > 0 ? `담김 <b>${currentQty}</b>개` : (gHasChoiceOptions(p) ? '옵션 선택' : '담기')))}</button>` +
                     `</div>` +
                     `</div></div>`;
 
@@ -10424,19 +10489,36 @@
              "학창 시절 그 맛 그대로! 두끼 학교 앞 떡볶이" → 위: 학창 시절 그 맛 그대로 / 아래: 두끼 학교 앞 떡볶이
            느낌표·물음표가 이름 앞쪽에 있을 때만 나눈다. 없으면 이름을 그대로 둔다.
            (수식어를 아예 따로 적는 칸이 상품등록에 생기면 이 어림짐작은 필요 없어진다) */
+        /* [신규] 상품 이름 나누기 — 손님 주문서와 주문관리(상품 등록 미리보기)가 똑같이 쓴다.
+           규칙 ① 맨 앞 [대괄호]·(괄호) → 위 작은 줄 (대괄호는 떼고, 여럿이면 ' · '로 잇는다)
+                ② 앞말 끝에 ! 또는 ? 를 붙이고 한 칸 띄우면 그 앞말 → 위 작은 줄
+                   (앞말은 4~40자, 그 안에 [ ] ( ) ! ? 가 없어야 한다. 뒤 이름은 4자 이상)
+                ①②가 같이 있어도 된다: '[사다드림] 한지민의 최애 떡볶이!! 신토불이 떡볶이' */
+        function gNameSplit(name) {
+            const takeBr = (str) => {
+                const m = str.match(/^((?:\s*\[[^\]]*\]|\s*\([^)]*\))+)\s*/);
+                if (!m || str.length <= m[0].length) return { pre: '', rest: str };
+                return { pre: m[1].trim().replace(/\]\s*\[/g, ' · ').replace(/[\[\]]/g, ''), rest: str.slice(m[0].length) };
+            };
+            const a = takeBr(String(name || '').trim());
+            const lm = a.rest.match(/^([^!?[\]()]{4,40}[!?]+)\s+(.{4,})$/);
+            const mid = lm ? lm[1].replace(/[!?\s]+$/, '') : '';
+            const b = takeBr(lm ? lm[2].trim() : a.rest);
+            return { leads: [a.pre, mid, b.pre].filter(Boolean), main: b.rest };
+        }
         function gNameParts(p) {
-            const sp = gSplitLead(gDisplayName(p));
-            const m = sp.main.match(/^((?:\s*\[[^\]]*\]|\s*\([^)]*\))+)\s*/);
-            const hasRest = m && sp.main.length > m[0].length;
-            const pre = hasRest ? m[1].trim().replace(/\]\s*\[/g, ' · ').replace(/[\[\]]/g, '') : '';
-            const main = hasRest ? sp.main.slice(m[0].length) : sp.main;
+            const ns = gNameSplit(gDisplayName(p));
+            // [신규] 주문관리에서 따로 적은 대괄호(nameTags)·수식어(nameLead). 예전 상품은 이름 안에 든 것을 떼어 쓴다
+            const E = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            const own = [...(Array.isArray(p.nameTags) ? p.nameTags : []), p.nameLead || ''].map(x => String(x || '').trim()).filter(Boolean).map(E);
             const lead = [
                 gSaleBadgeOn(p) ? '<span class="lead-sale">땡처리 특가</span>' : '',
                 gIsRecommendProduct(p) ? '오늘의추천' : '',
                 gIsFreshProduct(p) ? '신선식품' : '',
-                pre, sp.lead
+                ...own,
+                ...ns.leads
             ].filter(Boolean).join(' · ');
-            return { lead, main };
+            return { lead, main: ns.main };
         }
         function gCardNameHtml(p) {
             const { lead, main } = gNameParts(p);
@@ -10448,6 +10530,19 @@
             const m = s.match(/^([^!?[\]()]{4,40}[!?]+)\s+(.{4,})$/);
             if (!m) return { lead: '', main: s };
             return { lead: m[1].replace(/[!?\s]+$/, ''), main: m[2].trim() };
+        }
+
+        /* [신규] 냉동·냉장 옆 딱지 — 주문관리 상품 등록의 '딱지' 칸(tags, 두 개까지) +
+           고를 옵션이 있는 상품은 'N가지 중 선택'이 저절로 붙는다. 모양은 보관방법 딱지와 같다. */
+        function gTagBadges(p) {
+            const raw = Array.isArray(p && p.tags) ? p.tags : String((p && p.tags) || '').split(',');
+            const tags = raw.map(t => String(t || '').trim()).filter(Boolean).slice(0, 2);
+            if (gHasChoiceOptions(p)) {
+                const g = (p.options || []).find(g => Array.isArray(g.items) && g.items.length > 1);
+                if (g) tags.push(`${g.items.length}가지 중 선택`);
+            }
+            const E = t => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            return tags.map(t => `<span style="flex:0 0 auto; font-size:14px; font-weight:800; color:#4f5b46; background:#f1f4f7; padding:6px 11px; border-radius:8px; white-space:nowrap; line-height:1.2;">${E(t)}</span>`).join('');
         }
 
         function gStorageBadge(p) {
@@ -11982,7 +12077,7 @@
                     return !!(b && b.classList.contains('soldout'));
                 });
                 if (_dAdd) {
-                    _dAdd.innerText = _soldOut ? '품절' : (gHasChoiceOptions(p) ? '옵션 선택' : '담기');
+                    _dAdd.innerText = _soldOut ? (gIsClosedProduct(p) ? '마감' : '품절') : (gHasChoiceOptions(p) ? '옵션 선택' : '담기');
                     _dAdd.style.opacity = _soldOut ? '0.5' : '';
                     _dAdd.style.pointerEvents = _soldOut ? 'none' : '';
                 }
@@ -12160,26 +12255,24 @@
             const noticeArea = document.getElementById('confirm-notice-area');
             if (selectedShippingMethod === '배달주문') {
                 // [수정] 당일구매 탭이 열려 있어도 장바구니에 예약(공동구매) 상품이 섞였으면 예약 기준 안내로 표시
-                const depositNoticeLine = (currentDeliveryType === 'reserve' || gHasFutureReserveInCart())
-                    ? '<li>자정 전까지 입금이 확인되지 않으면 주문이 자동으로 취소됩니다.</li>'
-                    : '<li>오후 3시 전까지 입금이 확인되지 않으면 주문이 자동으로 취소됩니다.</li>';
-
+                // [ver3] 긴 문장 목록을 '말머리 + 짧은 한 줄'로. 가장 중요한 것(입금)을 맨 위에 둔다
+                const payBy = (currentDeliveryType === 'reserve' || gHasFutureReserveInCart()) ? '오늘 밤 12시' : gTodayCloseWords();
                 noticeArea.innerHTML = `
-                    <ul class="cf-notes">
-                        <li>주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</li>
-                        <li>바깥 온도에 상할 수 있으니 배달이 끝나면 바로 확인해 주세요.</li>
-                        ${depositNoticeLine}
-                        <li>업체·물류 사정에 따라 일정이 바뀌거나 취소될 수 있습니다.</li>
-                    </ul>
+                    <div class="cf-notes">
+                        <div><span>입금</span><span><b>${payBy}까지</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소돼요.</span></div>
+                        <div><span>배달</span><span>도착하면 바로 확인해 주세요. 바깥에 오래 두면 상할 수 있어요.</span></div>
+                        <div><span>취소</span><span>주문서에서 상품이 내려간 뒤에는 취소가 어려워요.</span></div>
+                        <div><span>일정</span><span>업체·물류 사정으로 날짜가 바뀌거나 취소될 수 있어요.</span></div>
+                    </div>
                 `;
             } else {
                 noticeArea.innerHTML = `
-                    <ul class="cf-notes">
-                        <li>주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</li>
-                        <li>과일·야채 같은 신선식품은 입고 당일까지, 그 밖의 상품은 입고일 포함 3일(휴무일 빼고)까지 찾아가실 수 있습니다.</li>
-                        <li>기간이 지나면 상시판매로 바뀌어 픽업할 수 없습니다.</li>
-                        <li>업체·물류 사정에 따라 일정이 바뀌거나 취소될 수 있습니다.</li>
-                    </ul>
+                    <div class="cf-notes">
+                        <div><span>픽업 기간</span><span>신선식품은 <b>입고 당일</b>, 그 밖의 상품은 <b>입고일 포함 3일</b>(휴무일 제외)까지예요. 지나면 상시판매로 바뀌어 찾아가실 수 없어요.</span></div>
+                        <div><span>노쇼</span><span>찾아가지 않는 일이 잦으면 다음 주문이 어려울 수 있어요.</span></div>
+                        <div><span>취소</span><span>주문서에서 상품이 내려간 뒤에는 취소가 어려워요.</span></div>
+                        <div><span>일정</span><span>업체·물류 사정으로 날짜가 바뀌거나 취소될 수 있어요.</span></div>
+                    </div>
                 `;
             }
 
@@ -13548,6 +13641,13 @@
                             }
                         }
 
+                        // [신규] 그 사이 마감됐는지 먼저 본다 (무제한 상품도 마감은 막는다)
+                        const [_cl, _ex] = await Promise.all([gFetchLiveClosed(fGetAdjKey(it.matchKey || it.date, it.name)), gFetchLiveExpired(pData)]);
+                        if (_cl || _ex) {
+                            failed.push({ name: it.name, need: parseInt(it.qty) || 0, remain: 0, closed: true });
+                            continue;
+                        }
+
                         if (gIsUnlimitedStock(pData)) continue;
 
                         let base = parseInt((pData && pData.originalStock) || 0) || 0;
@@ -13586,7 +13686,7 @@
                         const allOpt = failed.every(f => !!f.optName);      // 걸린 게 전부 옵션인가
                         const lines = failed.map(f => {
                             const remain = Math.max(0, f.remain);
-                            const reason = (remain <= 0 ? `품절되었습니다` : `주문 ${f.need}개 / 남은 수량 ${remain}개`);
+                            const reason = f.closed ? `주문이 마감되었습니다` : (remain <= 0 ? `품절되었습니다` : `주문 ${f.need}개 / 남은 수량 ${remain}개`);
                             if (f.optName) {
                                 // 옵션: 옵션명을 굵게 앞에, 상품명은 작고 흐리게 아래에
                                 return `· <b>${f.optName}</b>`
@@ -13598,7 +13698,8 @@
                         /* 부족한 경우의 문구는 '방금 다른 분이 먼저 주문하셨습니다'였다.
                            손님 입장에서는 남 탓처럼 들리고, 사장님이 수량을 줄인 경우에도
                            그렇게 떠서 사실과 달랐다. 무슨 일이 있었는지 말하지 않고 상태만 적는다. */
-                        const head = allOut
+                        const allClosed = failed.every(f => f.closed);
+                        const head = allClosed ? '방금 주문이 마감된 상품이 있습니다.' : allOut
                             ? (allOpt ? '방금 품절된 옵션이 있습니다.' : '방금 품절된 상품이 있습니다.')
                             : '주문하신 수량만큼 남아 있지 않습니다.';
                         const tail = allOpt
@@ -13606,7 +13707,7 @@
                             : '수량을 줄이거나 장바구니에서 빼고 다시 주문해 주세요.';
 
                         showSystemModal(
-                            `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[${allOut ? '품절' : '재고 부족'}]</span>` +
+                            `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[${allClosed ? '마감' : (allOut ? '품절' : '재고 부족')}]</span>` +
                             `${head}<br><br>${lines}<br><br>` +
                             `${tail}`,
                             'alert',
