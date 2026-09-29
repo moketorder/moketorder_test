@@ -2330,7 +2330,15 @@
         .item-price-row .item-price-val { white-space: nowrap; flex: 0 0 auto; }   /* '13,800원~'의 ~가 떨어지지 않게 */
         /* [ver3] 머리 줄 + 판매유형 탭만 늘 붙어 있고, 분류·날짜·검색은 함께 올라간다 */
         .header { position: sticky; top: 0; z-index: 101; }
-        .sticky-header-group { top: var(--hdr-h, 65px); padding-top: 4px; }
+        /* [ver3] 초록 머리와 흰 탭 줄 사이가 자로 그은 듯 끊겨 보여서, 초록 머리의 아래 두 모서리를 둥글게 한다.
+           둥근 모서리 뒤로 목록이 비치지 않게, 흰 탭 줄을 머리 밑으로 18px 밀어 넣어 깔아 둔다 (머리가 위에 온다). */
+        :root { --sheet-lap: 18px; }
+        .header { border-radius: 0 0 18px 18px; }
+        .sticky-header-group { top: calc(var(--hdr-h, 65px) - var(--sheet-lap)); margin-top: calc(-1 * var(--sheet-lap)); z-index: 100;
+            padding-top: calc(6px + var(--sheet-lap)); box-shadow: none; transition: box-shadow .2s ease; }
+        /* 뚝 잘려 보이지 않게 — 상품이 밑으로 지나갈 때만 아래로 퍼지는 부드러운 그림자 (모서리는 둥글리지 않는다: 화면 폭 전체 줄이라) */
+        .sticky-header-group.is-stuck { box-shadow: 0 1px 0 rgba(22, 32, 15, 0.05), 0 10px 18px -10px rgba(22, 32, 15, 0.28); }
+        @media (prefers-reduced-motion: reduce) { .sticky-header-group { transition: none; } }
         .sub-header-group { background: var(--white); padding-top: 2px; }
     </style>
 </head>
@@ -5366,6 +5374,14 @@
             window.addEventListener('load', set);
             window.addEventListener('resize', set);
             set();
+            // 상품이 탭 줄 밑으로 지나가기 시작하면(조금이라도 내렸으면) 그림자를 준다 — 떠 있다는 표시
+            let ticking = false;
+            const stuck = () => {
+                ticking = false;
+                const g = document.querySelector('.sticky-header-group');
+                if (g) g.classList.toggle('is-stuck', window.scrollY > 2);
+            };
+            window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(stuck); } }, { passive: true });
         })();
 
         // [ver3] 알림창 글 다듬기 — 88곳에서 부르는 글을 한 자리에서 맞춘다
