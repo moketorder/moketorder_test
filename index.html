@@ -2328,10 +2328,10 @@
         .item-deadline.is-urgent { color: #dc2626; }
         .item-badges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; flex: 1 1 auto; }
         .item-price-row .item-price-val { white-space: nowrap; flex: 0 0 auto; }   /* '13,800원~'의 ~가 떨어지지 않게 */
-        /* [ver3] 내릴 때 위쪽 고정 칸을 위로 숨긴다 (자리는 그대로, 움직임만) */
-        .sticky-header-group { transition: transform .22s ease; will-change: transform; }
-        .sticky-header-group.is-tucked { transform: translateY(-110%); }
-        @media (prefers-reduced-motion: reduce) { .sticky-header-group { transition: none; } }
+        /* [ver3] 머리 줄 + 판매유형 탭만 늘 붙어 있고, 분류·날짜·검색은 함께 올라간다 */
+        .header { position: sticky; top: 0; z-index: 101; }
+        .sticky-header-group { top: var(--hdr-h, 65px); padding-top: 4px; }
+        .sub-header-group { background: var(--white); padding-top: 2px; }
     </style>
 </head>
 
@@ -2536,6 +2536,9 @@
             <button class="delivery-type-btn" data-type="onsite" onclick="switchDeliveryType('onsite')">상시판매</button>
             <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">예약판매</button>
         </div>
+    </div>
+    <!-- [ver3] 여기부터(분류·날짜·검색)는 고정하지 않는다 — 판매유형 안내처럼 내리면 함께 올라가 사라진다 -->
+    <div class="sub-header-group">
         <!-- [신규] 대분류 탭 영역 -->
         <div class="main-tabs" id="main-tabs-container">
             <!-- JavaScript에서 동적으로 버튼들을 생성하여 주입합니다. -->
@@ -5353,25 +5356,16 @@
             checkScrollLock();
         }
 
-        /* [ver3] 목록을 아래로 내리는 동안에는 위쪽 고정 칸(판매유형·분류·날짜·검색)을 위로 숨기고,
-           조금이라도 올리면 바로 다시 내려 보인다. 자리를 밀지 않고 transform 으로만 움직여서
-           (예전 '검색줄 감추기'처럼) 스크롤 위치가 되잡히며 떨리는 일이 없다.
-           검색칸에 글을 치는 중이거나 맨 위 근처에서는 숨기지 않는다. */
-        (function gHideStickyOnScroll() {
-            let last = window.scrollY, ticking = false;
-            const run = () => {
-                ticking = false;
-                const g = document.querySelector('.sticky-header-group');
-                if (!g) return;
-                const y = window.scrollY, dy = y - last;
-                const inp = document.getElementById('product-search-input');
-                const typing = inp && document.activeElement === inp;
-                if (typing || y < 260) g.classList.remove('is-tucked');
-                else if (dy > 6) g.classList.add('is-tucked');
-                else if (dy < -6) g.classList.remove('is-tucked');
-                if (Math.abs(dy) > 6) last = y;
+        /* [ver3] 맨 위 [메뉴 · MOKET · 주문내역] 줄과 판매유형 탭을 늘 붙여 둔다.
+           판매유형 탭은 머리 줄 바로 밑에 붙어야 하므로 머리 높이를 재서 --hdr-h 로 넘긴다 (폰마다 윗여백이 달라서) */
+        (function gStickHeader() {
+            const set = () => {
+                const h = document.querySelector('.header');
+                if (h) document.documentElement.style.setProperty('--hdr-h', h.offsetHeight + 'px');
             };
-            window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(run); } }, { passive: true });
+            window.addEventListener('load', set);
+            window.addEventListener('resize', set);
+            set();
         })();
 
         // [ver3] 알림창 글 다듬기 — 88곳에서 부르는 글을 한 자리에서 맞춘다
