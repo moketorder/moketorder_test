@@ -1884,7 +1884,28 @@
 
         /* ④ 상품 줄을 시안 비례에 맞춘다 — 사진·이름·값·뱃지를 한 단계씩 줄여 한 화면에 더 들어오게.
               (시안은 사진 74px·이름 14px이지만 폰에서 너무 작다 하셔서 그 사이 값으로 잡았다) */
-        .thumb { width: 116px; height: 116px; }
+        /* [ver3] 사진을 수량 줄까지 내려 키우고, 수량·담기는 사진 오른쪽 아래 빈자리에 넣는다.
+           카드를 두 칸짜리 판으로 바꾸고 사진이 두 줄을 걸치게 한다.
+           (card-top 은 display:contents 로 껍데기만 없애 안쪽 둘이 바로 판에 놓이게 한다) */
+        .product-card {
+            display: grid;
+            grid-template-columns: 116px minmax(0, 1fr);
+            grid-template-rows: auto auto;
+            column-gap: 12px;
+            row-gap: 8px;
+            align-items: start;
+        }
+        .card-top { display: contents; }
+        .thumb {
+            grid-column: 1;
+            grid-row: 1 / span 2;
+            width: 116px;
+            height: 100%;
+            min-height: 116px;
+            align-self: stretch;
+        }
+        .item-info-top { grid-column: 2; grid-row: 1; }
+        .item-controls-bottom-v { grid-column: 2; grid-row: 2; width: auto; }
         .item-name { font-size: 17px !important; line-height: 1.3; }
         .item-lead { font-size: 14px; }
         .item-price-val { font-size: 21px; }
@@ -1922,13 +1943,16 @@
 
         /* ① 대분류 탭(공동구매·사다드림) — 시안처럼 왼쪽에 붙는 작은 알약 */
         .main-tabs {
-            padding: 8px 12px 2px 12px;
-            gap: 6px;
+            padding: 10px 12px 2px 12px;
+            gap: 7px;
             box-shadow: none;
             margin: 0;
             border-radius: 0;
             justify-content: flex-start;
         }
+        /* 판매유형 탭과 아래 딱지 줄 사이도 조금 띄운다 */
+        .delivery-type-tabs { margin-bottom: 2px; }
+        #product-search-bar { padding-top: 4px !important; }
         .main-tab-btn {
             flex: 0 0 auto;
             background: #f1f4ec;
@@ -1943,6 +1967,8 @@
             box-shadow: none;
             transform: none;
         }
+        /* 당일판매·예약판매 첫 줄은 칸을 똑같이 나눠 한 줄을 가득 채운다 (상시판매의 두 줄 격자는 그대로) */
+        .main-tabs:not(.grid-tabs):not(.scroll-tabs) .main-tab-btn { flex: 1 1 0; min-width: 0; padding: 8px 10px; font-size: 14px; }
 
         /* 5. 아래 줄은 수량과 담기 둘뿐. 자리를 반반 나눈다.
               (상세보기 단추는 없앴다 — 사진이나 이름을 누르면 열린다) */
@@ -1965,23 +1991,41 @@
         /* ②⑥ 날짜 딱지 — 큼직한 단추 대신 작은 알약으로. 고른 날은 먹색으로 (초록 탭과 구분)
               위에 있던 '픽업/배달 예정일' 글씨는 뺀다. 날짜 딱지만으로 무슨 줄인지 읽힌다. */
         #date-filters-caption { display: none !important; }
-        .date-filter-container { padding-top: 2px; padding-bottom: 6px; gap: 6px; }
+        /* 당일·예약의 세부 딱지(과일 / 날짜)를 상시판매 분류 딱지와 같은 크기·모양으로 맞춘다.
+           줄끼리 너무 붙어 있어 위아래도 띄운다. */
+        .date-filter-container { padding: 6px 12px 8px 12px; gap: 7px; }
         .date-btn {
             min-width: 0;
-            height: 30px;
-            padding: 0 11px;
+            height: 32px;
+            padding: 0 14px;
             font-size: 13px;
             font-weight: 700;
             border: 1px solid transparent;
             background: #f1f4ec;
-            color: #4f5b46;
-            border-radius: 7px;
+            color: #7d8a71;
+            border-radius: 999px;
         }
         .date-btn.active {
             background: var(--item-black);
             color: var(--white);
             border-color: var(--item-black);
         }
+
+        /* ⑫ 사진 아래 띠 — '예시이미지입니다.' 대신 '상세보기'.
+              누를 수 있다는 것을 알리는 자리라, 띠를 조금 키우고 글씨도 또렷하게 한다. */
+        .thumb-notice {
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.28));
+            font-size: 11.5px;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            padding: 5px 0 6px;
+            backdrop-filter: blur(1.5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+        }
+        .thumb-notice span { opacity: 0.75; font-weight: 700; }
 
         /* ⑪ 손님 이름 — 시안처럼 딱지를 벗기고 글씨로만.
               주황 상자에 담겨 있어 옆 글씨('님의 주문내역')와 따로 놀았다. */
@@ -2076,6 +2120,198 @@
             white-space: nowrap;
         }
 
+
+        /* ===== [ver3] 옆 메뉴 — 시안대로 ===== */
+        .side-menu { width: min(280px, 80vw); left: calc(-1 * min(280px, 80vw) - 30px); }
+        .side-menu.open { left: 0; box-shadow: 8px 0 24px rgba(22,32,15,.18); }
+        .side-menu-header {
+            padding: calc(12px + env(safe-area-inset-top)) 16px 12px 18px;
+            flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; text-align: left;
+        }
+        .sm-logo { font-size: 22px; font-weight: 800; letter-spacing: .02em; line-height: 1.1; cursor: pointer; }
+        .sm-logo small { display: block; font-size: 10px; font-weight: 500; opacity: .85; letter-spacing: .08em; margin-top: 2px; }
+        .sm-x { background: none; border: 0; color: #fff; font-size: 20px; opacity: .9; padding: 4px; cursor: pointer; line-height: 1; }
+        .sm-who { padding: 16px 18px 14px; border-bottom: 1px solid #eef1e9; }
+        #menu-greeting {
+            margin: 0; padding: 0; display: block; text-align: left; border: 0;
+            font-size: 17px; font-weight: 500; color: #8b9682; line-height: 1.35;
+        }
+        #menu-greeting .name-badge { color: #16200f; font-weight: 700; padding: 0; margin: 0 2px 0 0; background: none; }
+        .sm-edit { display: inline-block; margin-top: 5px; font-size: 13px; font-weight: 600; color: #3d8f19; text-decoration: underline; cursor: pointer; }
+        .sm-sec { padding: 14px 18px 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; color: #8b9682; }
+        .menu-list { padding: 0; }
+        .menu-list li {
+            padding: 12px 18px; font-size: 16px; font-weight: 600; border-bottom: 0; gap: 10px;
+        }
+        .menu-list li:active { background: #f1f4ec; }
+        .sm-arw { color: #8b9682; font-size: 17px; }
+        .menu-list li.sm-kakao { color: #3d8f19; font-weight: 700; }
+        .sm-foot {
+            margin-top: auto; padding: 14px 18px calc(16px + env(safe-area-inset-bottom, 0px));
+            border-top: 1px solid #eef1e9; display: flex; gap: 16px;
+        }
+        .sm-foot button {
+            background: none; border: 0; font-family: inherit; font-size: 13px; font-weight: 600;
+            color: #8b9682; text-decoration: underline; padding: 0; cursor: pointer;
+        }
+        /* 회원탈퇴는 메뉴 맨 아래로 옮겼다 — 주문자 변경 창 안의 것은 감춘다 */
+        #btn-unlink-kakao { display: none !important; }
+
+        /* ===== [ver3] 메뉴 속 창 (매장 위치 · 계좌번호 · 배송 안내) ===== */
+        .modal-content.v3-sheet { padding: 0; max-width: 360px; width: calc(100% - 32px); border-radius: 14px; }
+        .v3-sheet-top {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px; border-bottom: 1px solid #eef1e9;
+        }
+        .v3-sheet-top b { font-size: 16.5px; font-weight: 700; letter-spacing: -.01em; color: #16200f; }
+        .v3-x { background: none; border: 0; font-size: 18px; color: #8b9682; padding: 2px 4px; cursor: pointer; line-height: 1; }
+        .v3-pad { padding: 16px; }
+        .v3-addr { font-size: 18px; font-weight: 700; line-height: 1.45; letter-spacing: -.01em; color: #16200f; word-break: keep-all; }
+        .v3-btn-row { display: flex; gap: 8px; margin-top: 14px; }
+        .v3-btn-row + .v3-btn-row { margin-top: 8px; }
+        .v3-btn {
+            flex: 1; height: 46px; border: 1px solid #e2e8da; border-radius: 8px; background: #fff;
+            font-family: inherit; font-size: 15px; font-weight: 700; color: #16200f; text-decoration: none;
+            display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer;
+        }
+        .v3-btn i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+        .v3-btn-sub { color: #4f5b46; }
+        .v3-btn-main { background: #4CAF20; border-color: #4CAF20; color: #fff; }
+        .v3-bank { font-size: 14px; font-weight: 700; color: #8b9682; }
+        .v3-acct { margin-top: 3px; font-size: 26px; font-weight: 700; letter-spacing: -.5px; font-variant-numeric: tabular-nums; color: #16200f; }
+        .v3-holder { margin-top: 4px; font-size: 14.5px; font-weight: 600; color: #4f5b46; }
+        .v3-hint {
+            margin-top: 12px; padding: 11px 13px; background: #eef7e7; border-radius: 8px;
+            font-size: 14px; font-weight: 600; color: #3d8f19; line-height: 1.55; word-break: keep-all;
+        }
+        .v3-notice { margin-top: 10px; padding: 11px 13px; border: 1px solid #e2e8da; border-radius: 8px; line-height: 1.6; word-break: keep-all; }
+        .v3-notice-t { font-size: 13px; font-weight: 700; color: #3d8f19; margin-bottom: 4px; }
+        .v3-notice-b { font-size: 14px; font-weight: 600; color: #16200f; }
+        .v3-notice-l { font-size: 13px; font-weight: 500; color: #4f5b46; margin-top: 6px; }
+        .v3-grp { padding: 15px 16px; border-top: 1px solid #eef1e9; }
+        .v3-grp:first-child { border-top: 0; }
+        .v3-grp h4 { margin: 0 0 7px; font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: #16200f; }
+        .v3-grp p { margin: 5px 0 0; font-size: 14.5px; color: #4f5b46; line-height: 1.6; word-break: keep-all; }
+        .v3-grp p b { color: #16200f; font-weight: 700; }
+        .v3-grp p.kv { display: flex; }
+        .v3-grp p.kv > span:last-child { flex: 1; min-width: 0; }
+        .v3-sub { font-size: 14px; font-weight: 500; color: #4f5b46; line-height: 1.55; margin-bottom: 4px; word-break: keep-all; }
+        .v3-hours { padding-block: 8px; }
+        .v3-grp.v3-hours p.kv { margin: 0; padding: 10px 0; align-items: baseline; }
+        .v3-hours p.kv + p.kv { border-top: 1px solid #eef1e9; }
+        .v3-grp.v3-hours .k { flex: 0 0 104px; min-width: 104px; font-size: 14px; }
+        .v3-grp.v3-hours p.kv > span:last-child { font-size: 15.5px; font-weight: 600; color: #16200f; }
+        .v3-sub-note { font-size: 13px; color: #8b9682; }
+        .v3-label { display: block; margin: 12px 0 5px; font-size: 13.5px; font-weight: 700; color: #16200f; }
+        .v3-label span { color: #8b9682; font-weight: 600; }
+        .v3-input {
+            width: 100%; box-sizing: border-box; border: 1px solid #e2e8da; border-radius: 8px; background: #fff;
+            padding: 10px 12px; font-family: inherit; font-size: 15px; color: #16200f; resize: vertical;
+        }
+        .v3-input:focus { outline: none; border-color: #4CAF20; }
+        .v3-input::placeholder { color: #b3bcaa; }
+        .v3-grp .k { display: inline-block; min-width: 68px; flex: 0 0 68px; color: #8b9682; font-weight: 700; font-size: 13.5px; }
+        /* ===== [ver3] 주문하기 뒤의 창 · 알림·확인 창 ===== */
+        .modal-overlay { background: rgba(22, 32, 15, 0.55); }
+        .btn-common { font-weight: 700; border-radius: 10px; }
+        .btn-close { background: #f1f4ec; color: #4f5b46; }
+
+        /* 알림창 — 메뉴 속 창과 같은 흰 판, 글은 16px 보통 굵기 */
+        #system-modal .modal-content { max-width: 380px; width: calc(100% - 32px); border-radius: 14px; }
+        #sys-modal-msg { font-size: 16px; font-weight: 500 !important; line-height: 1.65; color: #16200f; word-break: keep-all; }
+        #sys-modal-msg b, #sys-modal-msg strong { font-weight: 700; }
+        #sys-modal-msg .sm-title { font-size: 17.5px; font-weight: 700; color: #16200f; margin-bottom: 10px; line-height: 1.4; text-align: center; }
+        #sys-modal-btns { gap: 8px !important; }
+        #sys-modal-btns .btn-common { margin-top: 0; border-radius: 10px; font-weight: 700; }
+        /* 여기저기 박힌 글자 굵기(800·900)와 주황 바탕 상자를 한 번에 가라앉힌다. 금액(b)의 주황은 남긴다 */
+        #sys-modal-msg [style*="font-weight:900"], #sys-modal-msg [style*="font-weight: 900"],
+        #sys-modal-msg [style*="font-weight:800"], #sys-modal-msg [style*="font-weight: 800"] { font-weight: 700 !important; }
+        #sys-modal-msg span[style*="nego-orange"], #sys-modal-msg div[style*="nego-orange"] { color: #3d8f19 !important; }
+        #sys-modal-msg [style*="#fff4e9"], #sys-modal-msg [style*="#fff9f2"], #sys-modal-msg [style*="#fff1e8"], #sys-modal-msg [style*="#fdf2e9"] {
+            background: #f4f6f0 !important; border-color: #e2e8da !important;
+        }
+        #sys-modal-msg [style*="#c2610a"] { color: #4f5b46 !important; }
+
+        /* 받는 방법 — 두 줄 같은 크기, 누르면 다음으로 */
+        .ship-opts { display: flex; flex-direction: column; gap: 10px; }
+        .ship-opt {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
+            padding: 15px 16px; border: 1px solid #e2e8da !important; border-radius: 10px;
+            background: #fff !important; color: #16200f !important; cursor: pointer !important; text-align: left; font-family: inherit;
+        }
+        .ship-opt:active { background: #f1f4ec !important; }
+        .ship-opt-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+        .ship-opt-t { font-size: 17px; font-weight: 700; }
+        .ship-opt-s { font-size: 13.5px; font-weight: 500; color: #8b9682; }
+        .ship-opt-arw { font-size: 20px; color: #8b9682; }
+
+        /* 주문 확인 */
+        .modal-content.confirm-sheet { max-width: 440px; display: flex; flex-direction: column; max-height: 92vh; text-align: left; }
+        #confirm-header-area { padding: 14px 16px 0; }
+        .cf-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; }
+        .cf-who b { font-weight: 700; color: #16200f; }
+        .cf-phone { color: #8b9682; font-weight: 500; font-size: 14px; }
+        .cf-chip { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+        .cf-chip-d { background: #e8f5e9; color: #2e7d32; }
+        .cf-chip-p { background: #eff6ff; color: #1d4ed8; }
+        .cf-addr { margin-top: 5px; font-size: 14px; font-weight: 500; color: #4f5b46; line-height: 1.5; word-break: keep-all; }
+        #confirm-product-wrapper { background: #fff !important; border-radius: 0 !important; padding: 4px 16px !important; margin: 0 !important; }
+        #confirm-item-list { font-size: 15px !important; }
+        .cf-group { padding: 10px 0 4px; }
+        .cf-group + .cf-group { border-top: 1px solid #eef1e9; }
+        .cf-date { font-size: 13px; font-weight: 700; color: #3d8f19; margin-bottom: 2px; }
+        .cf-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; }
+        .cf-name { flex: 1; min-width: 0; font-weight: 600; color: #16200f; line-height: 1.4; word-break: keep-all; }
+        .cf-lead { display: block; font-size: 12.5px; font-weight: 500; color: #8b9682; }
+        .cf-qty { flex-shrink: 0; font-size: 14px; color: #8b9682; font-weight: 500; }
+        .cf-sub { flex-shrink: 0; min-width: 72px; text-align: right; font-weight: 700; color: #16200f; font-variant-numeric: tabular-nums; }
+        #confirm-footer-area { padding: 0 16px 16px; border-top: 1px solid #e2e8da; }
+        #confirm-summary-area { margin: 0 0 4px !important; }
+        .cf-sum { display: flex; align-items: baseline; justify-content: space-between; padding: 12px 0; }
+        .cf-sum span { font-size: 16px; font-weight: 700; color: #16200f; }
+        .cf-sum small { font-size: 13px; font-weight: 500; color: #8b9682; margin-left: 4px; }
+        .cf-sum b { font-size: 21px; font-weight: 700; color: var(--nego-orange); font-variant-numeric: tabular-nums; }
+        #confirm-notice-area { border-top: 1px solid #eef1e9 !important; padding-top: 10px !important; }
+        .cf-notes { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 500; color: #4f5b46; line-height: 1.55; word-break: keep-all; }
+        #order-note { border: 1px solid #e2e8da !important; border-radius: 8px !important; font-weight: 500 !important; }
+        #order-note:focus { border-color: #4CAF20 !important; }
+        #confirm-overlay label[for], #confirm-overlay label { font-weight: 600 !important; color: #16200f !important; }
+        #confirm-footer-area .btn-common { height: 48px; font-size: 16px; }
+
+        /* 입금 안내(주문 완료) */
+        .pg { text-align: left; display: flex; flex-direction: column; }
+        .pg-done { font-size: 18px; font-weight: 700; color: #16200f; text-align: center; margin-bottom: 14px; }
+        .pg-amt-l { font-size: 13.5px; font-weight: 600; color: #8b9682; }
+        .pg-amt { font-size: 30px; font-weight: 700; color: var(--nego-orange); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.25; }
+        .pg-due { margin-top: 6px; font-size: 14.5px; font-weight: 500; color: #4f5b46; line-height: 1.55; }
+        .pg-due b { color: #16200f; }
+        .pg-refund { margin-top: 10px; font-size: 13px; font-weight: 600; color: #2e7d32; background: #eef7e7; border-radius: 8px; padding: 9px 11px; line-height: 1.6; }
+        .pg-extra { margin-top: 8px; font-size: 13px; font-weight: 500; color: #8b9682; line-height: 1.6; }
+        .pg-bank { margin-top: 16px; padding-top: 14px; border-top: 1px solid #eef1e9; }
+        .pg-copy { width: 100%; margin-top: 12px; }
+        .pg-items { margin-top: 16px; padding-top: 12px; border-top: 1px solid #eef1e9; }
+        .pg-items-t { font-size: 13.5px; font-weight: 700; color: #16200f; margin-bottom: 4px; }
+        .pg-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; font-size: 14px; }
+        .pg-row + .pg-row { border-top: 1px solid #f1f4ec; }
+        .pg-name { flex: 1; min-width: 0; font-weight: 500; color: #16200f; line-height: 1.45; word-break: keep-all; }
+        .pg-tag { font-size: 11.5px; font-weight: 700; color: #8b9682; margin-right: 5px; }
+        .pg-qty { flex-shrink: 0; color: #8b9682; }
+        .pg-sub { flex-shrink: 0; font-weight: 700; color: #16200f; font-variant-numeric: tabular-nums; }
+        .pg-row.is-extra .pg-name, .pg-row.is-extra .pg-sub { color: #8b9682; }
+        /* ===== [ver3] 폰 검토 뒤 ===== */
+        /* 2. 상품 이름은 낱말 단위로 넘긴다 ("272 ↵ g" 처럼 끊기지 않게) */
+        .item-name, .item-lead { word-break: keep-all !important; overflow-wrap: anywhere; }
+        .item-lead .lead-sale { color: #e11d48; }
+        /* 3. 검색창 옆 판매유형 딱지 — 바로 위 탭과 같은 말이라 뺀다 */
+        #search-scope-label { display: none !important; }
+        /* 6. 상세보기 사진 위 안내는 '예시 이미지'와 장수만 남긴다 */
+        #detail-overlay .slide-guide, #detail-overlay .touch-guide { display: none !important; }
+        /* 7. 상시판매 분류 칸 — 옆으로 더 있을 때 오른쪽 끝을 흐리게 */
+        .main-tabs.grid-tabs.more-right {
+            -webkit-mask-image: linear-gradient(to right, #000 82%, transparent);
+            mask-image: linear-gradient(to right, #000 82%, transparent);
+        }
+        #detail-title .detail-lead { font-size: 13.5px; margin-bottom: 3px; }
     </style>
 </head>
 
@@ -2102,25 +2338,32 @@
     </div>
     <div id="side-menu-overlay" class="side-menu-overlay" onclick="toggleMenu()"></div>
     <div id="side-menu" class="side-menu">
-        <div class="side-menu-header" style="text-align: center;">
-            <div onclick="handleAdminClick(event);" style="cursor: pointer;">
-                <div class="slogan"
-                    style="font-size: 14px; color: rgba(255,255,255,0.9); letter-spacing: 0.5px; margin-bottom: -2px;">
-                    모두를
-                    위한 공동구매 마켓</div>
-                <div class="logo-en" style="font-size: 45px; letter-spacing: -1px; margin-bottom: -1.5px;">MOKET</div>
-                <div class="logo-ko" style="font-size: 27px; letter-spacing: 0px; text-indent: 1px;">모켓</div>
-            </div>
+        <!-- [ver3] 머리를 본 화면처럼 한 줄로 눕히고 오른쪽에 닫기. 로고 열 번 누르기(관리자)는 그대로 -->
+        <div class="side-menu-header">
+            <div class="sm-logo" onclick="handleAdminClick(event);">MOKET<small>모두를 위한 공동구매</small></div>
+            <button type="button" class="sm-x" onclick="toggleMenu()" aria-label="닫기">✕</button>
         </div>
-        <p id="menu-greeting"><span class="name-badge">주문자</span>님</p>
+        <div class="sm-who">
+            <p id="menu-greeting"><span class="name-badge">주문자</span>님</p>
+            <a class="sm-edit" onclick="openSideModal('profile-modal')">주문자 정보 고치기</a>
+        </div>
+        <div class="sm-sec">가게</div>
         <ul class="menu-list">
-            <li onclick="openSideModal('profile-modal')">주문자 변경</li>
-            <li onclick="openSideModal('location-modal')">매장위치</li>
-            <li onclick="openSideModal('bank-modal')">계좌번호</li>
-            <li onclick="showCombinedDeliveryGuide()">배송서비스 안내</li>
-            <li onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기</li>
-
+            <li onclick="openSideModal('location-modal')"><span>매장 위치</span><span class="sm-arw">›</span></li>
+            <li onclick="openHoursModal()"><span>운영시간</span><span class="sm-arw">›</span></li>
+            <li onclick="showCombinedDeliveryGuide()"><span>배송 안내</span><span class="sm-arw">›</span></li>
+            <li onclick="openSideModal('bank-modal')"><span>계좌번호</span><span class="sm-arw">›</span></li>
         </ul>
+        <div class="sm-sec">문의</div>
+        <ul class="menu-list">
+            <li onclick="openSuggestModal()"><span>공구상품 추천하기</span><span class="sm-arw">›</span></li>
+            <li class="sm-kakao" onclick="window.open('https://open.kakao.com/me/moketstore')"><span>카카오톡 문의하기</span><span class="sm-arw">›</span></li>
+        </ul>
+        <!-- [ver3] 주문자 변경 창 안에 숨어 있던 로그아웃·회원탈퇴를 맨 아래로. 메뉴를 열 때 보일지 정한다 -->
+        <div class="sm-foot">
+            <button type="button" id="sm-logout" onclick="toggleMenu(); logoutKakao();">로그아웃</button>
+            <button type="button" id="sm-unlink" onclick="toggleMenu(); unlinkKakao();">회원탈퇴</button>
+        </div>
     </div>
     <div id="profile-modal" class="modal-overlay">
         <div class="modal-content" style="padding-top: 0; padding-bottom: 20px;">
@@ -2209,53 +2452,61 @@
         </div>
     </div>
     <div id="location-modal" class="modal-overlay">
-        <div class="modal-content" style="text-align: center;">
-            <div
-                style="background:var(--moket-green); padding: 15px 20px 12px 20px; border-radius: var(--common-radius) var(--common-radius) 0 0; margin: -25px -25px 10px -25px; text-align: center;">
-                <h3 style="margin: 0; font-weight: 800; color: var(--white); font-size: 20px; letter-spacing: 1px;">
-                    매장위치</h3>
+        <div class="modal-content v3-sheet">
+            <div class="v3-sheet-top"><b>매장 위치</b><button type="button" class="v3-x" onclick="closeModal('location-modal')" aria-label="닫기">✕</button></div>
+            <div class="v3-pad">
+                <div class="v3-addr">경기 하남시 미사강변한강로 60-1<br>상가 106호</div>
+                <div class="v3-btn-row">
+                    <a class="v3-btn" href="https://map.naver.com/v5/search/MOKET 모켓" target="_blank"><i style="background:#03C75A"></i>네이버지도</a>
+                    <a class="v3-btn" href="https://map.kakao.com/link/search/MOKET 모켓" target="_blank"><i style="background:#FEE500"></i>카카오맵</a>
+                </div>
+                <div class="v3-btn-row"><button type="button" class="v3-btn v3-btn-sub" onclick="copyToClipboard('경기도 하남시 미사강변한강로 60-1, 상가 106호', '주소가 복사되었습니다.')">주소 복사</button></div>
             </div>
-            <p style="font-size:16px; font-weight:700; margin:20px 0; line-height:1.5;">경기도 하남시 미사강변한강로 60-1, 상가 106호
-            </p>
-            <a href="https://map.naver.com/v5/search/MOKET 모켓" target="_blank" class="btn-common btn-naver">네이버지도</a>
-            <a href="https://map.kakao.com/link/search/MOKET 모켓" target="_blank" class="btn-common btn-kakao">카카오맵</a>
-            <button class="btn-common btn-close" onclick="closeModal('location-modal')">닫기</button>
         </div>
     </div>
     <div id="bank-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div
-                style="background:var(--moket-green); padding: 15px 20px 12px 20px; border-radius: var(--common-radius) var(--common-radius) 0 0; margin: -25px -25px 10px -25px; text-align: center;">
-                <h3 style="margin: 0; font-weight: 800; color: var(--white); font-size: 20px; letter-spacing: 1px;">
-                    계좌번호 안내</h3>
+        <div class="modal-content v3-sheet">
+            <div class="v3-sheet-top"><b>계좌번호</b><button type="button" class="v3-x" onclick="closeModal('bank-modal')" aria-label="닫기">✕</button></div>
+            <div class="v3-pad">
+                <div class="v3-bank">카카오뱅크</div>
+                <div class="v3-acct" id="bank-acc-num">3333-37-3410268</div>
+                <div class="v3-holder">예금주 · 강*민 (모켓)</div>
+                <div class="v3-btn-row"><button type="button" class="v3-btn v3-btn-main" onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')">계좌번호 복사</button></div>
+                <div class="v3-hint">입금자명을 <b>오픈채팅방 닉네임</b>과 같게 보내 주세요. 다르면 누가 넣었는지 찾기 어렵습니다.</div>
+                <!-- 사다드림·배달 주문을 마친 뒤에만 채워지는 안내 (setBankModalNotice) -->
+                <div id="bank-modal-notice" class="v3-notice" style="display:none;"></div>
             </div>
-            <div style="display:flex; justify-content:center; margin:20px 0;">
-                <div
-                    style="text-align:center; line-height:1.8; font-weight:700; font-size:17px; color:var(--item-black); width:100%;">
-                    <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:4px;">
-                        <span>카카오뱅크</span>
-                    </div>
-                    <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:4px;">
-                        <span style="font-size:24px; font-weight:900; color:var(--nego-orange);" id="bank-acc-num">3333-37-3410268</span>
-                        <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="padding:5px 12px; border:none; border-radius:6px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow: 0 2px 6px rgba(255, 107, 0, 0.3);">📋 복사</button>
-                    </div>
-                    <span style="font-size:15px; color:#676b5d; letter-spacing:-0.5px;">예금주 : 강*민(모켓(MOKET))</span>
-                    <!-- [수정] 사다드림 입금 안내 — 다른 안내문과 같은 주황 톤 형식으로 정리 -->
-                    <div id="bank-modal-notice"
-                        style="display:none; margin-top:16px; padding:12px 14px; background:#fff4e9; border:1px solid #ffd9b3; border-radius:12px; text-align:left; line-height:1.7; word-break:keep-all;">
-                        <div style="font-size:13px; font-weight:900; color:#c2610a; margin-bottom:6px;">🛵 사다드림 안내</div>
-                        <div style="font-size:13.5px; font-weight:700; color:var(--item-black);">
-                            사다드림은 <b style="color:var(--nego-orange);">당일 입금</b>이 확인되어야 주문이 확정됩니다.
-                        </div>
-                        <div style="font-size:12.5px; font-weight:600; color:#767a6c; margin-top:8px;">
-                            · 입금자명을 닉네임과 같게 보내주세요<br>
-                            · 당일 입금이 없으면 주문이 취소될 수 있습니다<br>
-                            · 그 외 상품은 현장 결제도 가능합니다
-                        </div>
-                    </div>
-                </div>
+        </div>
+    </div>
+    <!-- [ver3] 배송 안내 — 시스템 알림창 대신 다른 메뉴 창과 같은 모양의 창 -->
+    <div id="delivery-guide-modal" class="modal-overlay">
+        <div class="modal-content v3-sheet">
+            <div class="v3-sheet-top"><b>배송 안내</b><button type="button" class="v3-x" onclick="closeModal('delivery-guide-modal')" aria-label="닫기">✕</button></div>
+            <div id="delivery-guide-body"></div>
+        </div>
+    </div>
+    <!-- [신규] 운영시간 — 픽업·배달 시간은 주문관리 일반 관리(store_hours), 쉬는 날·마감은 기존 설정을 읽는다 -->
+    <div id="hours-modal" class="modal-overlay">
+        <div class="modal-content v3-sheet">
+            <div class="v3-sheet-top"><b>운영시간</b><button type="button" class="v3-x" onclick="closeModal('hours-modal')" aria-label="닫기">✕</button></div>
+            <div id="hours-body"></div>
+        </div>
+    </div>
+    <!-- [신규] 공구상품 추천하기 — 손님이 적어 보내면 product_suggestions/<번호>/ 에 쌓이고 주문관리에서 본다 -->
+    <div id="suggest-modal" class="modal-overlay">
+        <div class="modal-content v3-sheet">
+            <div class="v3-sheet-top"><b>공구상품 추천하기</b><button type="button" class="v3-x" onclick="closeModal('suggest-modal')" aria-label="닫기">✕</button></div>
+            <div class="v3-pad">
+                <div class="v3-sub">같이 사고 싶은 상품을 편하게 알려 주세요. 다음 공구를 고를 때 참고할게요.</div>
+                <div class="v3-sub v3-sub-note">추천해 주신 상품이 모두 공구로 열리지는 않아요.</div>
+                <label class="v3-label">상품 이름</label>
+                <input id="sg-name" class="v3-input" type="text" maxlength="100" placeholder="예: 제주 햇감귤 5kg">
+                <label class="v3-label">링크 <span>(선택)</span></label>
+                <input id="sg-link" class="v3-input" type="url" maxlength="500" placeholder="상품 페이지 주소를 붙여 넣어 주세요">
+                <label class="v3-label">한마디 <span>(선택)</span></label>
+                <textarea id="sg-memo" class="v3-input" rows="3" maxlength="300" placeholder="원하는 가격이나 양, 추천하는 까닭"></textarea>
+                <div class="v3-btn-row"><button type="button" id="sg-send" class="v3-btn v3-btn-main" onclick="sendSuggestion()">보내기</button></div>
             </div>
-            <button class="btn-common btn-close" onclick="closeModal('bank-modal')">닫기</button>
         </div>
     </div>
     <div class="sticky-header-group">
@@ -2371,9 +2622,9 @@
         </div>
     </div>
     <div id="confirm-overlay" class="modal-overlay">
-        <div class="modal-content"
-            style="padding: 20px; display: flex; flex-direction: column; text-align: center; max-height: 95vh; box-sizing: border-box;">
-            <!-- 상단 고정: 제목 및 주문자 정보 -->
+        <div class="modal-content v3-sheet confirm-sheet">
+            <div class="v3-sheet-top"><b>주문 확인</b><button type="button" class="v3-x" onclick="document.getElementById('confirm-notice-check').checked = false; closeModal('confirm-overlay')" aria-label="닫기">✕</button></div>
+            <!-- 상단 고정: 주문자 정보 -->
             <div id="confirm-header-area"></div>
 
             <!-- 중앙 가변: 상품 리스트만 스크롤 -->
@@ -2394,7 +2645,7 @@
                      주문할 때마다 비워 둔다. 지난번 말이 남아 있으면 엉뚱한 주문에 딸려 간다. -->
                 <div style="text-align:left; margin-bottom:14px;">
                     <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:5px;">
-                        <span style="font-size:13px; font-weight:800; color:#4f5b46;">📝 요청사항</span>
+                        <span style="font-size:14px; font-weight:700; color:#16200f;">요청사항</span>
                         <span style="font-size:12px; font-weight:700; color:#8b9682;">(선택)</span>
                         <span id="order-note-count" style="margin-left:auto; font-size:11.5px; font-weight:700; color:#c0c7cf;">0 / 100</span>
                     </div>
@@ -2418,26 +2669,19 @@
         </div>
     </div>
 
-    <!-- [추가] 수령방법 선택 모달 -->
+    <!-- [ver3] 받는 방법 고르기 — 초록 띠를 벗기고 메뉴 창과 같은 모양. 두 갈래를 같은 크기 줄로 -->
     <div id="shipping-overlay" class="modal-overlay">
-        <div class="modal-content" style="padding: 0; text-align:center; max-width:320px; overflow: hidden;">
-            <div
-                style="background: var(--moket-green); color: #fff; padding: 20px; font-size: 20px; font-weight: 900; margin-bottom: 25px;">
-                수령방법 선택
-            </div>
-            <div style="padding: 0 20px 25px 20px;">
-                <div style="display: flex; gap: 15px; margin-bottom: 5px;">
-                    <button id="btn-delivery-order" class="btn-common" style="flex: 1; margin: 0; font-size:16px;"
-                        onclick="handleDeliveryOrderClick()">
-                        배달주문
-                    </button>
-                    <button class="btn-common btn-primary" style="flex: 1; margin: 0; font-size:16px;"
-                        onclick="selectPickup()">
-                        매장픽업
-                    </button>
-                </div>
-                <button class="btn-common btn-close" onclick="closeModal('shipping-overlay')"
-                    style="margin-top: 15px; height:44px; font-size:15px;">취소</button>
+        <div class="modal-content v3-sheet">
+            <div class="v3-sheet-top"><b>받는 방법</b><button type="button" class="v3-x" onclick="closeModal('shipping-overlay')" aria-label="닫기">✕</button></div>
+            <div class="v3-pad ship-opts">
+                <button id="btn-delivery-order" type="button" class="ship-opt" onclick="handleDeliveryOrderClick()">
+                    <span class="ship-opt-txt"><span class="ship-opt-t">배달</span><span class="ship-opt-s" id="ship-opt-delivery-sub">15,000원 이상 무료 · 아니면 3,000원</span></span>
+                    <span class="ship-opt-arw">›</span>
+                </button>
+                <button type="button" class="ship-opt" onclick="selectPickup()">
+                    <span class="ship-opt-txt"><span class="ship-opt-t">매장 픽업</span><span class="ship-opt-s">배달비 없음 · 매장에서 찾아가기</span></span>
+                    <span class="ship-opt-arw">›</span>
+                </button>
             </div>
         </div>
     </div>
@@ -2445,7 +2689,7 @@
         <!-- [수정] 무료배달 안내 옆에 합배송 안내를 여는 작은 칩을 둔다.
              푸터는 자리가 좁으므로 줄을 늘리지 않고 같은 줄에 붙인다. -->
         <div id="free-delivery-notice"
-            style="display:none; justify-content:center; align-items:center; gap:7px; padding-bottom:8px; font-weight:900; color:var(--nego-orange);">
+            style="display:none; justify-content:center; align-items:center; gap:7px; padding-bottom:8px; font-weight:700; color:#3d8f19;">
             <!-- 좁은 화면(320px)에서 칩과 함께 한 줄에 들어가도록 글자 크기를 폭에 맞춰 줄인다 -->
             <span style="font-size:clamp(13px, 4.2vw, 16px); white-space:nowrap;">15,000원 이상 주문시 무료배달</span>
             <!-- 누를 수 있다는 게 보이도록, 아래 '총 N개' 알약과 같은 형태(주황 채움 + 그림자)로 맞춘다 -->
@@ -2914,7 +3158,7 @@
             const tabContainer = document.getElementById('main-tabs-container');
             if (!tabContainer) return;
             // 가로 스크롤은 탭이 많은 상시판매에서만 쓴다 (아래 상시판매 분기에서 다시 켠다)
-            tabContainer.classList.remove('scroll-tabs', 'grid-tabs');
+            tabContainer.classList.remove('scroll-tabs', 'grid-tabs', 'more-right');
 
             if (currentDeliveryType === 'today') {
                 // 당일배송 과일에 야채가 포함되어 있는지 체크
@@ -3010,6 +3254,11 @@
                     `<button class="main-tab-btn ${currentMainTab === c.key ? 'active' : ''}" data-tab="${c.key}" onclick="switchMainTab('${c.key}')">${c.label}</button>`
                 ).join('');
 
+                // [ver3] 옆으로 더 있으면 오른쪽 끝을 흐리게 해 밀 수 있다는 것을 알린다
+                const _fadeTabs = () => tabContainer.classList.toggle('more-right', tabContainer.scrollLeft + tabContainer.clientWidth < tabContainer.scrollWidth - 4);
+                if (!tabContainer._fadeBound) { tabContainer.addEventListener('scroll', _fadeTabs, { passive: true }); tabContainer._fadeBound = true; }
+                requestAnimationFrame(_fadeTabs);
+
                 // 고른 탭이 화면 밖에 있으면 탭 줄만 옆으로 밀어 준다.
                 //  (scrollIntoView는 페이지 전체가 움직일 수 있어 쓰지 않는다)
                 requestAnimationFrame(() => {
@@ -3087,6 +3336,21 @@
             const open = more.hidden;
             more.hidden = !open;
             btn.innerText = open ? '접기' : '자세히';
+            // [ver3] 이번에 들어와 있는 동안은 손님이 고른 대로 둔다 (목록을 다시 그려도 안 바뀌게)
+            try { sessionStorage.setItem('moket_notice_open_' + box.getAttribute('data-notice'), open ? '1' : '0'); } catch (e) { }
+        }
+        // [ver3] 안내 카드를 펴 둘지. 처음 보는 안내면 펴고, 전에 본 적 있으면 접어서 시작한다.
+        //  작은 폰에서 안내 카드가 첫 화면을 다 차지해 상품이 하나도 안 보였다.
+        function gNoticeStartsOpen(title) {
+            try {
+                const k = 'moket_notice_open_' + title;
+                const cur = sessionStorage.getItem(k);
+                if (cur !== null) return cur === '1';
+                const seen = localStorage.getItem('moket_notice_seen_' + title);
+                localStorage.setItem('moket_notice_seen_' + title, '1');
+                sessionStorage.setItem(k, seen ? '0' : '1');
+                return !seen;
+            } catch (e) { return true; }
         }
         function gTypeNoticeCard(icon, title, accent, tint, lines) {
             // [수정] 글씨가 작아 잘 안 읽힌다고 해서 제목·본문을 한 단계씩 키웠다. (13/12.5 → 14.5/13.5)
@@ -3097,15 +3361,17 @@
                 `<span style="min-width:0;">${t}</span></div>`;
             const first = lines.length ? lines[0] : '';
             const rest = lines.slice(1);
-            return `<div data-notice style="background:${gRgba(accent, 0.055)}; border:1px solid ${gRgba(accent, 0.2)}; border-radius:14px; padding:12px 14px; text-align:left; word-break:keep-all;">` +
+            const _open = rest.length ? gNoticeStartsOpen(title) : true;
+            return `<div data-notice="${String(title).replace(/"/g, '')}" style="background:${gRgba(accent, 0.055)}; border:1px solid ${gRgba(accent, 0.2)}; border-radius:14px; padding:12px 14px; text-align:left; word-break:keep-all;">` +
                 `<div style="display:flex; align-items:center; gap:8px;">` +
                 // [ver3] 그림글자를 뺐다. 아이콘을 안 넘기면 자리도 잡지 않는다.
                 (icon ? `<span style="flex:0 0 auto; width:28px; height:28px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` : '') +
                 `<span style="font-size:15.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
-                (rest.length ? `<button type="button" class="notice-toggle" style="margin-left:auto; color:${accent};" onclick="gToggleNotice(this)">접기</button>` : '') +
+                (rest.length ? `<button type="button" class="notice-toggle" style="margin-left:auto; color:${accent};" onclick="gToggleNotice(this)">${_open ? '접기' : '자세히'}</button>` : '') +
                 `</div>` +
-                (first ? row(first) : '') +
-                (rest.length ? `<div class="notice-more">${rest.map(row).join('')}</div>` : '') +
+                (rest.length
+                    ? `<div class="notice-more"${_open ? '' : ' hidden'}>${lines.map(row).join('')}</div>`
+                    : (first ? row(first) : '')) +
                 `</div>`;
         }
 
@@ -3147,6 +3413,7 @@
                 //  대행료 안내는 여기 두지 않는다. 대행료는 상세옵션에서 주문금액에 따라
                 //  계산되므로, 실제로 금액이 매겨지는 장바구니 담기(옵션 선택창)에서 설명한다.
                 html = gTypeNoticeCard('', '사다드림', '#3d8f19', '#eef7e7', [
+                    `모켓이 대신 사다 드리는 상품이에요`,
                     `무료배달 기준 금액(15,000원)에 <b style="color:#3d8f19;">포함되지 않아요</b>`,
                     // [수정] '(배달·픽업 모두)'는 괄호째 붙어 있어야 읽히므로 중간에 줄이 바뀌지 않게 묶어 둔다
                     `주문마감 전까지 <b style="color:#3d8f19;">입금이 확인</b>되어야 주문이 확정돼요<span style="white-space:nowrap;">(배달·픽업 모두)</span>`,
@@ -3992,19 +4259,19 @@
             const feeRow = (label, value) =>
                 `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:6px 0;">` +
                 `<span style="color:#767a6c; font-weight:700;">${label}</span>` +
-                `<span style="color:var(--item-black); font-weight:900; white-space:nowrap;">${value.toLocaleString()}원</span>` +
+                `<span style="color:var(--item-black); font-weight:700; white-space:nowrap;">${value.toLocaleString()}원</span>` +
                 `</div>`;
 
             const feeNote = (text) =>
-                `<div style="font-size:0.9em; font-weight:700; color:#c2610a; background:#fff4e9; border:1px solid #ffd9b3; border-radius:10px; padding:8px 12px; margin-bottom:12px; line-height:1.6;">🛵 ${text}</div>`;
+                `<div style="font-size:0.9em; font-weight:600; color:#4f5b46; background:#f4f6f0; border-radius:8px; padding:9px 12px; margin-bottom:12px; line-height:1.6;">${text}</div>`;
 
             const feeModal = (title, rowsHtml, noteHtml, resultHtml) =>
                 `<div style="text-align:left; line-height:1.7; word-break:keep-all;">` +
-                `<div style="text-align:center; font-size:1.1em; font-weight:900; color:var(--nego-orange); margin-bottom:14px;">${title}</div>` +
-                (rowsHtml ? `<div style="background:#f8f9fa; border-radius:10px; padding:8px 14px; margin-bottom:12px;">${rowsHtml}</div>` : ``) +
+                `<div class="sm-title">${title}</div>` +
+                (rowsHtml ? `<div style="border-top:1px solid #eef1e9; border-bottom:1px solid #eef1e9; padding:4px 0; margin-bottom:12px;">${rowsHtml}</div>` : ``) +
                 (noteHtml || ``) +
                 `<div style="margin-bottom:14px;">${resultHtml}</div>` +
-                `<div style="text-align:center; font-weight:800;">배달비를 추가하여 주문하시겠습니까?</div>` +
+                `<div style="text-align:center; font-weight:700;">배달비를 더해 주문할까요?</div>` +
                 `</div>`;
 
             const feeAmount = (v) => `<b style="color:var(--nego-orange);">${v.toLocaleString()}원</b>`;
@@ -4012,7 +4279,7 @@
             // [신규] 무료배달까지 얼마나 남았는지 알려준다. 배달비를 내는 바로 그 순간이라
             //  '조금만 더 담으면 무료'라는 정보가 가장 쓸모 있는 자리.
             const feeNudge = (shortfall) => shortfall > 0
-                ? `<div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:9px 12px; margin-top:10px; font-size:13px; font-weight:700; color:#2e7d32; line-height:1.6; word-break:keep-all; text-align:center;">💡 같은 날짜 상품을 ${`<b>${shortfall.toLocaleString()}원</b>`}만 더 담으면 배달비가 무료예요.</div>`
+                ? `<div style="background:#f1fbf5; border:1px solid #cfe6d8; border-radius:10px; padding:9px 12px; margin-top:10px; font-size:13px; font-weight:700; color:#2e7d32; line-height:1.6; word-break:keep-all; text-align:center;">같은 날짜 상품을 ${`<b>${shortfall.toLocaleString()}원</b>`}만 더 담으면 배달비가 무료예요.</div>`
                 : ``;
 
             /* [수정] 배달비 안내를 여기서 바로 띄우지 않고 함수로만 만들어 둔다.
@@ -4176,7 +4443,7 @@
 
             // [추가] 공동구매 상품과 일반(상시/과일) 상품 혼합 주문 시 안내 (최우선순위)
             if (hasReserve && hasAnyRegular) {
-                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 합배송 안내]</span><span style="display:block; white-space:nowrap; font-size:0.9em;">구매상품중 가장늦은 입고일에 합배송 됩니다.</span>${maxDateStr ? `<span style="display:block; white-space:nowrap; margin-top:2px;">[배달예정일 : ${maxDateStr}]</span>` : ''}`;
+                const msg = `<div class="sm-title">합배송 안내</div>담으신 상품 중 가장 늦은 입고일에 한 번에 배달됩니다.${maxDateStr ? `<br>배달 예정일 <b>${maxDateStr}</b>` : ''}`;
                 // [수정] 안내창을 따로 띄우지 않고 합배송 목록과 한 창에 묶어서 보여준다.
                 holidayConfirmedStatus = true;
                 cutoffConfirmedStatus = true;
@@ -4194,7 +4461,7 @@
                 } else {
                     holidayTerm = "주말";
                 }
-                const holidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>${holidayTerm}에 주문하신 상품은 <span style="color:var(--nego-orange);">\n다음 평일</span>에 배달됩니다.`;
+                const holidayMsg = `<div class="sm-title">배달 안내</div>${holidayTerm}에 주문하신 상품은 <b>다음 평일</b>에 배달됩니다.`;
 
                 holidayConfirmedStatus = true;
                 cutoffConfirmedStatus = true;
@@ -4208,20 +4475,20 @@
             // [신규] 예약배송 모드일 때는 마감 시각 조건 없이 예약배송용 배달안내 팝업을 우선 활성화
             if (currentDeliveryType === 'reserve') {
                 showModal = true;
-                msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 합배송 안내]</span><span style="display:block; white-space:nowrap; font-size:0.9em;">구매상품중 가장늦은 입고일에 합배송 됩니다.</span>${maxDateStr ? `<span style="display:block; white-space:nowrap; margin-top:2px;">[배달예정일 : ${maxDateStr}]</span>` : ''}`;
+                msg = `<div class="sm-title">합배송 안내</div>담으신 상품 중 가장 늦은 입고일에 한 번에 배달됩니다.${maxDateStr ? `<br>배달 예정일 <b>${maxDateStr}</b>` : ''}`;
             } else if (gTodayAfterClose(new Date())) {
                 if (hasAnyRegular) {
                     showModal = true;
-                    msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>오후 3시 이후 주문건은 <span style="color:var(--nego-orange);">내일</span> 배달됩니다.`;
+                    msg = `<div class="sm-title">배달 안내</div>${gTodayCloseWords()} 이후 주문은 <b>내일</b> 배달됩니다.`;
                 } else if (hasReserve) {
                     showModal = true;
-                    msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의\n<span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.`;
+                    msg = `<div class="sm-title">배달 안내</div>공동구매 상품은 상품마다 <b>입고일</b>에 맞춰 배달됩니다.`;
                 }
             } else {
                 // 15시 이전
                 if (hasReserve) {
                     showModal = true;
-                    msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[배달 서비스 안내]</span>공동구매 예약 상품은 각 상품의 <span style="color:var(--nego-orange);">입고일</span>에 맞춰 배달됩니다.`;
+                    msg = `<div class="sm-title">배달 안내</div>공동구매 상품은 상품마다 <b>입고일</b>에 맞춰 배달됩니다.`;
                 } else {
                     // 일반상품만 3시 이전인 경우: 별도 안내 없이 바로 진행
                     showModal = false;
@@ -4292,7 +4559,7 @@
                     const itemNames = pendingGoods.map(it => `• ${it.item} (${it.qty}개)`).join('<br>');
                     // 앞에 붙은 안내가 없으면 이 목록만으로도 무슨 창인지 알 수 있게 제목을 세운다
                     if (!body) {
-                        body = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[배달 서비스 합배송 안내]</span>`;
+                        body = `<span style="display:block;">[합배송 안내]</span>`;
                     }
                     body += `<span style="display:block; margin-top:12px; font-size:0.9em;">같은 날짜에 예약하신 아래 상품과 함께 배달됩니다.</span>` +
                             `<div style="background:#f4f6f0; padding:10px; border-radius:8px; margin:6px 0 0; text-align:left; font-size:14px; font-weight:700; color:var(--item-black);">${itemNames}</div>`;
@@ -4302,7 +4569,7 @@
                     proceed();
                     return;
                 }
-                showSystemModal(body + "<br><br>주문하시겠습니까?", 'confirm', proceed);
+                showSystemModal(body + "<br><br>주문할까요?", 'confirm', proceed);
             }
         }
 
@@ -4357,8 +4624,8 @@
                 } else {
                     holidayTerm = "주말";
                 }
-                const pickupHolidayMsg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--moket-green);">[픽업 서비스 안내]</span>${holidayTerm}에 주문하신 상품은 <span style="color:var(--nego-orange);">다음 영업일</span>부터 픽업하실 수 있습니다.`;
-                showSystemModal(pickupHolidayMsg + "<br><br>주문하시겠습니까?", 'confirm', () => {
+                const pickupHolidayMsg = `<span style="display:block;">[픽업 안내]</span>${holidayTerm}에 주문하신 상품은 <b>다음 영업일</b>부터 찾아가실 수 있습니다.`;
+                showSystemModal(pickupHolidayMsg + "<br><br>주문할까요?", 'confirm', () => {
                     holidayConfirmedStatus = true;
                     cutoffConfirmedStatus = true;
                     proceedToConfirm();
@@ -4369,7 +4636,7 @@
             // [수정] 13시 마감 보정 팝업(과일, 야채, 기타 한정 경고) 전면 제거로 즉시 주문 확인으로 직진
             // 단, 예약배송 모드일 때는 픽업 서비스 안내 팝업을 우선 활성화
             if (currentDeliveryType === 'reserve') {
-                const msg = `<span style="display:block; margin-bottom:10px; font-weight:800; font-size:1.05em; color:var(--nego-orange);">[픽업 서비스 안내]</span>각 구매상품 입고일에 맞춰 픽업이 가능합니다.<br><br>주문하시겠습니까?`;
+                const msg = `<span style="display:block;">[픽업 안내]</span>상품마다 입고일에 맞춰 찾아가실 수 있습니다.<br><br>주문할까요?`;
                 showSystemModal(msg, 'confirm', () => {
                     cutoffConfirmedStatus = true;
                     proceedToConfirm();
@@ -4936,7 +5203,7 @@
             const card = (icon, title, accent, tint, lines) =>
                 `<div style="background:${gRgba(accent, 0.055)}; border:1px solid ${gRgba(accent, 0.2)}; border-radius:14px; padding:12px 14px; margin-top:10px;">` +
                 `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">` +
-                `<span style="flex:0 0 auto; width:28px; height:28px; border-radius:9px; background:#fff; box-shadow:0 1px 2px ${gRgba(accent, 0.15)}; display:inline-flex; align-items:center; justify-content:center; font-size:15px; line-height:1;">${icon}</span>` +
+                
                 `<span style="font-size:15.5px; font-weight:900; color:${accent}; letter-spacing:-0.2px;">${title}</span>` +
                 `</div>` +
                 lines.map(t =>
@@ -4983,27 +5250,53 @@
 
         // 안내창 안에 접어 넣는 형태. 모달을 새로 띄우지 않으므로 확인/취소 흐름을 끊지 않는다.
         function gCombinedDeliveryFold(label) {
-            return `<details style="white-space:normal; background:#fff; border:1px solid #ffd9b3; border-radius:10px; padding:9px 12px; margin-top:10px; text-align:left;">` +
-                `<summary style="cursor:pointer; list-style:none; font-size:13px; font-weight:800; color:#c2610a; display:flex; align-items:center; gap:6px;">` +
-                `<span style="flex:0 0 auto;">🛵</span><span>${label || '합배송이 뭔가요?'}</span>` +
-                `<span style="margin-left:auto; font-size:11px; font-weight:700; color:#d9a878;">자세히</span>` +
+            return `<details style="white-space:normal; background:#fff; border:1px solid #e2e8da; border-radius:8px; padding:9px 12px; margin-top:10px; text-align:left;">` +
+                `<summary style="cursor:pointer; list-style:none; font-size:13.5px; font-weight:700; color:#3d8f19; display:flex; align-items:center; gap:6px;">` +
+                `<span>${label || '합배송이 뭔가요?'}</span>` +
+                `<span style="margin-left:auto; font-size:12px; font-weight:600; color:#8b9682;">자세히</span>` +
                 `</summary>` +
-                `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed #ffe8cc;">${gCombinedDeliveryGuideBody()}</div>` +
+                `<div style="margin-top:10px; padding-top:10px; border-top:1px solid #eef1e9;">${gCombinedDeliveryGuideBody()}</div>` +
                 `</details>`;
+        }
+
+        // [ver3] 메뉴 '배송 안내' 창 본문. 배달비·요일·마감 시각은 실제 설정값을 읽는다
+        //  (마감 시각 = 주문관리 일반 관리의 당일판매 마감). 주문 중 접이식 안내는 위 본문을 그대로 쓴다.
+        function gDeliveryGuideSheetBody() {
+            const fee = (typeof deliveryFee !== 'undefined' ? deliveryFee : 3000);
+            const daysStr = (typeof isSundayAsWeekday !== "undefined" && isSundayAsWeekday) ? "월~일" : ((typeof isSaturdayAsWeekday !== "undefined" && isSaturdayAsWeekday) ? "월~토" : "월~금");
+            return `<div class="v3-grp"><h4>배달비</h4>` +
+                `<p class="kv"><span class="k">배달</span><span><b>${Number(fee).toLocaleString()}원</b> · 같은 날 받는 상품이 <b>15,000원 이상</b>이면 무료</span></p>` +
+                `<p class="kv"><span class="k">매장 픽업</span><span>배달비 없음</span></p></div>` +
+                `<div class="v3-grp"><h4>받는 날</h4>` +
+                `<p>상품마다 받는 날이 정해져 있습니다. 여러 날짜를 같이 담으면 <b>가장 늦은 날에 한 번</b> 배달합니다.</p>` +
+                `<p>받는 날은 상품 목록과 주문내역에서 볼 수 있습니다.</p></div>` +
+                `<div class="v3-grp"><h4>합배송</h4>` +
+                `<p>따로 주문해도 받는 날이 같으면 함께 나갑니다. 합쳐서 <b>15,000원</b>이 넘으면 먼저 낸 배달비를 돌려드립니다.</p>` +
+                `<p>매장 픽업은 상품이 들어온 날마다 따로 찾아가시면 됩니다.</p></div>` +
+                `<div class="v3-grp"><h4>판매 방식</h4>` +
+                `<p class="kv"><span class="k">당일판매</span><span>${daysStr} <b>${gTodayCloseWords()}</b>까지 주문하면 그날 받습니다</span></p>` +
+                `<p class="kv"><span class="k">예약판매</span><span>정해진 날짜에 들어오는 상품입니다</span></p>` +
+                `<p class="kv"><span class="k">상시판매</span><span>늘 파는 상품이라 어느 쪽에 담아도 함께 나갑니다</span></p></div>`;
         }
 
         function showCombinedDeliveryGuide() {
             // 메뉴에서 부를 때만 메뉴를 닫는다. 푸터 등 다른 곳에서 부를 땐 건드리지 않는다.
             const side = document.getElementById('side-menu');
             if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
-            showSystemModal(
-                `<div style="white-space:normal;">` +
-                `<div style="text-align:center; font-size:18px; font-weight:900; color:var(--nego-orange); margin-bottom:4px;">🛵 배송서비스 안내</div>` +
-                `<div style="text-align:center; font-size:12.5px; font-weight:700; color:#8b9682; margin-bottom:16px;">배달비 · 받는 날짜 한눈에</div>` +
-                gCombinedDeliveryGuideBody() +
-                `</div>`,
-                'alert'
-            );
+            document.getElementById('delivery-guide-body').innerHTML = gDeliveryGuideSheetBody();
+            document.getElementById('delivery-guide-modal').style.display = 'flex';
+            checkScrollLock();
+        }
+
+        // [ver3] 알림창 글 다듬기 — 88곳에서 부르는 글을 한 자리에서 맞춘다
+        //  · 맨 앞 '[픽업 서비스 안내]' 같은 대괄호 제목 → 창 제목 한 줄
+        //  · 그림글자(🚚 ✅ ⚠️ 🚨 📋 …)는 뺀다. ✔ ✕ → 같은 기호는 남긴다
+        function gTidyModalMsg(msg) {
+            let s = String(msg == null ? '' : msg);
+            s = s.replace(/^\s*<span style="display:block;[^"]*">\s*\[([^\]<]+)\]\s*<\/span>/, '<div class="sm-title">$1</div>');
+            s = s.replace(/^\s*<div style="text-align:center; font-size:18px; font-weight:900;[^"]*">\s*([^<]+?)\s*<\/div>/, '<div class="sm-title">$1</div>');
+            s = s.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2705}\u{274C}\u{2757}\u{2B50}][\u{FE0F}\u{200D}]*\s?/gu, '');
+            return s;
         }
 
         // [시스템 모달]
@@ -5013,25 +5306,19 @@
             const btnDiv = document.getElementById('sys-modal-btns');
             const modalContent = modal.querySelector('.modal-content');
 
-            if (isTight) {
-                modalContent.style.padding = "8px 15px";
-                msgDiv.style.margin = "0 0 10px";
-                msgDiv.style.fontSize = "16px";
-                msgDiv.style.lineHeight = "1.3";
-            } else {
-                modalContent.style.padding = "25px 20px";
-                msgDiv.style.margin = "10px 0 25px";
-                msgDiv.style.fontSize = "18px";
-                msgDiv.style.lineHeight = "1.5";
-            }
+            // [ver3] 글씨·여백은 CSS(#system-modal)가 맡는다. 긴 안내(입금 안내 등)만 여백을 조금 줄인다
+            modalContent.style.padding = isTight ? "18px 16px 14px" : "24px 18px 16px";
+            msgDiv.style.margin = isTight ? "0 0 14px" : "0 0 20px";
+            msgDiv.style.fontSize = "";
+            msgDiv.style.lineHeight = "";
 
-            msgDiv.innerHTML = msg; // innerText 대신 innerHTML 사용하여 스타일 적용 허용
+            msgDiv.innerHTML = gTidyModalMsg(msg); // [ver3] 대괄호 제목은 창 제목으로, 그림글자는 걷는다
             msgDiv.style.textAlign = 'center'; // 전체 문구 중앙 정렬 적용
             msgDiv.style.whiteSpace = isTight ? 'normal' : 'pre-wrap'; // tight 모드일 땐 줄바꿈 무시 (HTML 구조 사용)
             btnDiv.innerHTML = '';
 
-            const btnHeight = isTight ? '40px' : '48px';
-            const btnFont = isTight ? '0.9rem' : '1rem';
+            const btnHeight = '48px';
+            const btnFont = '16px';
 
             if (type === 'confirm') {
                 const btnNo = document.createElement('button');
@@ -5105,7 +5392,89 @@
             const isOpen = side.classList.contains('open');
             side.classList.toggle('open');
             overlay.style.display = isOpen ? 'none' : 'block';
+            if (!isOpen) gSyncMenuFoot();
             checkScrollLock();
+        }
+
+        // [신규] 운영시간 창. 먼저 기기에 담아 둔 값으로 그리고, 서버 값을 받으면 다시 그린다
+        const STORE_HOURS_DEFAULT = { pickup: '24시간', delivery: '오후 3시 ~ 오후 6시' };
+        function gStoreHours() {
+            try { return Object.assign({}, STORE_HOURS_DEFAULT, JSON.parse(localStorage.getItem('moket_store_hours') || '{}') || {}); }
+            catch (e) { return Object.assign({}, STORE_HOURS_DEFAULT); }
+        }
+        function gHoursSheetBody() {
+            const H = gStoreHours();
+            const E = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            // 배달 요일·쉬는 날은 사장님이 정한 대로 고정 글로 둔다 (토·일 영업 설정, 임시 휴무일과 따로 논다)
+            // 제목 없이 '말머리 + 값' 세 줄을 같은 모양·같은 굵기로 둔다
+            return `<div class="v3-grp v3-hours">` +
+                `<p class="kv"><span class="k">매장 픽업</span><span>${E(H.pickup)}</span></p>` +
+                `<p class="kv"><span class="k">배달 시간</span><span>월~토 · ${E(H.delivery)}</span></p>` +
+                `<p class="kv"><span class="k">배달 쉬는 날</span><span>일요일 · 공휴일</span></p></div>`;
+        }
+        async function openHoursModal() {
+            const side = document.getElementById('side-menu');
+            if (side && side.classList.contains('open')) toggleMenu();
+            const body = document.getElementById('hours-body');
+            body.innerHTML = gHoursSheetBody();
+            document.getElementById('hours-modal').style.display = 'flex';
+            checkScrollLock();
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}store_hours.json?t=${Date.now()}`);
+                const v = r.ok ? await r.json() : null;
+                if (v && typeof v === 'object') {
+                    localStorage.setItem('moket_store_hours', JSON.stringify(v));
+                    body.innerHTML = gHoursSheetBody();
+                }
+            } catch (e) { /* 못 받으면 담아 둔 값(없으면 기본값) 그대로 */ }
+        }
+
+        // [신규] 공구상품 추천하기 — 카카오로 들어온 손님만 보낼 수 있다 (규칙: 자기 번호 칸에만 쓴다)
+        function openSuggestModal() {
+            const side = document.getElementById('side-menu');
+            if (side && side.classList.contains('open')) toggleMenu();
+            document.getElementById('suggest-modal').style.display = 'flex';
+            checkScrollLock();
+        }
+        async function sendSuggestion() {
+            const nameEl = document.getElementById('sg-name');
+            const name = String(nameEl.value || '').trim();
+            const link = String(document.getElementById('sg-link').value || '').trim();
+            const memo = String(document.getElementById('sg-memo').value || '').trim();
+            if (!name) { showToast('상품 이름을 적어 주세요.'); nameEl.focus(); return; }
+            const key = normP(localStorage.getItem('kakao_original_phone') || '');
+            if (!gIsValidPhone(key) || gIsGuestView()) { showToast('로그인한 뒤에 보낼 수 있어요.'); return; }
+            const btn = document.getElementById('sg-send');
+            btn.disabled = true; btn.style.opacity = '0.6'; btn.innerText = '보내는 중…';
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}product_suggestions/${key}.json`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name.slice(0, 100), link: link.slice(0, 500), memo: memo.slice(0, 300),
+                        customer: localStorage.getItem('moket_user_name') || '', phone: key, at: Date.now()
+                    })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                ['sg-name', 'sg-link', 'sg-memo'].forEach(id => { document.getElementById(id).value = ''; });
+                closeModal('suggest-modal');
+                showToast('추천을 보냈어요. 고맙습니다!');
+            } catch (e) {
+                console.warn('추천 보내기 실패:', e);
+                showToast('보내지 못했어요. 잠시 뒤 다시 보내 주세요.');
+            } finally {
+                btn.disabled = false; btn.style.opacity = ''; btn.innerText = '보내기';
+            }
+        }
+
+        // [ver3] 메뉴 맨 아래 — 로그아웃은 카카오로 들어온 손님만, 회원탈퇴는 가입을 마친 손님만
+        function gSyncMenuFoot() {
+            const lo = document.getElementById('sm-logout'), un = document.getElementById('sm-unlink');
+            const guest = (typeof gIsGuestView === 'function') && gIsGuestView();
+            if (lo) lo.style.display = (localStorage.getItem('kakao_original_name') && !guest) ? '' : 'none';
+            if (un) un.style.display = ((typeof gJoinDone === 'function') && gJoinDone() && !guest) ? '' : 'none';
+            // 둘 다 없으면 빈 줄만 남으니 칸째로 감춘다
+            const ft = lo && lo.parentNode;
+            if (ft) ft.style.display = (lo.style.display === 'none' && (!un || un.style.display === 'none')) ? 'none' : '';
         }
 
         // [신규] 계좌번호 안내 모달의 안내 문구를 상황에 맞게 바꾼다.
@@ -5115,22 +5484,22 @@
             if (!el) return;
 
             const box = (title, body, lines) =>
-                `<div style="font-size:13px; font-weight:900; color:#c2610a; margin-bottom:6px;">${title}</div>` +
-                `<div style="font-size:13.5px; font-weight:700; color:var(--item-black);">${body}</div>` +
-                `<div style="font-size:12.5px; font-weight:600; color:#767a6c; margin-top:8px;">${lines.map(l => '· ' + l).join('<br>')}</div>`;
+                `<div class="v3-notice-t">${title}</div>` +
+                `<div class="v3-notice-b">${body}</div>` +
+                (lines.length ? `<div class="v3-notice-l">${lines.map(l => '· ' + l).join('<br>')}</div>` : '');
 
             if (kind === 'sada') {
                 el.innerHTML = box(
-                    '🛵 사다드림 안내',
-                    '사다드림은 <b style="color:var(--nego-orange);">당일 입금</b>이 확인되어야 주문이 확정됩니다.',
-                    ['입금자명을 닉네임과 같게 보내주세요', '사다드림은 <b style="color:var(--text-main, #222);">카드 결제가 불가</b>합니다', '당일 입금이 없으면 주문이 취소될 수 있습니다', '그 외 상품은 현장 결제도 가능합니다']
+                    '사다드림 안내',
+                    '사다드림은 <b>당일 입금</b>이 확인되어야 주문이 확정됩니다.',
+                    ['사다드림은 <b>카드 결제가 불가</b>합니다', '당일 입금이 없으면 주문이 취소될 수 있습니다', '그 외 상품은 현장 결제도 가능합니다']
                 );
                 el.style.display = 'block';
             } else if (kind === 'delivery') {
                 el.innerHTML = box(
-                    '🚚 배달 안내',
-                    '배달 주문은 <b style="color:var(--nego-orange);">당일 입금</b>이 확인되어야 배달 준비가 시작됩니다.',
-                    ['입금자명을 닉네임과 같게 보내주세요', '당일 입금이 없으면 주문이 자동으로 취소됩니다']
+                    '배달 안내',
+                    '배달 주문은 <b>당일 입금</b>이 확인되어야 배달 준비가 시작됩니다.',
+                    ['당일 입금이 없으면 주문이 자동으로 취소됩니다']
                 );
                 el.style.display = 'block';
             } else {
@@ -6501,8 +6870,9 @@
         }
 
         // 카드 머리에 붙는 딱지·단추. 모양은 주문순 탭의 '취소완료·배달완료'와 똑같이 맞춘다.
+        /* [ver3] 카드 머리의 '배달완료·픽업완료'는 딱지가 아니라 글씨로 (상품 줄의 완료 글씨와 같은 모양) */
         const gDoneBadgeHtml = (label) => label
-            ? `<span style="padding:4px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #c5e0b4; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height:22px; box-sizing:border-box; white-space:nowrap;">${label}</span>`
+            ? `<span style="font-size:12.5px; font-weight:700; color:#2e7d32; white-space:nowrap;">${label}</span>`
             : '';
         const gPhotoBtnHtml = (key) => key
             ? `<button onclick="event.stopPropagation(); viewCustomerDeliveryPhoto('${escapeArg(key)}')" style="padding:4px 10px; background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; height:22px; box-sizing:border-box; white-space:nowrap; flex-shrink:0;">완료사진</button>`
@@ -6847,11 +7217,27 @@
                 return g;
             };
 
+            /* [ver3] 배달은 합배송이라 한 주문이 가장 늦은 입고일에 한 번 나간다.
+               입고일 그대로 묶으면 같이 받는 물건이 두 날짜로 나뉘어 손님이 헷갈린다.
+               그래서 배달 주문은 그 주문에서 가장 늦은 입고일(=실제 배달일)로 모아 둔다.
+               (픽업은 상품마다 그날 찾아가야 하므로 입고일 그대로 둔다) */
+            const _lastByOrder = {};
+            filtered.forEach(it => {
+                if (String(it.shippingMethod || '') !== '배달주문') return;
+                if (isOrderCancelled(it)) return;
+                const k = String(it.timestamp || '');
+                const d = gPickupDateKey(String(it.pickupDate || '').trim());
+                if (!k || !d) return;
+                if (!_lastByOrder[k] || d > _lastByOrder[k].key) _lastByOrder[k] = { key: d, raw: String(it.pickupDate || '').trim() };
+            });
+
             filtered.forEach(item => {
                 // [수정] 취소된 건은 이 탭에서 아예 빼고 본다. (취소 내역은 주문순 탭이나 '취소' 상태에서 확인)
                 if (isOrderCancelled(item)) return;
 
-                const raw = String(item.pickupDate || "").trim();
+                const _mergedTo = (String(item.shippingMethod || '') === '배달주문')
+                    ? _lastByOrder[String(item.timestamp || '')] : null;
+                const raw = _mergedTo ? _mergedTo.raw : String(item.pickupDate || "").trim();
                 const dateKey = gPickupDateKey(raw);
                 let g;
 
@@ -6927,29 +7313,34 @@
                 const doneInfo = gGroupDoneInfo(group.items);
 
                 html += `
-                    <div style="background:var(--white); border: 1.5px solid ${borderColor}; border-left: ${leftBorder}; border-radius:var(--common-radius); margin-bottom:15px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.03);">
-                        <div onclick="toggleHistoryGroup('${domKey}', this)" style="background:${headerBg}; padding:12px 15px; cursor:pointer;">
-                            <!-- [수정] 주문순 탭 카드와 같은 짜임으로 맞췄다.
-                                 윗줄 오른쪽 끝에 상태(배달완료·픽업완료·완료사진),
-                                 아랫줄에 날짜와 건수·금액을 한 줄로 마주 놓는다.
-                                 딱지는 이 카드 안 물건이 전부 끝난 때만 붙는다(주문순과 같은 잣대). -->
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:22px;">
-                                <div style="font-size:11px; color:#8b9682; flex-shrink:0;">${isUnpicked ? '지난 날짜' : '픽업/배달 예정일'}</div>
-                                <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
-                                    ${gDoneBadgeHtml(doneInfo.label)}
-                                    ${gPhotoBtnHtml(doneInfo.photoKey)}
-                                </div>
-                            </div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:4px;">
+                    <div style="background:var(--white); border: none; border-left: ${isUnpicked ? leftBorder : 'none'}; border-radius:0; margin-bottom:0; overflow:hidden;">
+                        <div onclick="toggleHistoryGroup('${domKey}', this)" style="background:transparent; padding:14px 2px; cursor:pointer;">
+                            ${/* [ver3] 주문순 탭과 같은 짜임 — 날짜가 제목, 그 아래 한 줄 요약 */ ''}
+                            <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
                                 <div style="flex:1; min-width:0; font-size:16px; font-weight:800; color:${isUnpicked ? '#d32f2f' : 'var(--item-black)'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${group.label}</div>
-                                <div style="flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end; gap:8px;">
-                                    <span style="font-size:13px; font-weight:700; color:#4f5b46;">${group.count}건</span>
+                                <div style="flex:0 0 auto; display:flex; align-items:center; gap:8px;">
                                     <span style="font-size:16px; font-weight:900; color:var(--nego-orange);">${group.totalPrice.toLocaleString()}원</span>
                                     <svg class="toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b9682" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.3s; transform: rotate(180deg);"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                 </div>
                             </div>
+                            <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:5px; min-height:22px;">
+                                ${/* [ver3] '받는 날 · 2건' 대신 배달·픽업이 몇 건인지 적는다.
+                                      한 날짜에 배달과 픽업이 섞일 수 있어 따로 센다. 배달비 줄은 물건이 아니라 빼고 센다. */ ''}
+                                <span style="font-size:12.5px; font-weight:700; color:${isUnpicked ? '#d32f2f' : '#8b9682'}; flex-shrink:0;">${(() => {
+                                    const 셈 = group.items.filter(it => !gIsFeeRow(it.item) && !String(it.item || '').includes('[배달합산]'));
+                                    const 수 = (arr) => arr.reduce((a, it) => a + (parseInt(it.qty || 0) || 0), 0);
+                                    const 배 = 수(셈.filter(it => String(it.shippingMethod || '') === '배달주문'));
+                                    const 픽 = 수(셈) - 배;
+                                    const 글 = [배 ? `배달 ${배}개` : '', 픽 ? `픽업 ${픽}개` : ''].filter(Boolean).join(' · ') || `${group.count}개`;
+                                    return isUnpicked ? `지난 날짜 · ${글}` : 글;
+                                })()}</span>
+                                <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap; margin-left:auto;">
+                                    ${gDoneBadgeHtml(doneInfo.label)}
+                                    ${gPhotoBtnHtml(doneInfo.photoKey)}
+                                </div>
+                            </div>
                         </div>
-                        <div id="${domKey}" style="display:block; padding:10px 15px 15px 15px; border-top:1px dashed #e9ece3; background:#fff;">
+                        <div id="${domKey}" style="display:block; padding:0 2px 14px 2px; border-top:none; background:#fff;">
                 `;
 
                 const groupItems = gSortFeeLast(group.items); // 배달비·차감은 맨 아래로
@@ -6977,11 +7368,10 @@
                     // 배달비 차감도 입금 표시 대상이다. 이 줄까지 묶어야 손님이 낼 총액이 맞는다.
                     const isBadgeTarget = isDeliveryItem || gIsSadaOrder(order) || gIsFeeRow(order.item);
                     const isPaid = (order.paid === true || order.paid === "true" || String(order.paid).toUpperCase() === "TRUE");
+                    /* [ver3] 주문순 탭과 같게 — 분홍·초록 딱지 대신 작은 글씨로 */
                     let payBadgeHtml = '';
                     if (isBadgeTarget && !isCancelled && !isCombined) {
-                        payBadgeHtml = isPaid
-                            ? `<span style="padding: 2px 7px; background: #e8f5e9; color: #2e7d32; border: 1px solid #c5e0b4; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">입금완료</span>`
-                            : `<span style="padding: 2px 7px; background: #ffd8d8; color: #d32f2f; border: 1px solid #ffb8b8; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">미입금</span>`;
+                        payBadgeHtml = `<span style="font-size:12.5px; font-weight:700; color:${isPaid ? '#3d8f19' : '#d32f2f'};">${isPaid ? '입금완료' : '미입금'}</span>`;
                     }
 
                     // 주문순 카드와 달리 여기선 주문일이 카드에 없으므로 항목마다 적어 준다
@@ -6992,7 +7382,7 @@
                     }
 
                     html += `
-                        <div style="padding: 10px 0; ${idx !== groupItems.length - 1 ? 'border-bottom: 1px dashed #e9ece3;' : ''} ${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
+                        <div style="padding: 9px 0; ${/* [ver3] 상품 줄 사이 점선은 없앴다 — 줄 간격만으로 나뉜다 */ ''}${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <div style="flex:1;">
                                     <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.3; margin-bottom:4px;">
@@ -7291,15 +7681,31 @@
                    (전부 취소된 카드만 회색으로 눕히는 것은 그대로 둔다) */
                 /* [ver3] 머리 요약 줄에 '언제 받는지'를 함께 적는다.
                    날짜가 여럿이면 가장 이른 날 하나만 적고 '외 n일'을 붙인다. */
+                /* [ver3] 건수 대신 물건 개수를 센다 (수량을 더한다).
+                   취소된 줄, 배달비, [배달합산] 표시줄은 물건이 아니라 뺀다. */
+                let _qtySum = 0;
+                Object.values(group.pickupGroups).forEach(list => list.forEach(o => {
+                    if (!o) return;
+                    if (isOrderCancelled(o)) return;
+                    if (String(o.item || '').includes('[배달합산]')) return;
+                    if (gIsFeeRow(o.item)) return;
+                    _qtySum += parseInt(o.qty || 0) || 0;
+                }));
+
                 const _pWhenKeys = Object.keys(group.pickupGroups)
                     .filter(k => k && k !== '정보없음' && parseKRDate(k))
                     .sort((a, b) => parseKRDate(a) - parseKRDate(b));
                 const _pWhen = (() => {
                     if (!_pWhenKeys.length) return '';
-                    const d = parseKRDate(_pWhenKeys[0]);
+                    /* [수정] 배달은 합배송이라 한 주문이 한 번만 나간다 — 가장 늦은 날 하나만 적는다.
+                       픽업은 상품마다 그날 찾아가야 하므로 날짜가 여럿이면 '외 n일'로 알려 준다. */
+                    const key = isDeliveryCard ? _pWhenKeys[_pWhenKeys.length - 1] : _pWhenKeys[0];
+                    const d = parseKRDate(key);
                     if (!d) return '';
                     const one = `${d.getMonth() + 1}월 ${d.getDate()}일`;
-                    return _pWhenKeys.length > 1 ? `${one} 외 ${_pWhenKeys.length - 1}일` : `${one} 받음`;
+                    const 이름 = isDeliveryCard ? '배달일' : '픽업일';
+                    if (isDeliveryCard) return `${이름} : ${one}`;
+                    return _pWhenKeys.length > 1 ? `${이름} : ${one} 외 ${_pWhenKeys.length - 1}일` : `${이름} : ${one}`;
                 })();
                 const cardBorderColor = allCanceled ? 'rgba(148, 163, 184, 0.4)' : 'rgba(16, 185, 129, 0.35)';
                 const cardLeftBorder = allCanceled ? '4px solid #8b9682' : '4px solid #10b981';
@@ -7322,7 +7728,8 @@
                             </div>
                             <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:5px; min-height:22px;">
                                 ${/* 배달인지 픽업인지 · 몇 건인지 · 언제 받는지를 한 줄로 */ ''}
-                                <span style="font-size:12.5px; font-weight:700; color:#8b9682; flex-shrink:0;">${isDeliveryCard ? '배달' : '픽업'} · ${originalCount}건${_pWhen ? ` · ${_pWhen}` : ''}</span>
+                                ${/* [ver3] 여기는 딱지가 아니라 글자로. 딱지는 아래 상품 줄마다 붙는다 */ ''}
+                                <span style="font-size:12.5px; font-weight:700; color:#8b9682; flex-shrink:0;">${isDeliveryCard ? '배달' : '픽업'} ${_qtySum}개${_pWhen ? ` · ${_pWhen}` : ''}</span>
                                 <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap; margin-left:auto;">
                                     <!-- 차례는 'N건 취소 → 취소완료 → 배달완료 → 완료사진 → 주문취소'.
                                          먼저 빠진 것(취소)을 알려 주고, 그 다음 나머지가 어떻게 됐는지,
@@ -7337,12 +7744,9 @@
                                             ${noShowCount === canceledCount ? '강제취소' : '취소완료'}
                                         </span>
                                     ` : ''}
-                                    <!-- 다 끝난 주문은 '취소완료'와 같은 모양으로 알린다.
-                                         카드 안 상품이 전부 완료됐거나 취소된 때만 붙는다. -->
+                                    ${/* [ver3] 다 끝난 주문은 딱지 대신 글씨로 알린다 */ ''}
                                     ${(nonCanceledCount > 0 && !allCanceled && (isDeliveryCard ? allDelivered : allReceived)) ? `
-                                        <span style="padding: 4px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #c5e0b4; border-radius:6px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; height: 22px; box-sizing: border-box; white-space:nowrap;">
-                                            ${isDeliveryCard ? '배달완료' : '픽업완료'}
-                                        </span>
+                                        <span style="font-size:12.5px; font-weight:700; color:#2e7d32; white-space:nowrap;">${isDeliveryCard ? '배달완료' : '픽업완료'}</span>
                                     ` : ''}
                                     <!-- 지금은 한 번 주문에 배달 날짜가 하나뿐이라 사진도 한 장이다.
                                          (한 주문이 여러 날로 나뉘던 예전 기록은 마지막 사진 한 장만 보인다) -->
@@ -7430,10 +7834,14 @@
                         }
 
                         htmlBuffer += `
-                            <div style="padding: 10px 0; ${idx !== items.length - 1 ? 'border-bottom: 1px dashed #e9ece3;' : ''} ${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
+                            <div style="padding: 9px 0; ${/* [ver3] 상품 줄 사이 점선은 없앴다 */ ''}${(isCancelled || isCombined || order.onSite) ? 'opacity:0.6; text-decoration:line-through;' : ''} ${isProcessing ? 'opacity:0.7;' : ''}">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <div style="flex:1;">
                                         <div style="font-size:15px; font-weight:800; color:var(--item-black); line-height:1.3; margin-bottom:4px;">
+                                            ${/* [ver3] 픽업/배송일순 탭처럼 상품 줄마다 배달·픽업 딱지를 단다 */ ''}
+                                            ${isDeliveryItem
+                                                ? '<span style="background:#e8f5e9; color:#2e7d32; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:5px; font-weight:900;">배달</span>'
+                                                : '<span style="background:#eff6ff; color:#1d4ed8; font-size:10px; padding:2px 5px; border-radius:4px; margin-right:5px; font-weight:900;">픽업</span>'}
                                             <span>${order.item}</span>
                                             ${gOptionLinesHtml(order.optionText)}
                                         </div>
@@ -9874,7 +10282,9 @@
                 card.innerHTML = `<div class="card-top">` +
                     `<div class="thumb" ${_openArg}>` +
                     (imgId ? `<img src="${getImgUrl(imgId, 300)}" loading="lazy" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain;" onload="this.classList.add('loaded')" onerror="this.onerror=null; this.src=getImgUrl('${imgId}', 300, true); this.classList.add('loaded');">` : 'No Image') +
-                    `<div class="thumb-notice">예시이미지입니다.</div>` +
+                    // [ver3] '예시이미지입니다.' 자리에 '상세보기'를 둔다.
+                    //  사진을 누르면 상세가 열리니, 누를 수 있다는 것을 여기서 알린다.
+                    `<div class="thumb-notice">상세보기 <span>›</span></div>` +
                     // [신규] 할인 상품은 사진 위쪽에 '15% 할인!' 띠를 두른다 (아래 '예시이미지입니다.'와 짝)
                     (gIsSale(p) ? `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>` : '') +
                     `</div>` +
@@ -9884,8 +10294,9 @@
                     // [ver3] 이름 앞에 붙는 수식어는 작은 글씨로 위에 올린다 (gSplitLead).
                     //  수식어와 이름은 한 칸(item-head) 안에 함께 둔다. 따로 두면 위아래 여백이 벌어져 서로 떨어져 보인다.
                     `<div class="item-head" ${_openArg}>` +
-                    (gSplitLead(gDisplayName(p)).lead ? `<div class="item-lead">${gSplitLead(gDisplayName(p)).lead}</div>` : '') +
-                    `<div class="item-name">${gSaleMark(p)}${gRecommendMark(p)}${gFreshMark(p)}${gSplitLead(gDisplayName(p)).main.replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.9em;">[$1]</span>') + '<br>' : '')}</div>` +
+                    // [ver3] [신선식품]·[사다드림] 같은 대괄호 말머리도 수식어 줄(회색 작은 글씨)에 ' · '로 이어 붙인다.
+                    //  색 글씨 말머리와 회색 수식어가 섞여 두 모양이었다. 땡처리 특가만 빨강을 남긴다(값 신호).
+                    gCardNameHtml(p) +
                     `</div>` +
                     gSaleNote(p) +
                     // [신규] 할인 상품은 판매가 바로 위에 할인 전 금액을 작게 적어 준다.
@@ -10013,6 +10424,25 @@
              "학창 시절 그 맛 그대로! 두끼 학교 앞 떡볶이" → 위: 학창 시절 그 맛 그대로 / 아래: 두끼 학교 앞 떡볶이
            느낌표·물음표가 이름 앞쪽에 있을 때만 나눈다. 없으면 이름을 그대로 둔다.
            (수식어를 아예 따로 적는 칸이 상품등록에 생기면 이 어림짐작은 필요 없어진다) */
+        function gNameParts(p) {
+            const sp = gSplitLead(gDisplayName(p));
+            const m = sp.main.match(/^((?:\s*\[[^\]]*\]|\s*\([^)]*\))+)\s*/);
+            const hasRest = m && sp.main.length > m[0].length;
+            const pre = hasRest ? m[1].trim().replace(/\]\s*\[/g, ' · ').replace(/[\[\]]/g, '') : '';
+            const main = hasRest ? sp.main.slice(m[0].length) : sp.main;
+            const lead = [
+                gSaleBadgeOn(p) ? '<span class="lead-sale">땡처리 특가</span>' : '',
+                gIsRecommendProduct(p) ? '오늘의추천' : '',
+                gIsFreshProduct(p) ? '신선식품' : '',
+                pre, sp.lead
+            ].filter(Boolean).join(' · ');
+            return { lead, main };
+        }
+        function gCardNameHtml(p) {
+            const { lead, main } = gNameParts(p);
+            return (lead ? `<div class="item-lead">${lead}</div>` : '') + `<div class="item-name">${main}</div>`;
+        }
+
         function gSplitLead(name) {
             const s = String(name || '').trim();
             const m = s.match(/^([^!?[\]()]{4,40}[!?]+)\s+(.{4,})$/);
@@ -11340,7 +11770,7 @@
                 footer.classList.remove('visible');
                 if (notice) notice.style.display = 'none';
             }
-            document.getElementById('total-qty-text').innerHTML = `총 <span onclick="openCartDetailModal()" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer; background:var(--nego-orange); color:#fff; padding:4px 14px; border-radius:20px; font-size:16px; font-weight:900; margin:0 6px; box-shadow:0 2.5px 6px rgba(255, 77, 0, 0.25); transform:translateY(-2px); transition: all 0.2s; line-height: 1; vertical-align: middle;">${tQ}개</span> 선택 <span style="color:#dde0d5; margin:0 8px; font-weight:normal;">|</span> 합계 <span style="color:var(--nego-orange);">${tP.toLocaleString()}</span>원`;
+            document.getElementById('total-qty-text').innerHTML = `총 <span onclick="openCartDetailModal()" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer; background:#3d8f19; color:#fff; padding:3px 9px; border-radius:999px; font-size:13.5px; font-weight:700; margin:0 5px; line-height:1.2; vertical-align:1px; font-variant-numeric:tabular-nums;">${tQ}개</span> 선택 <span style="color:#dde0d5; margin:0 8px; font-weight:normal;">|</span> 합계 <span style="color:var(--nego-orange); font-size:20px; font-weight:700; margin-left:3px; font-variant-numeric:tabular-nums; vertical-align:-1px;">${tP.toLocaleString()}</span>원`;
         }
 
         function resetCart() {
@@ -11393,7 +11823,7 @@
                             <span style="font-size:12px; color:#85897a; font-weight:600; flex:0 0 auto;">${price.toLocaleString()}원</span>
                             <div style="display:flex; align-items:center; gap:6px; flex:0 0 auto;">
                                 <button onclick="changeCartQty('${safeName}', -1)" style="width:28px; height:28px; border:1.5px solid #e2e8da; background:#fff; border-radius:8px; font-size:16px; font-weight:800; color:var(--item-black); cursor:pointer; line-height:1;">-</button>
-                                <span style="min-width:30px; text-align:center; font-weight:900; color:var(--nego-orange); font-size:14px;">${cart[name]}</span>
+                                <span style="min-width:30px; text-align:center; font-weight:700; color:#16200f; font-size:15px; font-variant-numeric:tabular-nums;">${cart[name]}</span>
                                 <button onclick="changeCartQty('${safeName}', 1)" style="width:28px; height:28px; border:1.5px solid #e2e8da; background:#fff; border-radius:8px; font-size:16px; font-weight:800; color:var(--item-black); cursor:pointer; line-height:1;">+</button>
                             </div>
                             <span style="font-weight:900; color:var(--item-black); font-size:14px; flex:1; text-align:right;">${subTotal.toLocaleString()}원</span>
@@ -11561,11 +11991,10 @@
             }
 
             // [수정] 상품카드와 같은 방식 — [오늘의추천]은 isRecommend 값으로 그리고 이름에서는 떼어낸다.
+            // [ver3] 카드와 같이 말머리·수식어는 회색 작은 줄로 위에, 이름은 아래에
+            const _np = gNameParts(p);
             document.getElementById('detail-title').innerHTML =
-                gSaleMark(p, '0.85em') +
-                (gIsRecommendProduct(p) ? `<span style="color:var(--nego-orange); font-size: 0.85em;">[오늘의추천]</span><br>` : '') +
-                gFreshMark(p, '0.85em') +
-                gDisplayName(p).replace(/^((?:\s*\[.*?\]|\s*\(.*?\))+)*/, (match) => match ? match.replace(/\[(.*?)\]/g, '<span style="color:var(--nego-orange); font-size: 0.85em;">[$1]</span>') + '<br>' : '');
+                (_np.lead ? `<div class="item-lead detail-lead">${_np.lead}</div>` : '') + _np.main;
             // [수정] 할인 상품은 상세보기에서도 할인 전 금액을 위에 작게 적고, 판매가를 빨간색으로 바꾼다.
             //  글자 크기 22px의 0.6배로, 카드와 같은 비율을 쓴다.
             // [신규] 특가 상품은 상품명 아랫줄에 안내 문구를 붙인다 (상품카드와 같은 문구)
@@ -11716,29 +12145,15 @@
             }
 
             const header = document.getElementById('confirm-header-area');
+            // [ver3] 받는 방법 딱지 + 이름·번호, 배달이면 주소 한 줄. 제목은 창 머리('주문 확인')가 맡는다
             if (selectedShippingMethod === '배달주문') {
                 header.innerHTML = `
-                    <div style="font-size:16px; font-weight:900; color:var(--item-black); margin-bottom:8px;">주문 내용을 확인해 주세요</div>
-                    <div style="text-align:left; background:#f8faf4; border:1.5px solid #e2e8da; padding: 8px 12px; border-radius:10px; margin-bottom:10px; font-size:13px; line-height:1.4;">
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; white-space:nowrap; overflow:hidden;">
-                            <span style="background:#e8f5e9; color:#2e7d32; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:800; flex-shrink:0;">🚚 배달주문</span>
-                            <span style="font-weight:800; color:#1e293b; font-size:13.5px; flex-shrink:0;">${name}</span>
-                            <span style="color:#4f5b46; font-weight:700; font-size:12.5px; flex-shrink:0;">(${phone})</span>
-                        </div>
-                        <div style="color:#3a4237; font-weight:700; font-size:12.5px; line-height:1.45;">📍 ${shortAddress}</div>
-                        ${entrance && entrance !== "정보없음" ? `<div style="margin-top:4px;"><span style="color:#4f5b46; font-size:11.5px; font-weight:700; background:#edf2f7; padding:2px 6px; border-radius:4px;">🚪 공동현관 ${entrance}</span></div>` : ''}
-                    </div>
+                    <div class="cf-who"><span class="cf-chip cf-chip-d">배달</span><b>${name}</b><span class="cf-phone">${phone}</span></div>
+                    <div class="cf-addr">${shortAddress}${entrance && entrance !== "정보없음" ? ` · 공동현관 ${entrance}` : ''}</div>
                 `;
             } else {
                 header.innerHTML = `
-                    <div style="font-size:16px; font-weight:900; color:var(--item-black); margin-bottom:8px;">주문 내용을 확인해 주세요</div>
-                    <div style="text-align:left; background:#f8faf4; border:1.5px solid #e2e8da; padding: 10px 12px; border-radius:10px; margin-bottom:10px; font-size:13px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="background:#eff6ff; color:#1d4ed8; font-size:11px; padding:2px 7px; border-radius:5px; font-weight:800;">🛍️ 매장픽업</span>
-                            <span style="font-weight:800; color:#1e293b; font-size:14px;">${name}</span>
-                            <span style="color:#4f5b46; font-weight:700;">(${phone})</span>
-                        </div>
-                    </div>
+                    <div class="cf-who"><span class="cf-chip cf-chip-p">픽업</span><b>${name}</b><span class="cf-phone">${phone}</span></div>
                 `;
             }
 
@@ -11746,29 +12161,25 @@
             if (selectedShippingMethod === '배달주문') {
                 // [수정] 당일구매 탭이 열려 있어도 장바구니에 예약(공동구매) 상품이 섞였으면 예약 기준 안내로 표시
                 const depositNoticeLine = (currentDeliveryType === 'reserve' || gHasFutureReserveInCart())
-                    ? '<div>✅ 자정 전까지 입금확인이 안될경우 자동으로 주문이 취소됩니다.</div>'
-                    : '<div>✅ 오후3시 전까지 입금확인이 안될경우 자동으로 주문이 취소됩니다.</div>';
+                    ? '<li>자정 전까지 입금이 확인되지 않으면 주문이 자동으로 취소됩니다.</li>'
+                    : '<li>오후 3시 전까지 입금이 확인되지 않으면 주문이 자동으로 취소됩니다.</li>';
 
                 noticeArea.innerHTML = `
-                    <div style="font-size: 12px; line-height: 1.5;">
-                        <div style="display: flex; flex-direction: column; gap: 2px; color: #4b5563;">
-                            <div>✅ 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
-                            <div>✅ 외부온도로 인해 변질 될 수 있으니 배달완료 즉시 확인바랍니다.</div>
-                            ${depositNoticeLine}
-                            <div>✅ 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
-                        </div>
-                    </div>
+                    <ul class="cf-notes">
+                        <li>주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</li>
+                        <li>바깥 온도에 상할 수 있으니 배달이 끝나면 바로 확인해 주세요.</li>
+                        ${depositNoticeLine}
+                        <li>업체·물류 사정에 따라 일정이 바뀌거나 취소될 수 있습니다.</li>
+                    </ul>
                 `;
             } else {
                 noticeArea.innerHTML = `
-                    <div style="font-size: 12px; line-height: 1.5;">
-                        <div style="display: flex; flex-direction: column; gap: 2px; color: #4b5563;">
-                            <div>✅ 주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</div>
-                            <div>✅ 픽업기간(과일, 야채 등 신선식품)은 입고 당일까지이며, 이외 제품은 입고일 포함 3일(휴무일 제외) 가능합니다.</div>
-                            <div>✅ 픽업기간 이후에는 상시판매로 전환되어 픽업이 불가능합니다.</div>
-                            <div>✅ 업체 및 물류 상황에 따라 일정이 변경 또는 취소될 수 있습니다.</div>
-                        </div>
-                    </div>
+                    <ul class="cf-notes">
+                        <li>주문 후 주문서에서 상품이 내려가면 취소가 어렵습니다.</li>
+                        <li>과일·야채 같은 신선식품은 입고 당일까지, 그 밖의 상품은 입고일 포함 3일(휴무일 빼고)까지 찾아가실 수 있습니다.</li>
+                        <li>기간이 지나면 상시판매로 바뀌어 픽업할 수 없습니다.</li>
+                        <li>업체·물류 사정에 따라 일정이 바뀌거나 취소될 수 있습니다.</li>
+                    </ul>
                 `;
             }
 
@@ -11860,12 +12271,9 @@
 
             sortedDates.forEach(date => {
                 let groupHtml = `
-                    <div style="background: #fbfbfc; border: 1px solid #edf2f7; border-radius: 10px; margin-bottom: 15px; overflow: hidden;">
-                        <div style="font-size:12px; font-weight:900; color:#5a67d8; background:#ebf4ff; padding:8px 12px; border-bottom:1px solid #edf2f7; display:flex; align-items:center;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; opacity:0.7;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                            ${date}
-                        </div>
-                        <div style="padding: 10px 12px 10px 12px;">
+                    <div class="cf-group">
+                        <div class="cf-date">${date}</div>
+                        <div>
                 `;
 
                 // 배달비·배달비 차감은 상품 뒤에 오도록 맞춘다 (읽는 순서: 상품 → 배달비 → 차감)
@@ -11877,13 +12285,10 @@
                     // 대행료가 나눠떨어지지 않는 수량에서도 실제 청구액과 같도록 줄 합계를 그대로 쓴다
                     const sub = (p.lineTotal !== undefined) ? p.lineTotal : p.qty * parseInt(p.price || 0);
                     groupHtml += `
-                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px; padding: 8px 0; ${idx !== rows.length - 1 ? 'border-bottom: 1px dashed #e9ece3;' : ''}">
-                            <span style="color:var(--item-black); font-weight:800; flex:1; padding-right:10px; word-break:keep-all; line-height:1.2; white-space: pre-wrap;">${p.name.replace(/^(\[.*?\](?:\s*\[.*?\])*)/, '<span style="color:var(--nego-orange); font-size: 0.9em;">$1</span><br>')}${gOptionLinesHtml(p.optionText)}</span>
-                            <div style="display:flex; align-items:center; min-width:90px; justify-content:flex-end; flex-shrink:0;">
-                                <span style="color:#4f5b46; font-size:15px; font-weight:700; text-align:right;">${p.qty}개</span>
-                                <span style="color:#cbd0c2; font-size:0.75rem; margin:0 4px;">/</span>
-                                <span style="color:var(--item-black); font-weight:800; text-align:right;">${sub.toLocaleString()}원</span>
-                            </div>
+                        <div class="cf-row">
+                            <span class="cf-name">${p.name.replace(/^(\[.*?\](?:\s*\[.*?\])*)\s*/, '<span class="cf-lead">$1</span>')}${gOptionLinesHtml(p.optionText)}</span>
+                            <span class="cf-qty">${p.qty}개</span>
+                            <span class="cf-sub">${sub.toLocaleString()}원</span>
                         </div>`;
 
                     // [신규] 차감 줄만 보면 왜 빠지는지 알 수 없어서, 바로 밑에 이유를 적어 준다.
@@ -11898,13 +12303,7 @@
 
             const summary = document.getElementById('confirm-summary-area');
             summary.innerHTML = `
-                <div style="padding:10px; background:#fff9f2; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:16px; font-weight:800; color:var(--item-black);">최종 주문 합계</span>
-                    <div style="text-align:right;">
-                        <span style="font-size:13px; color:#676b5d; font-weight:700;">총 ${totalQty}개</span>
-                        <span style="font-size:19px; font-weight:900; color:var(--nego-orange); margin-left:8px;">${totalSum.toLocaleString()}원</span>
-                    </div>
-                </div>
+                <div class="cf-sum"><span>합계 <small>총 ${totalQty}개</small></span><b>${totalSum.toLocaleString()}원</b></div>
             `;
 
             const submitBtn = document.getElementById('btn-submit-order');
@@ -11965,6 +12364,8 @@
                 selectPickup();
                 return;
             }
+            const _shipSub = document.getElementById('ship-opt-delivery-sub');   // [ver3] 배달비는 설정값으로
+            if (_shipSub) _shipSub.textContent = `15,000원 이상 무료 · 아니면 ${Number(deliveryFee || 3000).toLocaleString()}원`;
             document.getElementById('shipping-overlay').style.display = 'flex';
             checkScrollLock();
         }
@@ -12150,7 +12551,7 @@
                     } else {
                         holidayTerm = "주말";
                     }
-                    const holidayMsg = `${holidayTerm}에 주문하신 상품은\n<span style='color:var(--nego-orange);'>다음 평일</span>에 배달됩니다.\n\n주문하시겠습니까?`;
+                    const holidayMsg = `${holidayTerm}에 주문하신 상품은\n<b>다음 평일</b>에 배달됩니다.\n\n주문할까요?`;
                     showSystemModal(holidayMsg, 'confirm', () => {
                         completeOrder(shippingMethod, extraItems, cutoffConfirmed, true);
                         return true;
@@ -12707,79 +13108,40 @@
             `;
 
             if (isFinal) {
-                // [4번 단계] 주문 완료 후 입금 안내 (계좌 + 금액만)
+                // [4번 단계] 주문 완료 후 입금 안내 — [ver3] 계좌번호 창과 같은 모양. 주황은 금액에만
+                const payBy = (currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? `${gTodayCloseWords()}까지` : '오늘 밤 12시까지';
                 msg += `
-                    <div><div class="final-success-badge">주문 완료</div><div style="font-size:18px; font-weight:800; color:var(--item-black);">주문이 정상적으로 접수되었습니다!</div></div>
-                    
-                    <div style="background:#fff9f2; padding:16px 14px; border-radius:12px; border:1px solid #ffe8cc; display:flex; flex-direction:column; gap:0;">
-                        <!-- 계좌 -->
-                        <div style="font-size:14px; font-weight:800; color:#8a7461; letter-spacing:0.02em;">카카오뱅크</div>
-                        <div style="font-size:26px; font-weight:900; color:var(--nego-orange); letter-spacing:-0.02em; white-space:nowrap; margin-top:2px;" id="bank-acc-num">3333-37-3410268</div>
-                        <div style="font-size:13px; font-weight:600; color:#9a8b7a; margin-top:3px;">예금주 : 강*민 (모켓)</div>
-                        <button onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')" style="align-self:center; margin-top:10px; padding:7px 18px; border:none; border-radius:8px; font-size:13px; font-weight:800; background:var(--nego-orange, #ff6b00); color:#fff; cursor:pointer; box-shadow:0 2px 6px rgba(255,107,0,0.28);">📋 계좌번호 복사</button>
+                    <div class="pg">
+                        <div class="pg-done">주문이 접수되었습니다</div>
+                        <div class="pg-amt-l">입금하실 금액</div>
+                        <div class="pg-amt">${displayTotal.toLocaleString()}원</div>
+                        <div class="pg-due"><b>${payBy}</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소됩니다.</div>
+                        ${overRefund > 0 ? `<div class="pg-refund">빼드릴 배달비가 이번 주문 금액보다 <b>${overRefund.toLocaleString()}원</b> 많습니다. 이전 주문을 아직 입금하지 않으셨다면 그 금액에서 빼고 보내 주시고, 이미 입금하셨다면 <b>${overRefund.toLocaleString()}원</b>을 돌려드립니다.</div>` : ''}
+                        ${extraItems.length > 0 ? `<div class="pg-extra">이전 주문 ${extraItems.filter(it => it.name !== '배달비').length}건도 같은 날 함께 배달됩니다. 위 금액은 이번 주문 금액입니다.</div>` : ''}
 
-                        <!-- 금액 -->
-                        <div style="border-top:1px dashed #ffdfc0; margin:14px 0 0; padding-top:14px;">
-                            <div style="font-size:13px; font-weight:700; color:#8a7461;">입금하실 금액</div>
-                            <div style="font-size:32px; font-weight:900; color:var(--item-black); letter-spacing:-0.02em; margin-top:2px;">
-                                ${displayTotal.toLocaleString()}원
-                            </div>
+                        <div class="pg-bank">
+                            <div class="v3-bank">카카오뱅크</div>
+                            <div class="v3-acct" id="bank-acc-num">3333-37-3410268</div>
+                            <div class="v3-holder">예금주 · 강*민 (모켓)</div>
+                            <button type="button" class="v3-btn v3-btn-main pg-copy" onclick="copyToClipboard('3333373410268', '계좌번호가 복사되었습니다.')">계좌번호 복사</button>
+                            <div class="v3-hint">입금자명을 <b>오픈채팅방 닉네임</b>과 같게 보내 주세요.</div>
                         </div>
-                        <!-- [수정] 배달비 차감 설명은 바로 앞 주문확인창에서 이미 읽었으므로 여기선 뺐다.
-                             다만 빼드릴 금액이 주문 금액보다 커서 돌려드릴 돈이 생기는 경우만 알린다. -->
-                        ${overRefund > 0 ? `
-                        <div style="font-size:12.5px; font-weight:700; color:#2e7d32; background:#f1fbf5; border:1px solid #cfe6d8; border-radius:8px; padding:8px 11px; margin-top:10px; line-height:1.6; word-break:keep-all; text-align:left;">
-                            빼드릴 배달비가 이번 주문 금액보다 <b>${overRefund.toLocaleString()}원</b> 많습니다. 이전 주문 입금 전이라면 그 금액에서 빼고 보내주시고, 이미 입금하셨다면 <b>${overRefund.toLocaleString()}원</b>을 환불해 드립니다.
-                        </div>
-                        ` : ''}
-                        ${extraItems.length > 0 ? `
-                        <div style="font-size:12.5px; font-weight:600; color:#9a8b7a; margin-top:8px; line-height:1.6; word-break:keep-all;">
-                            이전 주문 ${extraItems.filter(it => it.name !== '배달비').length}건도 같은 날 함께 배달됩니다.<br>위 금액은 <b style="color:#7a6a5a;">이번 주문 건</b>에 대한 금액입니다.
-                        </div>
-                        ` : ''}
 
-                        <!-- 입금 안내 -->
-                        <div style="border-top:1px dashed #ffdfc0; margin-top:14px; padding-top:12px; display:flex; flex-direction:column; gap:6px; word-break:keep-all;">
-                            <div style="font-size:15.5px; font-weight:800; color:var(--nego-orange); line-height:1.5;">
-                                ${(currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? `${gTodayCloseWords()}까지 입금 부탁드립니다.` : '당일 24시까지 입금 부탁드립니다.'}
-                            </div>
-                            <!-- [수정] 입금자명 안내는 사다드림만이 아니라 모든 입금 주문에 해당하므로 기본 안내로 뺐다 -->
-                            <div style="font-size:13.5px; font-weight:700; color:#8a7461; line-height:1.6;">
-                                입금자명을 <b style="color:var(--item-black);">닉네임과 같게</b> 보내주세요.
-                            </div>
-                            <div style="font-size:14.5px; font-weight:800; color:#d32f2f; line-height:1.5; margin-top:2px;">
-                                🚨 미입금시 주문이 자동으로 취소됩니다.
-                            </div>
-                        </div>
-                        <!-- [수정] 사다드림 안내·합배송 안내는 여기서 뺐다.
-                             계좌·금액·입금기한·차감·이전주문 안내가 이미 쌓여 있어 정보량이 너무 많았음.
-                             합배송은 푸터 칩·메뉴·배달비 확인창에서 계속 볼 수 있다. -->
-
-                        <!-- 주문 상품 내역 렌더링 -->
-                        <div style="border-top:1px dashed #e9ece3; padding-top:12px; margin-top:5px; text-align:left;">
-                            <div style="font-size:13px; font-weight:800; color:#4f5b46; margin-bottom:8px; text-align:center;">[ 주문 상품 내역 ]</div>
-                            <div style="display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto; padding-right:2px;">
-                                ${allItems.slice().sort((a, b) => {
-                                    // 이번 주문 상품 → 이전 주문(합배송) → 배달비 차감 순으로 읽히게 한다
-                                    const rank = (it) => (it.name === FEE_REFUND_NAME ? 2 : (it.isExtra ? 1 : 0));
-                                    return rank(a) - rank(b);
-                                }).map(it => {
-                                    if (it.name === "배달비") return '';
-                                    return `
-                                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; background:#f8f9fa; padding:6px 8px; border-radius:6px; border:1px solid #f1f3f5;">
-                                            <span style="font-weight:700; color:${it.isExtra ? '#8b9682' : 'var(--item-black)'}; flex:1; padding-right:10px; min-width:0;">
-                                                <span style="display:block; white-space:normal; word-break:keep-all; line-height:1.4;">
-                                                    ${it.isExtra ? '<span style="color:#8b9682; font-size:10px; margin-right:4px; font-weight:900;">[이전 주문]</span>' : ''}
-                                                    ${it.name}
-                                                </span>
-                                                ${gOptionLinesHtml(it.optionText, 11.5)}
-                                            </span>
-                                            <span style="font-weight:800; color:#676b5d; margin-right:10px; flex-shrink:0;">${it.qty}개</span>
-                                            <span style="font-weight:800; color:${it.isExtra ? '#b6bcac' : 'var(--nego-orange)'}; flex-shrink:0;">${(it.price * it.qty).toLocaleString()}원</span>
-                                        </div>
-                                    `;
-                                }).join('')}
-                            </div>
+                        <div class="pg-items">
+                            <div class="pg-items-t">주문 상품</div>
+                            ${allItems.slice().sort((a, b) => {
+                                // 이번 주문 상품 → 이전 주문(합배송) → 배달비 차감 순으로 읽히게 한다
+                                const rank = (it) => (it.name === FEE_REFUND_NAME ? 2 : (it.isExtra ? 1 : 0));
+                                return rank(a) - rank(b);
+                            }).map(it => {
+                                if (it.name === "배달비") return '';
+                                return `
+                                    <div class="pg-row${it.isExtra ? ' is-extra' : ''}">
+                                        <span class="pg-name">${it.isExtra ? '<span class="pg-tag">이전 주문</span>' : ''}${it.name}${gOptionLinesHtml(it.optionText, 11.5)}</span>
+                                        <span class="pg-qty">${it.qty}개</span>
+                                        <span class="pg-sub">${(it.price * it.qty).toLocaleString()}원</span>
+                                    </div>`;
+                            }).join('')}
                         </div>
                     </div>
                 `;
@@ -13404,7 +13766,7 @@
                     showPaymentGuide(allItems, name, phone, shippingMethod, true, { opt: cashReceipt, phone: receiptPhone, type: cashReceiptType });
                 } else {
                     // 방문픽업 등은 기존처럼 완료 알림만 표시
-                    showSystemModal("주문이 완료되었습니다!", 'alert', () => { gReloadKeepingView(); });
+                    showSystemModal(`<div class="sm-title">주문이 접수되었습니다</div>상품이 들어오는 날 매장에서 찾아가시면 됩니다.<br>주문내역에서 언제든 다시 볼 수 있어요.`, 'alert', () => { gReloadKeepingView(); });
                 }
 
                 setTimeout(() => loadData(), 2000);
