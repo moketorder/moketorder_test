@@ -1983,6 +1983,47 @@
             border-color: var(--item-black);
         }
 
+        /* ⑩ 주문내역 — 시안대로. 상자를 없애고, 상태 탭은 밑줄, 정렬은 작은 알약. */
+        #history-modal .date-btn {
+            background: #f1f4ec !important;
+            color: #8b9682 !important;
+            border: none !important;
+            font-size: 13px !important;
+            font-weight: 700 !important;
+            height: 30px !important;
+            border-radius: 999px !important;
+        }
+        #history-modal .date-btn.active {
+            background: var(--item-black) !important;
+            color: var(--white) !important;
+        }
+        /* 상태 탭(전체·입고·완료·취소)은 밑줄로 */
+        #history-modal .date-btn[id^="status-"] {
+            background: transparent !important;
+            color: #8b9682 !important;
+            border-radius: 0 !important;
+            height: 38px !important;
+            font-size: 15px !important;
+            border-bottom: 2.5px solid transparent !important;
+        }
+        #history-modal .date-btn[id^="status-"].active {
+            background: transparent !important;
+            color: var(--item-black) !important;
+            border-bottom-color: var(--moket-green) !important;
+            font-weight: 800 !important;
+        }
+        /* 주문 카드는 상자가 아니라 줄로 나눈다 */
+        #history-list > div {
+            border: none !important;
+            border-left: none !important;
+            border-radius: 0 !important;
+            border-top: 1px solid #e2e8da !important;
+            margin-bottom: 0 !important;
+        }
+        #history-list > div:first-child { border-top: none !important; }
+        #history-list > div > div:first-child { background: transparent !important; padding: 14px 2px !important; }
+        #history-list > div > div:nth-child(2) { border-top: none !important; padding: 0 2px 14px 2px !important; }
+
         /* ⑨ 아래 장바구니·주문하기 줄 — 단추가 화면을 너무 많이 먹었다.
               높이 55→46px, 글씨 21→17px. 위 '총 N개 선택'과 무료배달 안내도 한 단계씩 줄인다. */
         .main-reset-btn, .main-submit-btn {
@@ -2467,7 +2508,7 @@
             </div>
             <div style="padding: 0 14px 0 14px; flex-shrink: 0;">
                 <div
-                    style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; border-bottom: 1.5px solid #e9ece3; padding-bottom: 8px;">
+                    style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-bottom: 10px; border-bottom: 1px solid #e2e8da; padding-bottom: 0;">
                     <button class="date-btn active" id="status-all" onclick="filterStatus('all')"
                         style="height:32px; font-size:17px; padding:0; font-weight:900;">전체</button>
                     <button class="date-btn" id="status-stocked" onclick="filterStatus('stocked')"
@@ -7328,12 +7369,12 @@
                        한 주문에 배달 날짜가 하나뿐이라 카드가 늘 한 장씩만 생겨,
                        테두리 안에 테두리가 겹쳐 보이기만 했다.
                        날짜 줄은 그대로 두고 상자만 걷어낸다. */
+                    /* [ver3] '[픽업/배달 예정일] 2026. 10. 1.' 줄은 뺐다.
+                       카드 머리 요약('배달 · 2건 · 10월 1일 받음')에 같은 내용이 이미 있다.
+                       한 주문에 날짜 묶음이 둘 이상일 때만 어느 날 것인지 작게 적는다. */
                     htmlBuffer += `
-                        <div style="margin-bottom: 12px;">
-                            <div style="font-size: 15px; font-weight: 800; color: var(--nego-orange); margin-bottom: 8px; display: flex; align-items: center; border-bottom: 1px solid #e9ece3; padding-bottom: 6px;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px; opacity:0.6;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                                <span style="font-size: 0.8em; opacity: 0.8; margin-right: 4px;">[픽업/배달 예정일]</span> ${pDisp}
-                            </div>
+                        <div style="margin-bottom: 10px;">
+                            ${sortedPKeys.length > 1 ? `<div style="font-size: 12.5px; font-weight: 700; color: #8b9682; margin: 4px 0 6px;">${pDisp}</div>` : ''}
                     `;
 
                     items.forEach((order, idx) => {
@@ -7364,13 +7405,12 @@
                         const isBadgeTarget = isDeliveryItem || isSadaItem || gIsFeeRow(order.item);
                         const isPaid = (order.paid === true || order.paid === "true" || String(order.paid).toUpperCase() === "TRUE");
 
-                        let payBadgeHtml = '';
+                        /* [ver3] 입금 여부와 진행 상태가 딱지 + 글자로 두 줄을 먹었다.
+                           시안처럼 오른쪽에 작은 글씨 한 줄로 합친다. 색으로만 갈라 준다. */
+                        let payText = '', payColor = '';
                         if (isBadgeTarget && !isCancelled && !isCombined) {
-                            if (isPaid) {
-                                payBadgeHtml = `<span style="padding: 2px 7px; background: #e8f5e9; color: #2e7d32; border: 1px solid #c5e0b4; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">입금완료</span>`;
-                            } else {
-                                payBadgeHtml = `<span style="padding: 2px 7px; background: #ffd8d8; color: #d32f2f; border: 1px solid #ffb8b8; border-radius: 5px; font-size: 11px; font-weight: 800; display: inline-block;">미입금</span>`;
-                            }
+                            payText = isPaid ? '입금완료' : '미입금';
+                            payColor = isPaid ? '#3d8f19' : '#d32f2f';
                         }
 
                         htmlBuffer += `
@@ -7386,10 +7426,9 @@
                                             <div style="font-size:13px; font-weight:700; color:var(--item-black);">${parseInt(order.total || 0).toLocaleString()}원</div>
                                         </div>
                                     </div>
-                                    <div style="text-align:right; min-width:80px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:3px;">
-                                        ${payBadgeHtml}
-                                        <!-- [수정] 위 목록과 같이, '배달완료'도 상태 글자를 적는다 -->
-                                        <div style="font-size:14px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>
+                                    <div style="text-align:right; min-width:70px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:2px;">
+                                        ${payText ? `<div style="font-size:12.5px; font-weight:700; color:${payColor};">${payText}</div>` : ''}
+                                        <div style="font-size:12.5px; font-weight:700; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>
                                         ${isProcessing ? `<div style="width:70px; height:26px; display:flex; align-items:center; justify-content:center; background:#f4f6f0; color:#8b9682; border-radius:4px; font-size:12px; font-weight:700;">대기중</div>` : ''}
                                     </div>
                                 </div>
