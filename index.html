@@ -1983,6 +1983,22 @@
             border-color: var(--item-black);
         }
 
+        /* ⑪ 손님 이름 — 시안처럼 딱지를 벗기고 글씨로만.
+              주황 상자에 담겨 있어 옆 글씨('님의 주문내역')와 따로 놀았다. */
+        .name-badge {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+            margin-right: 2px;
+            border-radius: 0;
+            font-weight: 800;
+        }
+        /* 주문내역 머리(초록 바탕)에서는 이름을 흰 글씨로 */
+        #history-modal-title .name-badge { color: var(--white); }
+        #history-modal-title { font-size: 17px !important; font-weight: 700 !important; letter-spacing: 0 !important; }
+        /* 옆 메뉴 인사말은 이름만 진하게 */
+        #menu-greeting { font-size: 17px; font-weight: 700; letter-spacing: 0; gap: 3px; }
+
         /* ⑩ 주문내역 — 시안대로. 상자를 없애고, 상태 탭은 밑줄, 정렬은 작은 알약. */
         #history-modal .date-btn {
             background: #f1f4ec !important;
@@ -8188,9 +8204,15 @@
                 console.log("새로고침: 모든 재고 잠금을 해제합니다.");
             }
 
+            /* [ver3 버그수정] 손님용 목록과 관리자용 목록을 서로 다른 칸에 담는다.
+               손님은 숨긴 상품을 뺀 목록(184개)을, 관리자 모드는 전부(351개)를 받는데
+               한 칸을 같이 쓰다 보니, 손님용이 담긴 채로 관리자 모드를 켜면 목록이 비어 보였다. */
+            const _cacheKey = (typeof isAdminMode !== 'undefined' && isAdminMode)
+                ? 'moket_products_cache_v3_admin' : 'moket_products_cache_v3';
+
             // 1. [로컬 캐시] 메모리에 데이터가 없을 때만 즉시 렌더링 (깜빡임 최소화)
             if (productsData.length === 0) {
-                const cachedData = localStorage.getItem('moket_products_cache_v3');
+                const cachedData = localStorage.getItem(_cacheKey);
                 if (cachedData) {
                     try {
                         /* [수정] 캐시에 빈 칸(null)이 섞여 있으면 아래 목록을 훑는 코드들이 통째로 터진다.
@@ -8203,7 +8225,7 @@
                     } catch (e) {
                         console.error("캐시 로드 실패:", e);
                         // 캐시가 깨져 있으면 버린다. 안 버리면 다음 접속에도 같은 오류가 되풀이된다.
-                        try { localStorage.removeItem('moket_products_cache_v3'); } catch (e2) {}
+                        try { localStorage.removeItem(_cacheKey); } catch (e2) {}
                         productsData = [];
                     }
                 }
@@ -8217,12 +8239,19 @@
             try {
                 // [신규 0.008KB 최적화] 파이어베이스 published_products_last_updated 시각 먼저 확인
                 let isProductsCacheValid = false;
-                const cachedProductsStr = localStorage.getItem('moket_products_cache_v3');
+                const cachedProductsStr = localStorage.getItem(_cacheKey);
                 const cachedTimestamp = localStorage.getItem('published_products_last_updated');
 
                 // [신규] 관리자 모드는 숨긴 상품까지 봐야 하므로 손님용 캐시를 쓰지 않는다
                 const _adminNow = (typeof isAdminMode !== 'undefined' && isAdminMode);
-                if (!force && !_adminNow && cachedProductsStr && cachedTimestamp) {
+                /* [ver3 버그수정] 시각만 보고 '최신'이라 믿던 것을 고친다.
+                   담긴 것이 빈 목록이어도 시각이 같으면 그대로 써서, 화면이 통째로 비어 버렸다.
+                   (다른 모드가 덮어썼거나 저장이 반쯤 끊긴 경우) 내용이 있는지도 함께 본다. */
+                const _cacheHasItems = (() => {
+                    try { const a = JSON.parse(cachedProductsStr || '[]'); return Array.isArray(a) && a.some(x => x && x.name); }
+                    catch (e) { return false; }
+                })();
+                if (!force && !_adminNow && _cacheHasItems && cachedTimestamp) {
                     try {
                         const tsRes = await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`).catch(() => null);
                         if (tsRes && tsRes.ok) {
@@ -8298,7 +8327,7 @@
                        (빠진 자리는 비워 둔다 — 자리가 밀리면 관리자 모드에서 엉뚱한 상품을 고치게 된다). */
                     publishedProducts = gToProductArray(pubData);
                     rawData = JSON.parse(JSON.stringify(publishedProducts));
-                    localStorage.setItem('moket_products_cache_v3', JSON.stringify(rawData));
+                    localStorage.setItem(_cacheKey, JSON.stringify(rawData));
 
                     const serverTsRes = await fetch(`${FIREBASE_DB_URL}published_products_last_updated.json`).catch(() => null);
                     if (serverTsRes && serverTsRes.ok) {
@@ -8539,7 +8568,7 @@
 
                     if (isDataChanged || force) {
                         productsData = freshData;
-                        localStorage.setItem('moket_products_cache_v3', JSON.stringify(productsData));
+                        localStorage.setItem(_cacheKey, JSON.stringify(productsData));
                         console.log(isDataChanged ? "데이터 변경됨: 화면 업데이트" : "강제 새로고침: 화면 업데이트");
                         processAndRender(productsData, false);
                         startImageCaching(productsData);
