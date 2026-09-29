@@ -2328,6 +2328,10 @@
         .item-deadline.is-urgent { color: #dc2626; }
         .item-badges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; flex: 1 1 auto; }
         .item-price-row .item-price-val { white-space: nowrap; flex: 0 0 auto; }   /* '13,800원~'의 ~가 떨어지지 않게 */
+        /* [ver3] 내릴 때 위쪽 고정 칸을 위로 숨긴다 (자리는 그대로, 움직임만) */
+        .sticky-header-group { transition: transform .22s ease; will-change: transform; }
+        .sticky-header-group.is-tucked { transform: translateY(-110%); }
+        @media (prefers-reduced-motion: reduce) { .sticky-header-group { transition: none; } }
     </style>
 </head>
 
@@ -5348,6 +5352,27 @@
             document.getElementById('delivery-guide-modal').style.display = 'flex';
             checkScrollLock();
         }
+
+        /* [ver3] 목록을 아래로 내리는 동안에는 위쪽 고정 칸(판매유형·분류·날짜·검색)을 위로 숨기고,
+           조금이라도 올리면 바로 다시 내려 보인다. 자리를 밀지 않고 transform 으로만 움직여서
+           (예전 '검색줄 감추기'처럼) 스크롤 위치가 되잡히며 떨리는 일이 없다.
+           검색칸에 글을 치는 중이거나 맨 위 근처에서는 숨기지 않는다. */
+        (function gHideStickyOnScroll() {
+            let last = window.scrollY, ticking = false;
+            const run = () => {
+                ticking = false;
+                const g = document.querySelector('.sticky-header-group');
+                if (!g) return;
+                const y = window.scrollY, dy = y - last;
+                const inp = document.getElementById('product-search-input');
+                const typing = inp && document.activeElement === inp;
+                if (typing || y < 260) g.classList.remove('is-tucked');
+                else if (dy > 6) g.classList.add('is-tucked');
+                else if (dy < -6) g.classList.remove('is-tucked');
+                if (Math.abs(dy) > 6) last = y;
+            };
+            window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(run); } }, { passive: true });
+        })();
 
         // [ver3] 알림창 글 다듬기 — 88곳에서 부르는 글을 한 자리에서 맞춘다
         //  · 맨 앞 '[픽업 서비스 안내]' 같은 대괄호 제목 → 창 제목 한 줄
