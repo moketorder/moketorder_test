@@ -30,13 +30,39 @@
 
     <!-- [임시] 모바일/카카오톡 에러 화면 표시기 -->
     <script>
+        /* [신규 2026-10-01] 아이폰(특히 카톡 안 브라우저)이 뒤로 보냈던 화면을 다시 열면 저장 공간(IndexedDB) 연결을 끊는다.
+           로그인 기억 기능이 다시 붙으려다 같은 오류를 수십 번 낸다. 고칠 것이 없는 아이폰 사정이라
+           오류 칸에는 남기지 않고, 손님에게 '새로고침' 안내를 한 번만 띄운다. */
+        function __gIsIdbLost(m) { return /Indexed ?Database|IndexedDB|IDBDatabase/i.test(String(m || '')); }
+        // [신규 2026-10-02] 아이폰이 서랍 작업을 한 번 중간에 닫은 것 — 연결은 살아 있어 저절로 다시 된다. 기록도 안내도 없이 넘긴다
+        function __gIsIdbHiccup(m) { return /without an in-progress transaction|TransactionInactiveError|transaction (?:has finished|is not active|was aborted)|database connection is closing/i.test(String(m || '')); }
+        function __gShowIdbRefresh() {
+            if (window.__gIdbShown) return;
+            window.__gIdbShown = true;
+            var show = function () {
+                var d = document.createElement('div');
+                d.style = 'position:fixed; left:12px; right:12px; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); z-index:999999; background:#16200f; color:#fff; border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:10px; font-size:14.5px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.25); font-family:inherit;';
+                d.innerHTML = '<span style="flex:1; min-width:0; line-height:1.45;">연결이 잠시 끊겼어요</span>'
+                    + '<button type="button" onclick="location.reload()" style="flex:0 0 auto; border:none; background:#4CAF20; color:#fff; font-weight:800; font-size:14px; padding:9px 14px; border-radius:9px; cursor:pointer;">새로고침</button>';
+                document.body.appendChild(d);
+            };
+            document.body ? show() : window.addEventListener('DOMContentLoaded', show);
+        }
         window.onerror = function(message, source, lineno, colno, error) {
+            if (__gIsIdbHiccup(message) || __gIsIdbHiccup(error && error.message)) return true;
+            if (__gIsIdbLost(message) || __gIsIdbLost(error && error.message)) { __gShowIdbRefresh(); return true; }
             var errDiv = document.createElement('div');
             errDiv.style = 'position:fixed; top:0; left:0; width:100%; background:#e53e3e; color:white; padding:15px; z-index:999999; font-family:monospace; font-size:12px; word-break:break-all; box-sizing:border-box; border-bottom:3px solid #c53030;';
             errDiv.innerHTML = '<strong>[JS ERROR]</strong> ' + message + '<br><small>Line: ' + lineno + ', Col: ' + colno + '<br>Source: ' + source + '</small>';
             document.body ? document.body.appendChild(errDiv) : document.documentElement.appendChild(errDiv);
+            // [신규 2026-10-01] 주문관리 '오류' 칸에도 남긴다 (기록 함수가 아직 안 읽혔으면 줄 세워 뒀다가 보낸다)
+            try { var _a = ['화면', error || { message: String(message) }, { line: '줄 ' + lineno + ':' + colno }]; window.gReportError ? window.gReportError.apply(null, _a) : (window.__gErrQ = window.__gErrQ || []).push(_a); } catch (e) { }
             return false;
         };
+        // [신규 2026-10-01] 놓친 비동기(Promise) 오류도 남긴다 — 손님 화면에는 띄우지 않는다
+        window.addEventListener('unhandledrejection', function (ev) {
+            try { var r = ev && ev.reason; if (__gIsIdbHiccup(r && r.message) || __gIsIdbHiccup(r)) return; if (__gIsIdbLost(r && r.message) || __gIsIdbLost(r)) { __gShowIdbRefresh(); return; } var _a = ['화면(비동기)', (r && r.message) ? r : { message: String(r) }, {}]; window.gReportError ? window.gReportError.apply(null, _a) : (window.__gErrQ = window.__gErrQ || []).push(_a); } catch (e) { }
+        });
     </script>
 
     <!-- [추가] 자동 업데이트 체크: 새 버전 배포 시 모바일에서 즉시 반영되도록 강제 새로고침 -->
@@ -142,6 +168,13 @@
             return signing;
         };
         window.gFirebaseHasUser = async function () { await wait(firstState, 3000); return !!auth.currentUser; };
+        // [신규 2026-10-01] 로그인 증표 속 번호 — 오류 기록(error_logs)은 이 번호로만 쓸 수 있다. 로그인 전이면 ''
+        window.gFirebasePhone = async function () {
+            await wait(firstState, 3000);
+            const u = auth.currentUser;
+            if (!u) return '';
+            try { return String((await u.getIdTokenResult()).claims.phone || ''); } catch (e) { return ''; }
+        };
         window.gFirebaseSignOut = function () { return auth.signOut().catch(() => { }); };
     })();
     </script>
@@ -1408,11 +1441,149 @@
             font-size: calc(var(--price-size) * 0.78);
         }
 
+        /* [신규 2026-10-02] '정상가'가 붙어 길어지면 덩어리째 다음 줄로 (글씨 중간에서 끊지 않는다) */
+        .item-orig-price { flex-wrap: wrap; row-gap: 2px; }
+        .item-orig-price > span { white-space: nowrap; }
+
         .item-orig-price .orig {
             font-size: 1em;
             font-weight: 700;
             color: #8b9682;
             text-decoration: line-through;
+        }
+
+        /* [신규 2026-10-02] 정상가 방식 — 최종 금액 앞 빨간 'n%' 딱지 (카드·상세보기 같이) */
+        /* 상자 높이 = 가격 글씨 높이(금액 글씨 크기의 약 0.84배), 아래 끝을 숫자 바닥에 맞춘다.
+           카드의 가격 줄에는 딱지용 '.item-price-row span { 12px !important }'가 있어 같은 힘(!important)으로 덮는다 */
+        .sale-pct, .item-price-row .item-price-val .sale-pct {
+            display: inline-block;
+            background: #e11d48;
+            color: #fff;
+            font-size: 0.68em !important;
+            font-weight: 900;
+            height: 1.24em;
+            line-height: 1.24em;
+            padding: 0 0.32em !important;
+            border-radius: 4px !important;
+            margin-right: 6px;
+            vertical-align: 0.2em;
+            letter-spacing: -0.02em;
+        }
+        .product-card.soldout .sale-pct { background: #8b9682; }
+
+        /* ===== [신규 2026-10-02] 목록 카드 — 한 줄에 두 개 (사장님 고른 D 시안)
+           사진(정사각형) 위 아래쪽에 딱지, 그 밑에 수식어·이름(두 줄까지)·별점·마감·금액, 맨 아래 수량·담기 ===== */
+        /* 상자로 감싸지 않고 얇은 줄로 칸만 나눈다 (가운데 세로줄 + 줄 사이 가로줄) — 사장님 요청 */
+        .card-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; padding: 0 0 6px !important; margin: 0 -14px; }   /* 화면 좌우 끝까지 (목록 판의 좌우 여백 14px를 걷는다) */
+        .card-grid > .product-card {
+            display: flex !important; flex-direction: column; min-width: 0;
+            padding: 0 0 14px !important; margin: 0 !important; border: none !important; border-radius: 0 !important;
+            border-bottom: 1px solid #eef1e9 !important; background: transparent !important; box-shadow: none !important;
+        }
+        .card-grid > .product-card:nth-child(odd) { border-right: 1px solid #eef1e9 !important; }
+        .card-grid > .product-card .thumb { border-radius: 0 !important; overflow: hidden; border: none !important; box-sizing: border-box; }   /* 사진은 칸 끝까지 꽉 (테두리 1px 때문에 화면이 옆으로 2px 넘치던 것도 막는다) */
+        .card-grid > .product-card .card-top { display: flex !important; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+        .card-grid > .product-card .thumb {
+            position: relative; width: 100% !important; height: auto !important; min-height: 0 !important; aspect-ratio: 1 / 1;
+            flex: 0 0 auto; grid-row: auto !important; grid-column: auto !important;
+        }
+        .card-grid > .product-card .thumb img { object-fit: cover !important; }
+        .card-grid .thumb-notice { display: none !important; }
+        .card-grid .thumb-sale { top: auto !important; bottom: 0 !important; }   /* 딱지가 사진 위쪽에 오므로 할인 띠는 아래로 */
+        .thumb-badges { display: none; }
+        .card-grid .thumb-badges { display: flex; position: absolute; left: 6px; right: 6px; top: 6px; flex-wrap: wrap; gap: 4px; z-index: 2; pointer-events: none; }
+        .card-grid .thumb-badges span {
+            font-size: 11.5px !important; font-weight: 800 !important; padding: 3px 6px !important; border-radius: 6px !important;
+            background: rgba(255, 255, 255, 0.93) !important; line-height: 1.2 !important;
+        }
+        .card-grid .item-info-top { padding: 8px 10px 0; min-height: 0 !important; flex: 1 1 auto; display: flex; flex-direction: column; grid-column: auto !important; grid-row: auto !important; }
+        .card-grid .item-lead { font-size: 12px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-grid .item-name {
+            font-size: 15px !important; line-height: 1.35 !important;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .card-grid .item-rating { text-align: left; margin-top: 3px; font-size: 12.5px; }
+        .card-grid .item-rating .stars5 i { font-size: 13px; }
+        .card-grid .item-deadline { font-size: 12px; margin-top: 2px; }
+        .card-grid .item-orig-price { margin-top: auto; padding-top: 6px; justify-content: flex-start; font-size: 12.5px; margin-bottom: 0; }
+        .card-grid .item-price-row { margin-top: 2px; justify-content: flex-start; }
+        .card-grid .item-info-top { justify-content: flex-start !important; }
+        .card-grid .item-info-top > .item-price-row { margin-top: auto; padding-top: 6px; }
+        .card-grid .item-info-top > .item-orig-price + .item-price-row { margin-top: 0 !important; padding-top: 0; }
+        .card-grid .item-price-val { font-size: 19px !important; }
+        .card-grid .item-controls-bottom-v { padding: 8px 10px 0; gap: 6px !important; grid-column: auto !important; grid-row: auto !important; }
+        .card-grid .item-controls-bottom-v .qty-stepper.wide { flex: 0 0 auto; height: 36px !important; padding: 2px; }
+        .card-grid .item-controls-bottom-v .qty-stepper.wide .qty-step-btn { width: 24px; height: 32px; font-size: 15px; }
+        .card-grid .item-controls-bottom-v .qty-stepper.wide .qty-sel { width: 20px; flex: 0 0 20px; font-size: 14px; }
+        .card-grid .item-controls-bottom-v .btn-add-cart { height: 36px !important; font-size: 14px !important; padding: 0 4px; }
+        .card-grid .item-controls-bottom-v .qty-group { min-width: 0; }
+
+        /* [신규 2026-10-02] 후기 쓰기 */
+        .rv-item { font-size: 15px; font-weight: 800; color: #16200f; line-height: 1.4; margin-bottom: 10px; word-break: keep-all; }
+        .rv-stars { display: flex; gap: 6px; margin-bottom: 12px; }
+        .rv-stars { align-items: center; }
+        .rv-stars button { position: relative; border: none; background: none; padding: 0; font-size: 34px; line-height: 1; cursor: pointer; color: #dfe4d8; }
+        .rv-stars button::before { content: '★'; }
+        /* [수정 2026-10-02] 반 개도 고른다 — 별 왼쪽 반을 누르면 반 개, 오른쪽 반이면 한 개 */
+        .rv-stars button b { position: absolute; left: 0; top: 0; overflow: hidden; color: #f5b301; white-space: nowrap; pointer-events: none; }
+        .rv-stars button b::before { content: '★'; }
+        .rv-stars .rv-star-num { margin-left: 6px; font-size: 18px; font-weight: 800; color: #16200f; font-variant-numeric: tabular-nums; }
+        .rv-count { margin-top: 6px; font-size: 13px; font-weight: 700; color: #8b9682; text-align: right; }
+        .rv-count b { color: #3d8f19; }
+        /* [수정 2026-10-02] 상태 글자(픽업완료) 밑에 같은 결로 — 테두리 없이 옅은 초록 바탕의 작은 글자 */
+        .rv-write-btn { border: none; background: #eef7e8; color: #3d8f19; font-size: 12px; font-weight: 800; line-height: 1.2; padding: 4px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-family: inherit; }
+        .rv-write-btn::before { content: '✎ '; font-weight: 700; }
+        .rv-done { font-size: 12px; font-weight: 700; color: #a5ab9b; white-space: nowrap; padding: 4px 0; }
+        /* 카드 별점 · 상세 후기 · 내 포인트 */
+        /* 별 5개 — 회색 별 위에 노란 별을 반 개 단위 너비로 덮는다 */
+        .stars5 { display: inline-flex; gap: 1px; vertical-align: -1px; }
+        .stars5 i { position: relative; display: inline-block; font-style: normal; color: #dfe4d8; line-height: 1; }
+        .stars5 i::before { content: '★'; }
+        .stars5 i b { position: absolute; left: 0; top: 0; overflow: hidden; color: #f5b301; font-weight: inherit; white-space: nowrap; }
+        .stars5 i b::before { content: '★'; }
+        .item-rating { margin-top: 5px; text-align: right; font-size: 14px; font-weight: 700; color: #a5ab9b; }
+        .item-rating .cnt { margin-left: 3px; }
+        .detail-price-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .detail-price-row #detail-price { min-width: 0; }
+        .detail-rating { display: none; flex: 0 0 auto; margin-left: auto; text-align: right; font-size: 17px; font-weight: 700; color: #8b9682; cursor: pointer; white-space: nowrap; }
+        .detail-rating .cnt { margin-left: 4px; text-decoration: underline; text-underline-offset: 3px; }
+        .dr-wrap { margin-top: 22px; padding-top: 16px; border-top: 1px solid #eef1e9; scroll-margin-top: 12px; }
+        .dr-head { font-size: 16px; font-weight: 900; color: #16200f; margin-bottom: 10px; }
+        .dr-head .st { color: #f5b301; }
+        .dr-head span { color: #8b9682; font-weight: 700; font-size: 14px; margin-left: 4px; }
+        .dr-row { padding: 11px 0; border-bottom: 1px solid #f1f4ec; }
+        .dr-row:last-child { border-bottom: none; }
+        .dr-top { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #8b9682; }
+        .dr-top .st { color: #f5b301; font-size: 14px; letter-spacing: 1px; }
+        .dr-item { font-size: 12.5px; color: #a5ab9b; font-weight: 600; margin-top: 3px; }
+        .dr-text { margin-top: 5px; font-size: 15px; color: #16200f; line-height: 1.55; white-space: pre-wrap; word-break: keep-all; }
+        .dr-reply { margin-top: 7px; background: #f4f6f0; border-radius: 8px; padding: 8px 10px; font-size: 13.5px; color: #4f5b46; line-height: 1.5; }
+        .dr-reply b { color: #3d8f19; }
+        .dr-empty { font-size: 14px; color: #a5ab9b; font-weight: 600; padding: 6px 0; }
+        .dr-more { margin-top: 8px; width: 100%; border: 1px solid #e2e8da; background: #fff; border-radius: 9px; padding: 10px; font-weight: 800; color: #4f5b46; cursor: pointer; }
+        .pt-bal { font-size: 32px; font-weight: 900; color: #3d8f19; margin: 4px 0 8px; }
+        .pt-bal small { font-size: 15px; font-weight: 700; color: #8b9682; margin-left: 4px; }
+        .pt-list { margin-top: 14px; }
+        .pt-row { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f4ec; font-size: 14px; }
+        .pt-row .w { color: #4f5b46; font-weight: 700; min-width: 0; word-break: keep-all; }
+        .pt-row .w small { display: block; color: #a5ab9b; font-weight: 600; font-size: 12px; margin-top: 2px; }
+        .pt-row .a { font-weight: 900; white-space: nowrap; }
+        .pt-row .a.plus { color: #3d8f19; }
+        .pt-row .a.minus { color: #d32f2f; }
+        /* [수정 2026-10-02] 사장님이 보낸 그림처럼 — 숫자 높이를 넉넉히 감싸는 상자, 글씨는 굵게, 모서리는 살짝만 둥글게,
+           상자 가운데가 금액 가운데에 오게 (위 정의를 덮는다) */
+        .sale-pct, .item-price-row .item-price-val .sale-pct {
+            font-size: 0.66em !important;
+            font-weight: 800;
+            height: auto;
+            line-height: 1;
+            padding: 0.26em 0.62em 0.22em 0.34em !important;   /* 오른쪽은 사선으로 깎이는 만큼 더 띄운다 */
+            border-radius: 2px 0 0 2px !important;
+            /* 오른쪽 끝을 사선으로 깎는다 (위는 끝까지, 아래는 안쪽으로) — 사장님이 보낸 그림 모양 */
+            clip-path: polygon(0 0, 100% 0, calc(100% - 0.42em) 100%, 0 100%);
+            margin-right: 3px;
+            vertical-align: 0.24em;
+            letter-spacing: -0.01em;
         }
 
         .item-orig-price .off {
@@ -1456,6 +1627,9 @@
             pointer-events: none;
             backdrop-filter: blur(1px);
         }
+
+        /* [신규 2026-10-02] 사장님이 적은 문구 띠 — 사진이 좁아 길면 두 줄까지 접는다 */
+        .thumb-sale.txt { font-size: 13px; line-height: 1.3; padding: 4px 6px; word-break: keep-all; box-sizing: border-box; }
 
         .item-price-val {
             color: var(--nego-orange);
@@ -2138,6 +2312,9 @@
         }
         #menu-greeting .name-badge { color: #16200f; font-weight: 700; padding: 0; margin: 0 2px 0 0; background: none; }
         .sm-edit { display: inline-block; margin-top: 5px; font-size: 13px; font-weight: 600; color: #3d8f19; text-decoration: underline; cursor: pointer; }
+        .sm-pt { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding: 10px 12px; background: #f5faf0; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 700; color: #4f5b46; }
+        .sm-pt b { margin-left: auto; font-size: 16px; font-weight: 900; color: #3d8f19; font-variant-numeric: tabular-nums; }
+        .sm-pt .sm-arw { font-size: 15px; color: #a5ab9b; }
         .sm-sec { padding: 14px 18px 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; color: #8b9682; }
         .menu-list { padding: 0; }
         .menu-list li {
@@ -2177,9 +2354,9 @@
         .v3-btn i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
         .v3-btn-sub { color: #4f5b46; }
         .v3-btn-main { background: #4CAF20; border-color: #4CAF20; color: #fff; }
-        .v3-bank { font-size: 14px; font-weight: 700; color: #8b9682; }
+        .v3-bank { font-size: 17px; font-weight: 700; color: #4f5b46; }
         .v3-acct { margin-top: 3px; font-size: 26px; font-weight: 700; letter-spacing: -.5px; font-variant-numeric: tabular-nums; color: #16200f; }
-        .v3-holder { margin-top: 4px; font-size: 14.5px; font-weight: 600; color: #4f5b46; }
+        .v3-holder { margin-top: 6px; font-size: 17px; font-weight: 600; color: #16200f; }
         .v3-hint {
             margin-top: 12px; padding: 11px 13px; background: #eef7e7; border-radius: 8px;
             font-size: 14px; font-weight: 600; color: #3d8f19; line-height: 1.55; word-break: keep-all;
@@ -2246,8 +2423,19 @@
         .ship-opt-arw { font-size: 20px; color: #8b9682; }
 
         /* 주문 확인 */
-        .modal-content.confirm-sheet { max-width: 440px; display: flex; flex-direction: column; max-height: 92vh; text-align: left; }
+        /* [수정] 예전에는 상품 목록만 따로 스크롤하고 아래 안내·요청사항·버튼(450px 남짓)을 고정해 두어,
+           작은 폰에서는 상품 목록이 한 줄도 안 보일 만큼 눌렸다. 이제 창이 통째로 스크롤되고,
+           확인 체크와 버튼만 아래에 붙어 늘 보인다. 높이는 주소창을 뺀 실제 보이는 높이(dvh)로 잰다. */
+        .modal-content.confirm-sheet { max-width: 440px; display: block; max-height: 92vh; max-height: 92dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; text-align: left; }
+        .confirm-sheet .v3-sheet-top { position: sticky; top: 0; z-index: 2; background: #fff; }
+        #confirm-product-wrapper { flex: none !important; overflow: visible !important; }
+        #confirm-footer-area .cf-actions {
+            position: sticky; bottom: 0; z-index: 2; background: #fff;
+            margin: 0 -16px -16px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+            border-top: 1px solid #eef1e9; box-shadow: 0 -6px 12px rgba(22, 32, 15, .05);
+        }
         #confirm-header-area { padding: 14px 16px 0; }
+        #confirm-header-area::after { content: ''; display: block; height: 1px; background: #eef1e9; margin-top: 12px; }
         .cf-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; }
         .cf-who b { font-weight: 700; color: #16200f; }
         .cf-phone { color: #8b9682; font-weight: 500; font-size: 14px; }
@@ -2260,18 +2448,32 @@
         .cf-group { padding: 10px 0 4px; }
         .cf-group + .cf-group { border-top: 1px solid #eef1e9; }
         .cf-date { font-size: 13px; font-weight: 700; color: #3d8f19; margin-bottom: 2px; }
+        .cf-date-word { font-weight: 600; color: #8b9682; margin-left: 2px; }
+        .cf-merge-note { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12.5px; font-weight: 500; color: #4f5b46; word-break: keep-all; }
+        .cf-merge-note span { flex-shrink: 0; font-size: 11px; font-weight: 700; color: #fff; background: #3d8f19; padding: 2px 6px; border-radius: 5px; }
         .cf-row { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; }
         .cf-name { flex: 1; min-width: 0; font-weight: 600; color: #16200f; line-height: 1.4; word-break: keep-all; }
         .cf-lead { display: block; font-size: 12.5px; font-weight: 500; color: #8b9682; }
         .cf-qty { flex-shrink: 0; font-size: 14px; color: #8b9682; font-weight: 500; }
         .cf-sub { flex-shrink: 0; min-width: 72px; text-align: right; font-weight: 700; color: #16200f; font-variant-numeric: tabular-nums; }
-        #confirm-footer-area { padding: 0 16px 16px; border-top: 1px solid #e2e8da; }
-        #confirm-summary-area { margin: 0 0 4px !important; }
+        #confirm-footer-area { padding: 0 16px 16px; }
+        #confirm-summary-area { margin: 0 0 4px !important; border-top: 1px solid #eef1e9; }
         .cf-sum { display: flex; align-items: baseline; justify-content: space-between; padding: 12px 0; }
         .cf-sum span { font-size: 16px; font-weight: 700; color: #16200f; }
         .cf-sum small { font-size: 13px; font-weight: 500; color: #8b9682; margin-left: 4px; }
         .cf-sum b { font-size: 21px; font-weight: 700; color: var(--nego-orange); font-variant-numeric: tabular-nums; }
-        #confirm-notice-area { border-top: 1px solid #eef1e9 !important; padding-top: 10px !important; }
+        /* [신규 2026-10-02] 주문 확인 — 포인트 쓰기 */
+        .cf-pt { margin-top: 6px; padding: 10px 12px; background: #f5faf0; border: 1px solid #d9ecc9; border-radius: 10px; }
+        .cf-pt-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 800; color: #16200f; }
+        .cf-pt-top small { font-size: 13px; font-weight: 700; color: #3d8f19; }
+        .cf-pt-in { display: flex; gap: 6px; margin-top: 8px; }
+        .cf-pt-in input { flex: 1 1 auto; min-width: 0; height: 36px; padding: 0 10px; border: 1px solid #cfdcc3; border-radius: 8px; background: #fff; font-size: 15px; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+        .cf-pt-in button { flex: 0 0 auto; height: 36px; padding: 0 13px; border: none; border-radius: 8px; font-size: 14px; font-weight: 800; cursor: pointer; }
+        .cf-pt-in .all { background: #e4e9dc; color: #4f5b46; }
+
+        .cf-pt-used { display: flex; justify-content: space-between; margin-top: 8px; font-size: 14px; font-weight: 800; color: #3d8f19; font-variant-numeric: tabular-nums; }
+        .cf-pt-note { margin-top: 6px; font-size: 12.5px; font-weight: 700; color: #8b9682; text-align: right; }
+        #confirm-notice-area { border-top: 1px solid #e2e8da !important; margin: 0 -16px 12px !important; padding: 12px 16px 0 !important; }
         .cf-notes { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; font-weight: 500; color: #4f5b46; line-height: 1.5; word-break: keep-all; }
         .cf-notes > div { display: flex; gap: 10px; }
         .cf-notes > div > span:first-child { flex: 0 0 64px; font-weight: 700; color: #8b9682; font-size: 13px; }
@@ -2281,6 +2483,19 @@
         #order-note:focus { border-color: #4CAF20 !important; }
         #confirm-overlay label[for], #confirm-overlay label { font-weight: 600 !important; color: #16200f !important; }
         #confirm-footer-area .btn-common { height: 48px; font-size: 16px; }
+
+        /* 상세보기 아래 줄 — 폰에서도 닫기·수량·담기가 한 줄, 같은 높이로 */
+        .detail-foot {
+            padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+            border-top: 1px solid #eef1e9;
+            display: flex; flex-wrap: nowrap; align-items: stretch; gap: 8px;
+        }
+        .detail-foot > * { box-sizing: border-box; height: 46px; margin: 0 !important; min-width: 0; }
+        .detail-foot .btn-close { flex: 0 0 64px; width: 64px; font-size: 15px; padding: 0; }
+        .detail-foot .qty-stepper { flex: 0 0 auto; align-items: center; padding: 4px; gap: 0; border-radius: 10px; background: #f1f4ec; }
+        .detail-foot .qty-step-btn { width: 36px; height: 38px; font-size: 18px; border-radius: 8px; padding: 0; }
+        .detail-foot .qty-sel { width: 30px; height: 38px; font-size: 16px; }
+        .detail-foot #detail-add-btn { flex: 1 1 0; width: auto; font-size: 16px; font-weight: 700; border-radius: 10px; white-space: nowrap; }
 
         /* 입금 안내(주문 완료) */
         .pg { text-align: left; display: flex; flex-direction: column; }
@@ -2306,6 +2521,8 @@
         /* 2. 상품 이름은 낱말 단위로 넘긴다 ("272 ↵ g" 처럼 끊기지 않게) */
         .item-name, .item-lead { word-break: keep-all !important; overflow-wrap: anywhere; }
         .item-lead .lead-sale { color: #e11d48; }
+        .item-lead .lead-fresh { color: #047857; }
+        .item-lead .lead-br { color: var(--nego-orange); }
         /* 3. 검색창 옆 판매유형 딱지 — 바로 위 탭과 같은 말이라 뺀다 */
         #search-scope-label { display: none !important; }
         /* 6. 상세보기 사진 위 안내는 '예시 이미지'와 장수만 남긴다 */
@@ -2373,6 +2590,8 @@
         <div class="sm-who">
             <p id="menu-greeting"><span class="name-badge">주문자</span>님</p>
             <a class="sm-edit" onclick="openSideModal('profile-modal')">주문자 정보 고치기</a>
+            <!-- [신규 2026-10-02] 내 포인트 — '주문자 정보 고치기' 바로 밑 (사장님 요청). 누르면 쌓인·쓴 내역 -->
+            <div class="sm-pt" id="sm-pt" onclick="gOpenMyPoints()"><span>내 포인트</span><b id="menu-points"></b><span class="sm-arw">›</span></div>
         </div>
         <div class="sm-sec">가게</div>
         <ul class="menu-list">
@@ -2482,12 +2701,12 @@
         <div class="modal-content v3-sheet">
             <div class="v3-sheet-top"><b>매장 위치</b><button type="button" class="v3-x" onclick="closeModal('location-modal')" aria-label="닫기">✕</button></div>
             <div class="v3-pad">
-                <div class="v3-addr">경기 하남시 미사강변한강로 60-1<br>상가 106호</div>
+                <div class="v3-addr">경기 하남시 미사강변한강로 60-1<br>미사강변푸르지오2차 상가 106호</div>
                 <div class="v3-btn-row">
                     <a class="v3-btn" href="https://map.naver.com/v5/search/MOKET 모켓" target="_blank"><i style="background:#03C75A"></i>네이버지도</a>
                     <a class="v3-btn" href="https://map.kakao.com/link/search/MOKET 모켓" target="_blank"><i style="background:#FEE500"></i>카카오맵</a>
                 </div>
-                <div class="v3-btn-row"><button type="button" class="v3-btn v3-btn-sub" onclick="copyToClipboard('경기도 하남시 미사강변한강로 60-1, 상가 106호', '주소가 복사되었습니다.')">주소 복사</button></div>
+                <div class="v3-btn-row"><button type="button" class="v3-btn v3-btn-sub" onclick="copyToClipboard('경기도 하남시 미사강변한강로 60-1, 미사강변푸르지오2차 상가 106호', '주소가 복사되었습니다.')">주소 복사</button></div>
             </div>
         </div>
     </div>
@@ -2536,12 +2755,37 @@
             </div>
         </div>
     </div>
+    <!-- [신규 2026-10-02] 내 포인트 -->
+    <div id="points-modal" class="modal-overlay">
+        <div class="modal-content v3-sheet">
+            <div class="v3-sheet-top"><b>내 포인트</b><button type="button" class="v3-x" onclick="closeModal('points-modal')" aria-label="닫기">✕</button></div>
+            <div class="v3-pad">
+                <div class="pt-bal" id="pt-bal">-</div>
+                <div class="v3-sub v3-sub-note">상품을 받은 뒤 주문내역에서 후기를 쓰면 쌓여요 (글 50P · 20자 이상 100P). 1,000P부터 주문할 때나 매장 픽업할 때 쓸 수 있고, 받은 날부터 1년이 지나면 사라져요.</div>
+                <div class="pt-list" id="pt-list"></div>
+            </div>
+        </div>
+    </div>
+    <!-- [신규 2026-10-02] 후기 쓰기 — 주문내역에서 받은 상품마다 [후기 쓰기]로 연다 -->
+    <div id="review-modal" class="modal-overlay" style="z-index: 9000;">
+        <div class="modal-content v3-sheet">
+            <div class="v3-sheet-top"><b>후기 쓰기</b><button type="button" class="v3-x" onclick="closeModal('review-modal')" aria-label="닫기">✕</button></div>
+            <div class="v3-pad">
+                <div class="rv-item" id="rv-item"></div>
+                <div class="rv-stars" id="rv-stars"></div>
+                <textarea id="rv-text" class="v3-input" rows="4" maxlength="500" placeholder="맛·상태·양은 어땠나요? 다른 손님에게 큰 도움이 돼요" oninput="gReviewPaint()"></textarea>
+                <div class="rv-count" id="rv-count"></div>
+                <div class="v3-sub v3-sub-note">글을 쓰면 50P, 띄어쓰기 빼고 20자 이상이면 100P를 드려요. 1,000P부터 주문할 때 쓸 수 있어요.</div>
+                <div class="v3-btn-row"><button type="button" id="rv-send" class="v3-btn v3-btn-main" onclick="gSubmitReview()">등록</button></div>
+            </div>
+        </div>
+    </div>
     <div class="sticky-header-group">
         <!-- [신규] 배송 유형 대분류 탭 영역 -->
         <div class="delivery-type-tabs">
-            <button class="delivery-type-btn active" data-type="today" onclick="switchDeliveryType('today')">당일판매</button>
+            <!-- [수정 2026-09-30] 당일판매·예약판매를 '공동구매' 하나로 합쳤다 (안쪽 값은 reserve 그대로) -->
+            <button class="delivery-type-btn active" data-type="reserve" onclick="switchDeliveryType('reserve')">공동구매</button>
             <button class="delivery-type-btn" data-type="onsite" onclick="switchDeliveryType('onsite')">상시판매</button>
-            <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">예약판매</button>
         </div>
     </div>
     <!-- [ver3] 여기부터(분류·날짜·검색)는 고정하지 않는다 — 판매유형 안내처럼 내리면 함께 올라가 사라진다 -->
@@ -2596,23 +2840,26 @@
                     <h2 id="detail-title"
                         style="margin:0; font-size:22px; font-weight:800; letter-spacing: 1px; color:var(--item-black); white-space: pre-wrap;">
                     </h2>
-                    <div id="detail-price"
-                        style="color:var(--nego-orange); font-weight:900; font-size:22px; margin:10px 0;"></div>
+                    <!-- [신규 2026-10-02] 금액과 같은 줄 맨 오른쪽에 별점 (후기 수) — 누르면 아래 후기로 내려간다 -->
+                    <div class="detail-price-row">
+                        <div id="detail-price"
+                            style="color:var(--nego-orange); font-weight:900; font-size:22px; margin:10px 0;"></div>
+                        <div id="detail-rating" class="detail-rating" onclick="gScrollToReviews()"></div>
+                    </div>
                     <div id="detail-desc" style="white-space:pre-wrap; color:#4f5b46; font-size:17px; line-height:1.6;">
                     </div>
+                    <div id="detail-reviews"></div>
                 </div>
             </div>
             <!-- [ver3] 여기서 바로 담는다. 예전에는 닫기뿐이라 창을 닫고 목록에서 그 상품을 다시 찾아야 했다. -->
-            <div style="padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #eef1e9; display: flex; align-items: center; gap: 10px;">
-                <button class="btn-common btn-close" onclick="closeModal('detail-overlay')"
-                    style="margin-top: 0; flex: 0 0 72px; width: 72px; height: 44px; font-size: 15px;">닫기</button>
-                <div class="qty-stepper" id="detail-qty" style="flex: 0 0 auto; height: 44px;">
+            <div class="detail-foot">
+                <button class="btn-common btn-close" onclick="closeModal('detail-overlay')">닫기</button>
+                <div class="qty-stepper" id="detail-qty">
                     <button class="qty-step-btn" onclick="stepQty(this, -1)">-</button>
                     <input class="qty-sel" value="1" readonly>
                     <button class="qty-step-btn" onclick="stepQty(this, 1)">+</button>
                 </div>
-                <button id="detail-add-btn" class="btn-common btn-primary" onclick="addFromDetail(this)"
-                    style="flex: 1; height: 44px; font-size: 16px; font-weight: 800; border-radius: 8px;">담기</button>
+                <button id="detail-add-btn" class="btn-common btn-primary" onclick="addFromDetail(this)">담기</button>
             </div>
         </div>
     </div>
@@ -2683,7 +2930,9 @@
                         oninput="gPaintNoteCount()"
                         style="width:100%; box-sizing:border-box; padding:10px 12px; border:1.5px solid #d7dde3; border-radius:10px; font-size:14px; font-weight:700; font-family:inherit; line-height:1.5; resize:none; outline:none;"></textarea>
                 </div>
-                <label style="margin-bottom:15px; font-weight:700; font-size:14px; color:#4f5b46; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
+                <!-- [수정] 확인 체크와 버튼은 창 맨 아래에 붙여 둔다. 창이 통째로 스크롤돼도 늘 보인다 -->
+                <div class="cf-actions">
+                <label style="margin-bottom:12px; font-weight:700; font-size:14px; color:#4f5b46; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
                     <input type="checkbox" id="confirm-notice-check"
                         style="width:18px; height:18px; margin:0; cursor:pointer;">
                     <span>위 안내를 확인했어요</span>
@@ -2695,6 +2944,7 @@
                     <button id="btn-submit-order" class="btn-common btn-primary" onclick="startFinalOrderProcess()"
                         style="margin-top: 0; flex: 1;">주문확정</button>
                 </div>
+                </div>
             </div>
         </div>
     </div>
@@ -2705,7 +2955,7 @@
             <div class="v3-sheet-top"><b>받는 방법</b><button type="button" class="v3-x" onclick="closeModal('shipping-overlay')" aria-label="닫기">✕</button></div>
             <div class="v3-pad ship-opts">
                 <button id="btn-delivery-order" type="button" class="ship-opt" onclick="handleDeliveryOrderClick()">
-                    <span class="ship-opt-txt"><span class="ship-opt-t">배달</span><span class="ship-opt-s" id="ship-opt-delivery-sub">15,000원 이상 무료 · 아니면 3,000원</span></span>
+                    <span class="ship-opt-txt"><span class="ship-opt-t">배달</span><span class="ship-opt-s" id="ship-opt-delivery-sub">15,000원 이상 무료 · 미만 3,000원</span></span>
                     <span class="ship-opt-arw">›</span>
                 </button>
                 <button type="button" class="ship-opt" onclick="selectPickup()">
@@ -2889,7 +3139,7 @@
         let combinedDeliveryItems = [];
         let cutoffConfirmedStatus = false; // [추가] 11시 마감 안내 확인 여부
         let holidayConfirmedStatus = false; // [추가] 주말/공휴일 안내 확인 여부
-        let currentDeliveryType = 'today'; // [신규] 배송 유형 대분류 ('today' or 'reserve')
+        let currentDeliveryType = 'reserve'; // [수정 2026-09-30] 대분류 — 'reserve'(공동구매) 또는 'onsite'(상시판매). 'today'는 더 쓰지 않는다
         let currentMainTab = 'fruit-veg'; // [공동구매(reserve), 상시판매(on-site), 야채구매(vegetable)] - 당일배송 기본값인 과일로 시작
         let today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -3010,6 +3260,8 @@
                이 판단은 검색에도 쓰인다. 여기서 걸러 주지 않으면, 원래는 상시판매인 특가 상품이
                당일판매 검색에도(여기서 false) 상시판매 검색에도(할인 상품은 당일 모드에서만 보이므로)
                걸리지 않아 어디서도 찾을 수 없게 된다. */
+            // [수정 2026-09-30] 공동구매(당일+예약 합침)는 공동구매 목록에 들어가는 것 그대로
+            if (currentDeliveryType === 'reserve') return gGbVisible(p);
             if (gIsSaleToday(p)) return currentDeliveryType === 'today';
 
             if (currentDeliveryType === 'onsite') return !!gOnsiteTabCatOf(p);
@@ -3029,7 +3281,17 @@
         }
 
         function switchDeliveryType(type) {
+            if (type === 'today') type = 'reserve';   // [수정 2026-09-30] 당일판매는 공동구매로 합쳤다
             if (currentDeliveryType === type) return;
+            if (type === 'reserve' || type === 'onsite') {
+                currentDeliveryType = type;
+                currentMainTab = (type === 'onsite') ? ONSITE_CATS[0].key : 'gb-all';
+                window.gGbPickedDate = 'all';
+                initMainTabs();
+                processAndRender(productsData, true);
+                updateFooter();
+                return;
+            }
 
             // [신규] 당일구매와 예약구매는 함께 주문할 수 없으므로, 장바구니에 반대편 상품이 있으면
             //  담을 때가 아니라 '탭 진입' 자체를 막고 안내한다. (상시판매는 양쪽 모두와 함께 담을 수 있어 제한 없음)
@@ -3119,6 +3381,7 @@
                     deliveryType: currentDeliveryType,
                     mainTab: currentMainTab,
                     listKey: window.lastRenderedTargetKey || '',
+                    gbDate: window.gGbPickedDate || 'all',
                     at: Date.now()
                 }));
             } catch (e) { /* 저장 못 해도 기본 탭으로 열릴 뿐이라 무시 */ }
@@ -3166,13 +3429,17 @@
                     currentDeliveryType = _saved.deliveryType;
                     if (_saved.mainTab) currentMainTab = _saved.mainTab;
                     if (_saved.listKey) window.lastRenderedTargetKey = _saved.listKey;
-                } else if (gTodayClosedNow(now) || isHoliday) {
-                    currentDeliveryType = 'reserve';
-                    currentMainTab = 'reserve'; // 15시 이후, 휴무일에는 예약배송으로 유도
+                    if (_saved.gbDate) window.gGbPickedDate = _saved.gbDate;
                 } else {
-                    currentDeliveryType = 'today';
-                    currentMainTab = 'today-fruit'; // 평일 6시 ~ 15시 사이에는 당일배송으로 기본 시작
+                    // [수정 2026-09-30] 당일·예약을 합친 '공동구매'로 늘 시작한다
+                    currentDeliveryType = 'reserve';
+                    currentMainTab = 'gb-all';
                 }
+            }
+            // [신규 2026-09-30] 예전 값(당일판매·예전 공동구매 탭)은 합친 공동구매로 옮긴다
+            if (currentDeliveryType === 'today') currentDeliveryType = 'reserve';
+            if (currentDeliveryType === 'reserve' && !/^gb-/.test(String(currentMainTab)) && currentMainTab !== CHUSEOK_TAB) {
+                currentMainTab = (currentMainTab === 'sada') ? 'gb-sada' : 'gb-all';
             }
             
             // [수정] 코스트코 탭은 더 이상 쓰지 않는다. 예전에 그 탭을 보던 창이 남아 있으면 공동구매로 돌린다.
@@ -3335,15 +3602,21 @@
                 /* [수정] 사다드림 탭은 상품이 없어도 항상 노출 (공동구매 / 사다드림 두 칸 고정)
                    [신규] 추석선물은 철 따라 쓰는 칸이라, 그 탭으로 지정한 상품이 있을 때만 나온다.
                     철이 지나면 상품만 내리면 탭도 따라 사라진다. */
-                // [수정] 추석선물을 맨 앞에 둔다. 철에만 세우는 칸이라 그때는 그것부터 보여야 한다.
-                let html = gHasChuseokProduct()
-                    ? `<button class="main-tab-btn ${currentMainTab === 'chuseok' ? 'active' : ''}" data-tab="chuseok" onclick="switchMainTab('chuseok')">추석선물</button>`
-                    : '';
-                html += `
-                    <button class="main-tab-btn ${currentMainTab === 'reserve' ? 'active' : ''}" data-tab="reserve" onclick="switchMainTab('reserve')">공동구매</button>
-                    <button class="main-tab-btn ${currentMainTab === 'sada' ? 'active' : ''}" data-tab="sada" onclick="switchMainTab('sada')">사다드림</button>
-                `;
-                tabContainer.innerHTML = html;
+                /* [수정 2026-09-30] 공동구매(당일+예약 합침) — 위에 종류, 아래에 날짜.
+                   상품이 있는 종류만 탭을 세운다. 추석선물은 철에만 쓰는 칸이라 있을 때만 맨 뒤에 둔다.
+                   [수정 2026-09-30] 탭은 전체 · 과일 · 사다드림 · 일반 (사장님 요청) */
+                const _gbList = (typeof productsData !== 'undefined' ? productsData : []).filter(gGbVisible);
+                const _has = new Set(_gbList.map(gGbTabKind));
+                const _hasVeg = _gbList.some(p => gKindOf(p) === 'veg');
+                const _tabs = [['gb-all', '전체']];
+                // [수정 2026-09-30] 과일은 주력 상품이라 상품이 없어도 탭을 늘 세운다 (없을 때는 목록에 안내가 나온다)
+                _tabs.push(['gb-fruit', _hasVeg ? '과일·야채' : '과일']);
+                if (_has.has('sada')) _tabs.push(['gb-sada', '사다드림']);
+                if (_has.has('group')) _tabs.push(['gb-group', '일반']);
+                if (_has.has('chuseok')) _tabs.push([CHUSEOK_TAB, '추석선물']);
+                if (!_tabs.some(([k]) => k === currentMainTab)) currentMainTab = _tabs.length ? _tabs[0][0] : 'gb-all';
+                tabContainer.innerHTML = _tabs.map(([k, l]) =>
+                    `<button class="main-tab-btn ${currentMainTab === k ? 'active' : ''}" data-tab="${k}" onclick="switchMainTab('${k}')">${l}</button>`).join('');
             }
         }
 
@@ -3427,7 +3700,7 @@
                 // [수정] 문구를 짧게 다듬었다. 품절 안내의 빨간 강조는 그대로 둔다.
                 html = gTypeNoticeCard('', '상시판매', '#3d8f19', '#eef7e7', [
                     `늘 파는 상품이라 언제든 담으실 수 있어요`,
-                    `당일·예약 판매와 같이 주문하시면 함께 나가요`,
+                    `공동구매와 같이 주문하시면 함께 나가요`,
                     `<b style="color:#ff4d4d;">매장에서도 함께 판매해 품절될 수 있어요</b>`
                 ]);
             // [수정] 코스트코 구매대행 안내는 없앴다. (그 탭을 더 이상 쓰지 않음)
@@ -3435,7 +3708,7 @@
             //  예전에는 검색 중이면 감췄는데, 검색으로 사다드림을 찾아 바로 담는 손님은
             //  당일 입금·카드 불가 안내를 한 번도 못 보게 되는 문제가 있었다.
             //  (사다드림 탭은 목록이 비어 있어도 탭 자체가 사다드림이므로 항상 띄운다)
-            } else if (key === '사다드림' || hasSadaInList) {
+            } else if (key === '사다드림' || key.startsWith('gb:sada:') || (hasSadaInList && !key.startsWith('gb:'))) {
                 kind = 'sada';
                 // [수정] 입금 안내창에서 뺀 사다드림 안내(당일 입금·카드 불가)를 여기로 옮겼다.
                 //  상품을 고르는 시점에 알아야 하는 내용이라 목록 위가 더 맞는 자리.
@@ -3459,16 +3732,23 @@
                     `<b style="color:#3d8f19;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
                     `${isSundayAsWeekday ? "휴무일은 쉬어요" : "일요일·휴무일은 쉬어요"}`
                 ]);
+            } else if (key.startsWith('gb:fruit:')) {
+                kind = 'fruit';
+                // [신규 2026-09-30] 공동구매 › 과일 탭 안내 — 예전 당일판매(과일) 안내를 바탕으로 쓴다
+                html = gTypeNoticeCard('', '과일', '#3d8f19', '#eef7e7', [
+                    `<b style="color:#3d8f19;">매일 새벽시장</b>에서 신선하고 당도 좋은 것만 골라와요`,
+                    `오늘 과일은 <b style="color:#3d8f19;">${gTodayCloseWords()}</b>까지 주문하면 <b style="color:#3d8f19;">오후 6시</b> 전에 받을 수 있어요`,
+                    `${isSundayAsWeekday ? "공휴일은 쉬어요" : "일요일·공휴일은 쉬어요"}`
+                ]);
             } else if (currentDeliveryType === 'reserve') {
                 kind = 'reserve';
-                // [신규] 예약판매 특징
-                // [수정] 문구를 짧게 다듬었다. 합배송 안내의 강조는 그대로 둔다.
-                html = gTypeNoticeCard('', '예약판매', '#3d8f19', '#eef7e7', [
-                    `정해진 날짜에 입고되는 상품들이에요`,
-                    `위에 날짜를 고르시면 그날 상품만 보여요`,
+                // [수정 2026-09-30] 당일판매·예약판매를 합친 공동구매 안내
+                html = gTypeNoticeCard('', '공동구매', '#3d8f19', '#eef7e7', [
+                    `상품마다 받는 날이 정해져 있어요`,
+                    `오늘 상품은 <b style="color:#3d8f19;">${gTodayCloseWords()}</b>까지 주문하면 오늘 받아요`,
                     `여러 날짜를 같이 담으면 <b style="color:#3d8f19;">가장 늦은 날로 합배송</b>돼요`,
-                    `신선식품은 무조건 해당 날짜에 픽업/배송돼요`
-                ]);
+                    `신선식품·사다드림은 해당 날짜에 픽업/배송돼요`
+                ]);   // [수정 2026-10-02] '사다드림은 카드 결제가 안 돼요' 줄은 공동구매 안내에서 뺐다 — 사다드림 안내에만 둔다 (사장님 요청)
             }
 
             // [수정] 접었다 펴는 처리를 모두 없앴다. 안내는 sticky 헤더 밖에 있어 스크롤하면
@@ -4064,7 +4344,7 @@
 
             // [신규] 장바구니 상품의 배달 기준일 계산하여 해당 일자에 기존 주문이 있는지 확인
             let targetDateObj = new Date(now);
-            if (currentDeliveryType === 'reserve' || gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);
+            if (gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);   // [수정 2026-09-30] 공동구매에 오늘 상품이 있어 탭으로 가르지 않는다
 
             while (true) {
                 const chkDay = targetDateObj.getDay();
@@ -4200,7 +4480,7 @@
             //  - 배달비 자체와 사다드림 금액은 기준에서 뺀다.
             //  - 픽업 주문은 배달과 상관없으므로 뺀다. (같은 날이라도 차가 나가는 것과 무관)
             const sumFreeShipBase = (items) => items.reduce((acc, it) => {
-                if (gIsFeeRow(it.item)) return acc;   // 배달비·배달비 차감은 상품 금액이 아니다
+                if (gIsFeeRow(it.item) || gIsPointRow(it.item)) return acc;   // 배달비·배달비 차감·포인트는 상품 금액이 아니다
                 if (gIsSadaOrder(it)) return acc;
                 if (!String(it.shippingMethod || "").includes("배달")) return acc;
                 return acc + parseInt(it.price || 0) * parseInt(it.qty || 0);
@@ -4321,9 +4601,9 @@
                     showSystemModal(
                         feeModal(
                             `배달 최소주문금액 미달`,
-                            feeRow('사다드림 주문금액', sadaTotal) + feeRow('예약판매 주문금액', reserveTotal),
+                            feeRow('사다드림 주문금액', sadaTotal) + feeRow('공동구매 주문금액', reserveTotal),
                             feeNote('사다드림 상품 금액은 무료배달 기준 금액(<b style="color:var(--nego-orange);">15,000원</b>)에 <b style="color:#16200f;">포함되지 않아요</b>.'),
-                            `사다드림과 예약판매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
+                            `사다드림과 공동구매는 배송일이 달라 배달비가 각각 붙습니다.<br>` +
                             `<span style="display:block; text-align:center; margin-top:8px;">배달비 ${feeAmount(deliveryFee)} × 2 = ${feeAmount(deliveryFee * 2)}</span>`
                         ),
                         'confirm',
@@ -4503,7 +4783,7 @@
             let msg = "";
  
             // [신규] 예약배송 모드일 때는 마감 시각 조건 없이 예약배송용 배달안내 팝업을 우선 활성화
-            if (currentDeliveryType === 'reserve') {
+            if (gHasFutureReserveInCart()) {   // [수정 2026-09-30] 뒷날 상품이 있을 때만
                 showModal = true;
                 msg = `<div class="sm-title">합배송 안내</div>담으신 상품 중 가장 늦은 입고일에 한 번에 배달됩니다.${maxDateStr ? `<br>배달 예정일 <b>${maxDateStr}</b>` : ''}`;
             } else if (gTodayAfterClose(new Date())) {
@@ -4539,7 +4819,7 @@
             function checkCombinedDelivery(noticeHtml) {
                 // [신규] 장바구니 상품의 배달 기준일 계산
                 let targetDateObj = new Date(now);
-                if (currentDeliveryType === 'reserve' || gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);
+                if (gTodayAfterClose(new Date())) targetDateObj.setDate(targetDateObj.getDate() + 1);   // [수정 2026-09-30] 공동구매에 오늘 상품이 있어 탭으로 가르지 않는다
 
                 while (true) {
                     const chkDay = targetDateObj.getDay();
@@ -4584,7 +4864,7 @@
 
                 let body = noticeHtml || "";
                 // 배달비·배달비 차감 줄은 상품이 아니므로 합배송 목록에는 넣지 않는다
-                const pendingGoods = pendingItems.filter(it => !gIsFeeRow(it.item));
+                const pendingGoods = pendingItems.filter(it => !gIsFeeRow(it.item) && !gIsPointRow(it.item));
                 if (pendingGoods.length > 0) {
                     const itemNames = pendingGoods.map(it => `• ${it.item} (${it.qty}개)`).join('<br>');
                     // 앞에 붙은 안내가 없으면 이 목록만으로도 무슨 창인지 알 수 있게 제목을 세운다
@@ -4665,7 +4945,7 @@
 
             // [수정] 13시 마감 보정 팝업(과일, 야채, 기타 한정 경고) 전면 제거로 즉시 주문 확인으로 직진
             // 단, 예약배송 모드일 때는 픽업 서비스 안내 팝업을 우선 활성화
-            if (currentDeliveryType === 'reserve') {
+            if (gHasFutureReserveInCart()) {   // [수정 2026-09-30] 뒷날 상품이 있을 때만
                 const msg = `<span style="display:block;">[픽업 안내]</span>상품마다 입고일에 맞춰 찾아가실 수 있습니다.<br><br>주문할까요?`;
                 showSystemModal(msg, 'confirm', () => {
                     cutoffConfirmedStatus = true;
@@ -4703,12 +4983,33 @@
             return String((el && el.value) || '').trim().slice(0, 100);
         }
 
-        function startFinalOrderProcess() {
+        // [신규] 로그인 증표가 풀려 서버가 주문을 거절한 경우(401·권한 없음)
+        function gIsLoginErr(err) {
+            return /\b40[13]\b|Permission denied|LOGIN_EXPIRED/i.test(String((err && err.message) || err || ''));
+        }
+        function gShowLoginExpired() {
+            showSystemModal('로그인이 풀렸어요.\n카카오 로그인을 한 번 다시 해 주세요.', 'alert', () => {
+                closeModal('confirm-overlay');
+                gOpenLoginForced();
+            });
+        }
+
+        async function startFinalOrderProcess() {
             const noticeCheck = document.getElementById('confirm-notice-check');
             if (noticeCheck && !noticeCheck.checked) {
                 showSystemModal("안내 내용을 확인하신 후 동의해주세요.", 'alert');
                 return;
             }
+            /* [신규] 주문을 넣기 직전에 로그인 증표를 확인한다.
+               증표가 풀린 손님(오래 켜 둔 화면, 사파리가 저장 자료를 지운 경우 등)은 상품은 보이지만
+               주문은 서버가 401로 거절해 '재고 반영 실패 401'이라는 알아듣기 힘든 말만 떴다.
+               풀렸으면 조용히 다시 받고, 그래도 안 되면 카카오 로그인을 다시 하게 한다. */
+            try {
+                if (localStorage.getItem('kakao_original_name') && typeof gFirebaseHasUser === 'function' && !(await gFirebaseHasUser())) {
+                    const r = await gFirebaseKakaoSignIn(localStorage.getItem('kakao_original_phone') || '');
+                    if (r !== 'ok') { gShowLoginExpired(); return; }
+                }
+            } catch (e) { console.warn('주문 전 로그인 확인 실패:', e); }
             // 전역 변수 cutoffConfirmedStatus와 holidayConfirmedStatus를 전달
             completeOrder(selectedShippingMethod, combinedDeliveryItems, cutoffConfirmedStatus, holidayConfirmedStatus);
         }
@@ -5028,7 +5329,8 @@
         function gIsClosedProduct(p) {
             if (!p) return false;
             if (gIsExpiredProduct(p)) return true;   // 노출일정의 마감 시각이 지났다
-            const k = fGetAdjKey(p.matchKey || p.date, p.name);
+            if (gIsTodayGbClosed(p)) return true;    // [신규 2026-09-30] 오늘 상품인데 당일 마감시각이 지났거나 휴무일
+            const k = fGetAdjKey(p.matchKey || p.date, p.name, p.sid);
             return gClosedMap[k] === true || gClosedMap[encodeURIComponent(k)] === true;
         }
 
@@ -5063,7 +5365,7 @@
             return { today: false, urgent: false, html: `${d.getMonth() + 1}/${d.getDate()}(${W}) ${clock} 마감 · <b>${dayDiff}일 남음</b>` };
         }
         function gDeadlineHtml(p, closed) {
-            const t = gExpireAt(p);
+            const t = gExpireAt(p) || gTodayGbCloseAt(p);   // [신규 2026-09-30] 오늘 상품은 당일 마감시각까지 카운트다운
             if (!t || closed) return '';
             const x = gDeadlineText(t);
             return `<div class="item-deadline${x.today ? ' is-today' : ''}${x.urgent ? ' is-urgent' : ''}" data-exp="${t}">${x.html}</div>`;
@@ -5111,7 +5413,34 @@
             } catch (e) { return false; }
         }
 
-        function fGetAdjKey(mKey, name) {
+        /* [수정 2026-10-02] 재고 열쇠 = 상품 노출번호(sid). 주문관리에서 픽업일을 바꿔도 재고·마감이 그대로 따라간다.
+           부르는 쪽은 예전처럼 (날짜·분류, 이름)을 넘기고, 받아 둔 상품 목록(gSidIndex)에서 그 상품의 노출번호를 찾는다.
+           번호가 없는 상품(주문관리가 아직 안 옮긴 것)은 예전 열쇠 '날짜_이름'을 그대로 쓴다. sid 를 직접 넘기면 그것을 쓴다.
+           ※ 주문관리가 이 글자(gSidIndex)가 올라간 것을 보고서야 재고를 옮긴다 — 이름을 바꾸지 말 것 */
+        let gSidIndex = new Map();   // '이름|날짜' → 노출번호
+        function gSidNormMk(mKey) {
+            const s = String(mKey || '').trim();
+            const m = s.match(/^(\d{2,4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})$/);
+            if (!m) return s;
+            const y = m[1].length === 2 ? '20' + m[1] : m[1];
+            return `${y}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+        }
+        function gBuildSidIndex(list) {
+            const map = new Map();
+            (Array.isArray(list) ? list : []).forEach(p => {
+                if (!p || !p.sid || !p.name) return;
+                const k = String(p.name).trim() + '|' + gSidNormMk(p.matchKey || p.date);
+                if (!map.has(k)) map.set(k, String(p.sid));
+                const k2 = String(p.name).trim() + '|' + gSidNormMk(p.date || p.matchKey);   // 날짜로 불러도 찾게
+                if (!map.has(k2)) map.set(k2, String(p.sid));
+            });
+            gSidIndex = map;
+        }
+        function fGetAdjKey(mKey, name, sid) {
+            const direct = String(sid || '').trim();
+            if (direct) return direct;
+            const found = gSidIndex.get(String(name || '').trim() + '|' + gSidNormMk(mKey));
+            if (found) return found;
             const s = String(mKey || "").trim();
             return fSafeKey(s) + "_" + fSafeKey(name);
         }
@@ -5349,9 +5678,8 @@
                 `<p>따로 주문해도 받는 날이 같으면 함께 나갑니다. 합쳐서 <b>15,000원</b>이 넘으면 먼저 낸 배달비를 돌려드립니다.</p>` +
                 `<p>매장 픽업은 상품이 들어온 날마다 따로 찾아가시면 됩니다.</p></div>` +
                 (forFold ? '' : `<div class="v3-grp"><h4>판매 방식</h4>` +
-                `<p class="kv"><span class="k">당일판매</span><span>${daysStr} <b>${gTodayCloseWords()}</b>까지 주문하면 그날 받습니다</span></p>` +
-                `<p class="kv"><span class="k">예약판매</span><span>정해진 날짜에 들어오는 상품입니다</span></p>` +
-                `<p class="kv"><span class="k">상시판매</span><span>늘 파는 상품이라 어느 쪽에 담아도 함께 나갑니다</span></p></div>`);
+                `<p class="kv"><span class="k">공동구매</span><span>상품마다 받는 날이 정해져 있습니다. 오늘 상품은 ${daysStr} <b>${gTodayCloseWords()}</b>까지 주문하면 그날 받습니다</span></p>` +
+                `<p class="kv"><span class="k">상시판매</span><span>늘 파는 상품이라 공동구매와 같이 담아도 함께 나갑니다</span></p></div>`);
         }
 
         function showCombinedDeliveryGuide() {
@@ -5402,7 +5730,74 @@
         }
 
         // [시스템 모달]
+        /* [신규 2026-10-01] 손님 화면 오류를 error_logs/{날짜}/{번호} 에 남긴다 — 주문관리 가게 관리 > 오류 칸에서 본다.
+           (10/1 배달 주문이 저장된 뒤 오류가 났는데 손님이 캡처를 보내기 전엔 알 길이 없었다)
+             · 카카오 로그인한 손님만 — 규칙이 자기 번호로만 쓰게 한다. 로그인 전 오류는 남지 않는다
+             · 손님 화면은 절대 막지 않는다. 뒤에서 보내고, 실패해도 조용히 넘어간다
+             · 같은 오류가 1분 안에 다시 나면 새로 쓰지 않고 횟수만 올린다. 한 기기에서 하루 20건까지
+             · 인터넷이 끊겨 생긴 오류(Failed to fetch 등)와 내용 없는 'Script error.'는 남기지 않는다 */
+        const ERR_LOG_MAX_PER_DAY = 20;
+        const _gErrLast = {};   // '어디서|내용' → { path, count, at }
+        async function gReportError(where, err, extra) {
+            try {
+                if (isAdminMode) return;
+                const msg = String((err && err.message) || err || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+                if (!msg || /^Script error\.?$/i.test(msg) || /Failed to fetch|Load failed|NetworkError|network error|AbortError|ResizeObserver|Indexed ?Database|IndexedDB|in-progress transaction|TransactionInactiveError/i.test(msg)) return;   // [수정 2026-10-01] 아이폰 저장 공간 끊김은 남기지 않는다
+                const phone = (typeof window.gFirebasePhone === 'function') ? await window.gFirebasePhone() : '';
+                if (!phone) return;
+                const now = new Date(), day = gYmdOf(now), sig = `${where}|${msg}`;
+                const last = _gErrLast[sig];
+                if (last && now.getTime() - last.at < 60000) {
+                    last.count++; last.at = now.getTime();
+                    fetch(`${FIREBASE_DB_URL}error_logs/${last.path}.json`, {
+                        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count: last.count, lastAt: last.at })
+                    }).catch(() => { });
+                    return;
+                }
+                const capKey = 'moket_errlog_' + day;
+                const sent = parseInt(localStorage.getItem(capKey) || '0', 10) || 0;
+                if (sent >= ERR_LOG_MAX_PER_DAY) return;
+                localStorage.setItem(capKey, String(sent + 1));
+                const ua = navigator.userAgent || '';
+                const device = (/iPhone|iPad/.test(ua) ? '아이폰' : /Android/.test(ua) ? '안드로이드' : /Windows/.test(ua) ? '윈도우' : /Mac OS X/.test(ua) ? '맥' : '기타')
+                    + ' · ' + (/KAKAOTALK/i.test(ua) ? '카톡' : /SamsungBrowser/.test(ua) ? '삼성 인터넷' : /NAVER/.test(ua) ? '네이버' : /CriOS|Chrome\//.test(ua) ? '크롬' : /Safari\//.test(ua) ? '사파리' : '브라우저');
+                const x = extra || {};
+                const nameEl = document.getElementById('input-name');
+                const rec = {
+                    at: now.getTime(),
+                    phone,
+                    name: String((nameEl && nameEl.value) || '').slice(0, 40),
+                    where: String(where || '').slice(0, 40),
+                    msg,
+                    device,
+                    ver: String(document.lastModified || '').slice(0, 40),
+                    count: 1
+                };
+                if (x.line) rec.line = String(x.line).slice(0, 300);
+                if (err && err.stack) rec.stack = String(err.stack).split('\n').slice(0, 3).join(' / ').slice(0, 300);
+                if (x.saved !== undefined) rec.saved = !!x.saved;
+                if (x.ship) rec.ship = String(x.ship).slice(0, 20);
+                if (x.cart) rec.cart = String(x.cart).slice(0, 500);
+                const path = `${day}/${now.getTime()}_${Math.random().toString(36).slice(2, 7)}`;
+                _gErrLast[sig] = { path, count: 1, at: now.getTime() };
+                await fetch(`${FIREBASE_DB_URL}error_logs/${path}.json`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec)
+                });
+            } catch (e) { /* 기록 실패는 손님과 상관없다 */ }
+        }
+        // 장바구니를 한 줄로 (오류 기록용)
+        function gCartLineForLog() {
+            try { return Object.keys(cart).filter(k => cart[k] > 0).map(k => `${gCartName(k)}×${cart[k]}`).join(', '); } catch (e) { return ''; }
+        }
+        window.gReportError = gReportError;
+        (window.__gErrQ || []).splice(0).forEach(a => gReportError(a[0], a[1], a[2]));   // 이 함수가 읽히기 전에 난 오류
+
         function showSystemModal(msg, type, yesCallback, noCallback, isTight = false) {
+            // [신규 2026-10-01] 실패·오류 안내는 주문관리 오류 칸에도 남긴다 (주문 처리 오류는 catch 에서 장바구니까지 자세히 남기므로 뺀다)
+            try {
+                const _t = String(msg || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                if (/실패|오류/.test(_t) && !/^주문 처리 중 오류/.test(_t)) gReportError('안내창', _t);
+            } catch (e) { }
             const modal = document.getElementById('system-modal');
             const msgDiv = document.getElementById('sys-modal-msg');
             const btnDiv = document.getElementById('sys-modal-btns');
@@ -5568,10 +5963,362 @@
             }
         }
 
+        /* ===== [신규 2026-10-02] 상품 후기 · 포인트 =====
+           · 쓸 수 있는 줄 : 가게가 '픽업·배달완료·픽업완료'로 바꾼, 취소 안 된, 식별번호가 있는 상품 줄 (주문 한 줄에 후기 하나)
+           · 포인트(1P=1원) : 글 1~19자 50P · 20자 이상 100P — 띄어쓰기( )만 빼고 센다. 규칙관리와 똑같이 세야 저장된다
+           · 한 번에 같이 쓰는 것 : 후기 · 내 후기 표시(review_keys) · 상품 별점 합계 · (포인트가 있으면) 포인트 기록과 잔액 */
+        const REVIEW_DONE_STATUS = ['픽업', '배달완료', '픽업완료'];
+        window.gMyReviewKeys = null;   // { 주문키: true }
+        function gReviewPts(text) {
+            const n = String(text || '').replace(/ /g, '').length;
+            return n >= 20 ? 100 : (n >= 1 ? 50 : 0);
+        }
+        function gReviewPhone() { return normP(localStorage.getItem('kakao_original_phone') || ''); }
+        function gCanReview(o) {
+            return !!(o && o.__fbKey && String(o.productCode || '').trim() && REVIEW_DONE_STATUS.includes(String(o.status || ''))
+                && !isOrderCancelled(o) && !gIsFeeRow(o.item) && o.item !== '포인트 사용');
+        }
+        async function gLoadMyReviewKeys() {
+            const ph = gReviewPhone();
+            if (!gIsValidPhone(ph) || gIsGuestView()) return;
+            window.__gReviewKeysLoading = true;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}review_keys/${ph}.json?shallow=true&t=${Date.now()}`);
+                window.gMyReviewKeys = (r.ok ? await r.json() : null) || {};
+            } catch (e) { window.gMyReviewKeys = window.gMyReviewKeys || null; }
+            window.__gReviewKeysLoading = false;
+            const hm = document.getElementById('history-modal');
+            if (window.gMyReviewKeys && hm && getComputedStyle(hm).display !== 'none') renderHistory();
+        }
+        function gReviewBtnHtml(o) {
+            if (!gCanReview(o) || !window.gMyReviewKeys) return '';
+            if (window.gMyReviewKeys[o.__fbKey]) return `<div class="rv-done">후기 완료</div>`;
+            return `<button type="button" class="rv-write-btn" onclick="gOpenReview('${encodeURIComponent(o.__fbKey)}')">후기 쓰기</button>`;
+        }
+        let _gRv = null;   // 지금 쓰는 후기 { order, stars }
+        function gOpenReview(encKey) {
+            const key = decodeURIComponent(encKey);
+            const o = (fullHistoryData || []).find(x => x.__fbKey === key);
+            if (!o || !gCanReview(o)) { showToast('후기를 쓸 수 없는 상품이에요'); return; }
+            _gRv = { order: o, stars: 0 };
+            document.getElementById('rv-item').innerText = String(o.item || '');
+            document.getElementById('rv-text').value = '';
+            gReviewPaint();
+            document.getElementById('review-modal').style.display = 'flex';
+            checkScrollLock();
+        }
+        // [수정 2026-10-02] 반 개도 고른다 (사장님 요청) — 누른 별의 왼쪽 반이면 n-0.5
+        function gReviewSetStar(n, ev, el) {
+            if (!_gRv) return;
+            let v = n;
+            if (ev && el) { const r = el.getBoundingClientRect(); if (ev.clientX - r.left < r.width / 2) v = n - 0.5; }
+            _gRv.stars = v;
+            gReviewPaint();
+        }
+        function gReviewPaint() {
+            const st = _gRv ? _gRv.stars : 0;
+            document.getElementById('rv-stars').innerHTML = [1, 2, 3, 4, 5].map(n => {
+                const fill = st >= n ? 100 : (st >= n - 0.5 ? 50 : 0);
+                return `<button type="button" onclick="gReviewSetStar(${n}, event, this)" aria-label="별 ${n}개">${fill ? `<b style="width:${fill}%"></b>` : ''}</button>`;
+            }).join('') + (st ? `<span class="rv-star-num">${st}</span>` : '');
+            const txt = String(document.getElementById('rv-text').value || '').trim();
+            const n = txt.replace(/ /g, '').length, pts = gReviewPts(txt);
+            document.getElementById('rv-count').innerHTML = `${n}자 · 받을 포인트 <b>${pts}P</b>${pts < 100 ? ` <span style="font-weight:600;">(${n ? 20 - n + '자 더 쓰면 100P' : '글을 써야 등록돼요'})</span>` : ''}`;
+            const btn = document.getElementById('rv-send');
+            btn.disabled = !st || !n; btn.style.opacity = (st && n) ? '' : '0.45';   // [수정 2026-10-02] 별점과 글이 다 있어야
+        }
+        function gMaskName(nm) {
+            const s = String(nm || '').replace(/\s+/g, '');
+            if (!s) return '손님';
+            if (s.length <= 2) return s[0] + '*';
+            return s[0] + '*'.repeat(Math.min(s.length - 2, 3)) + s[s.length - 1];
+        }
+        async function gSubmitReview() {
+            if (!_gRv || !_gRv.stars) { showToast('별점을 골라 주세요'); return; }
+            if (!String(document.getElementById('rv-text').value || '').replace(/\s/g, '')) { showToast('후기를 써 주세요'); return; }   // [신규 2026-10-02] 글 없는 후기는 안 받는다
+            const o = _gRv.order, ph = gReviewPhone();
+            if (!gIsValidPhone(ph)) { showToast('로그인한 뒤에 쓸 수 있어요'); return; }
+            const code = String(o.productCode).trim(), ref = o.__fbKey;
+            const text = String(document.getElementById('rv-text').value || '').trim().slice(0, 500);
+            const pts = gReviewPts(text);
+            const btn = document.getElementById('rv-send');
+            btn.disabled = true; btn.innerText = '올리는 중…';
+            try {
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+                    const now = Date.now();
+                    const [stRes, ptRes] = await Promise.all([
+                        fetch(`${FIREBASE_DB_URL}review_stats/${encodeURIComponent(code)}.json?t=${now}`),
+                        pts ? fetch(`${FIREBASE_DB_URL}points/${ph}.json?t=${now}`) : Promise.resolve(null)
+                    ]);
+                    const st = (stRes.ok ? await stRes.json() : null) || null;
+                    const pt = ptRes ? ((ptRes.ok ? await ptRes.json() : null) || null) : null;
+                    const up = {};
+                    up[`product_reviews/${code}/${rid}`] = { stars: _gRv.stars, text, name: gMaskName(localStorage.getItem('moket_user_name') || localStorage.getItem('kakao_original_name') || ''), item: String(o.item || '').slice(0, 100), at: now, ref, pts };
+                    up[`review_keys/${ph}/${ref}`] = { code, rid, at: now };
+                    up[`review_stats/${code}`] = { n: (st ? Number(st.n) || 0 : 0) + 1, sum: (st ? Number(st.sum) || 0 : 0) + _gRv.stars, last: rid };
+                    if (pts) {
+                        up[`point_logs/${ph}/r_${rid}`] = { amt: pts, why: 'review', at: now, code, rid, ref };
+                        up[`points/${ph}`] = { bal: (pt ? Number(pt.bal) || 0 : 0) + pts, last: `r_${rid}`, at: now };
+                    }
+                    const res = await fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(up) });
+                    if (res.ok) {
+                        window.gMyReviewKeys = window.gMyReviewKeys || {};
+                        window.gMyReviewKeys[ref] = true;
+                        closeModal('review-modal');
+                        showToast(pts ? `후기를 남겼어요 · ${pts}P 적립` : '후기를 남겼어요');
+                        try { renderHistory(); } catch (e) { }
+                        try { gLoadReviewStats(true); } catch (e) { }
+                        return;
+                    }
+                    if (res.status === 401 && attempt === 1) { await gFirebaseKakaoSignIn(ph); continue; }
+                    // 같은 순간 다른 손님이 같은 상품 후기를 써 합계가 어긋났을 수 있다 — 다시 받아 한 번 더
+                    await new Promise(r => setTimeout(r, 400 * attempt));
+                }
+                throw new Error('저장 거절');
+            } catch (e) {
+                console.warn('후기 저장 실패:', e);
+                showToast('후기를 올리지 못했어요. 잠시 뒤 다시 해 주세요');
+            } finally {
+                btn.disabled = false; btn.innerText = '등록';
+            }
+        }
+
+        // ── 상품별 별점 합계 (review_stats, 누구나 읽음) → 카드의 ★4.8 (12)
+        window.gReviewStats = {};
+        let _gStatsAt = 0;
+        async function gLoadReviewStats(force) {
+            if (!force && Date.now() - _gStatsAt < 60000) return;
+            _gStatsAt = Date.now();
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}review_stats.json?t=${Date.now()}`);
+                const d = r.ok ? await r.json() : null;
+                const before = JSON.stringify(window.gReviewStats);
+                window.gReviewStats = d || {};
+                if (before !== JSON.stringify(window.gReviewStats) && typeof renderList === 'function' && window.lastRenderedTargetKey !== undefined) {
+                    try { renderList(gCurrentListKey()); } catch (e) { }
+                }
+            } catch (e) { }
+        }
+        function gRatingOf(p) {
+            const st = p && window.gReviewStats && window.gReviewStats[String(p.productCode || '').trim()];
+            const n = st ? Number(st.n) || 0 : 0;
+            return n > 0 ? { n, avg: (Number(st.sum) || 0) / n } : null;
+        }
+        // 별 5개 — 평균을 반 개 단위로 반올림해 채운다 (4.3 → ★★★★☆ 반, 4.8 → ★★★★★)
+        function gStars5Html(avg) {
+            const v = Math.round((Number(avg) || 0) * 2) / 2;
+            let h = '<span class="stars5" aria-label="별점 ' + v + '점">';
+            for (let i = 1; i <= 5; i++) {
+                const fill = v >= i ? 100 : (v >= i - 0.5 ? 50 : 0);
+                h += `<i>${fill ? `<b style="width:${fill}%"></b>` : ''}</i>`;
+            }
+            return h + '</span>';
+        }
+        function gRatingHtml(p) {
+            const r = gRatingOf(p);
+            return r ? `<div class="item-rating">${gStars5Html(r.avg)}<span class="cnt">(${r.n})</span></div>` : '';
+        }
+        // ── 상세보기 아래 후기 목록 (숨긴 후기는 빼고 최근 것부터, 처음 5개 → 더보기)
+        let _gDetailRvCode = '';
+        async function gRenderDetailReviews(p, showAll) {
+            const box = document.getElementById('detail-reviews');
+            if (!box) return;
+            const code = String((p && p.productCode) || '').trim();
+            _gDetailRvCode = code;
+            const r0 = gRatingOf(p);
+            // 위쪽 '★4.8 후기 12개' — 후기가 있을 때만
+            const rt = document.getElementById('detail-rating');
+            if (rt) {
+                rt.innerHTML = r0 ? `${gStars5Html(r0.avg)}<span class="cnt">(${r0.n})</span>` : '';
+                rt.style.display = r0 ? 'block' : 'none';
+            }
+            if (!code) { box.innerHTML = ''; return; }
+            box.innerHTML = `<div class="dr-wrap"><div class="dr-head">후기${r0 ? ` <span class="st">★</span>${r0.avg.toFixed(1)}<span>${r0.n}개</span>` : ''}</div><div class="dr-empty">불러오는 중…</div></div>`;
+            let list = [];
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}product_reviews/${encodeURIComponent(code)}.json?t=${Date.now()}`);
+                const d = r.ok ? await r.json() : null;
+                list = Object.values(d || {}).filter(x => x && !x.hidden).sort((a, b) => (b.at || 0) - (a.at || 0));
+            } catch (e) { }
+            if (_gDetailRvCode !== code) return;   // 그 사이 다른 상품을 열었다
+            const E = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            const day = t => { const d = new Date(t); return `${d.getFullYear() % 100}.${d.getMonth() + 1}.${d.getDate()}`; };
+            const shown = showAll ? list : list.slice(0, 5);
+            const rows = shown.map(x => `<div class="dr-row"><div class="dr-top"><span class="st">${gStars5Html(x.stars)}</span>${E(x.name)} · ${day(x.at)}</div>`
+                + (x.item && x.item !== (p && p.name) ? `<div class="dr-item">${E(x.item)}</div>` : '')
+                + (x.text ? `<div class="dr-text">${E(x.text)}</div>` : '')
+                + (x.reply ? `<div class="dr-reply"><b>모켓</b> ${E(x.reply)}</div>` : '') + `</div>`).join('');
+            box.innerHTML = `<div class="dr-wrap"><div class="dr-head">후기${r0 ? ` <span class="st">★</span>${r0.avg.toFixed(1)}<span>${r0.n}개</span>` : ''}</div>`
+                + (rows || `<div class="dr-empty">아직 후기가 없어요. 받아 보신 뒤 주문내역에서 첫 후기를 남겨 주세요!</div>`)
+                + (!showAll && list.length > 5 ? `<button type="button" class="dr-more" onclick="gRenderDetailReviews(productsData.find(x => String(x.productCode || '').trim() === '${code}'), true)">후기 ${list.length - 5}개 더 보기</button>` : '')
+                + `</div>`;
+        }
+        // 상세보기 위 '★ 후기 n개'를 누르면 아래 후기 자리로 부드럽게 내려간다
+        function gScrollToReviews() {
+            const el = document.querySelector('#detail-reviews .dr-wrap') || document.getElementById('detail-reviews');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        // ── 내 포인트
+        const POINT_WHY = { review: '후기 포인트', use: '주문에 사용', refund: '주문 취소로 돌려받음', expire: '1년 지나 사라짐', delete: '후기 삭제', adjust: '가게에서 조정' };
+        async function gLoadMyPointBal() {
+            const ph = gReviewPhone();
+            const el = document.getElementById('menu-points');
+            if (!gIsValidPhone(ph) || gIsGuestView()) { if (el) el.innerText = ''; return null; }
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}points/${ph}.json?t=${Date.now()}`);
+                const d = r.ok ? await r.json() : null;
+                const bal = d ? Number(d.bal) || 0 : 0;
+                if (el) el.innerText = `${bal.toLocaleString()}P`;
+                return bal;
+            } catch (e) { return null; }
+        }
+        /* [신규 2026-10-02] 주문할 때 포인트 쓰기
+           · 1,000P 넘게 있으면 주문 확인 창에서 쓸 금액을 적으면 바로 빠진다 — 상품 금액(사다드림·배달비 빼고)과 가진 포인트 중 작은 쪽까지
+           · 주문 줄 '포인트 사용'(마이너스) · 기록 u_<주문키> · 잔액을 한 번에 쓴다 (규칙관리가 셋을 같이 본다)
+           · 손님이 주문을 다 취소하면 f_<주문키> 로 돌려받는다. 가게가 취소한 주문은 주문관리 '손님 포인트'에서 더해 준다 */
+        const PT_MIN_USE = 1000;
+        async function gPaintConfirmPoints(total, goods) {
+            const box = document.getElementById('cf-points');
+            const sumEl = document.getElementById('cf-sum-val');
+            if (!box) return;
+            const ph = gKeyPhone(document.getElementById('input-phone').value);
+            if (!gIsValidPhone(ph) || gIsGuestView() || !(goods > 0)) return;
+            let bal = 0;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}points/${ph}.json?t=${Date.now()}`);
+                const d = r.ok ? await r.json() : null;
+                bal = d ? Number(d.bal) || 0 : 0;
+            } catch (e) { return; }
+            if (!box.isConnected || bal <= 0) return;   // 그 사이 창을 다시 열었으면 새 창이 그린다
+            if (bal < PT_MIN_USE) {
+                box.innerHTML = `<div class="cf-pt-note">포인트 ${bal.toLocaleString()}P · ${PT_MIN_USE.toLocaleString()}P부터 쓸 수 있어요</div>`;
+                return;
+            }
+            // [수정 2026-10-02] 쓸 금액을 손님이 적는다 (사장님 요청) — 상품 금액과 가진 포인트 중 작은 쪽까지
+            const max = Math.min(bal, goods);
+            //  적는 대로 바로 합계에서 빠진다 ('사용' 단추 없음 — 사장님 요청)
+            box.innerHTML = `<div class="cf-pt">
+                <div class="cf-pt-top"><span>포인트</span><small>${bal.toLocaleString()}P 보유</small></div>
+                <div class="cf-pt-in"><input type="number" inputmode="numeric" min="0" max="${max}" placeholder="0"><button type="button" class="all">전액</button></div>
+                <div class="cf-pt-used" style="display:none;"><span>포인트 사용</span><span></span></div>
+            </div>`;
+            const inp = box.querySelector('input'), usedEl = box.querySelector('.cf-pt-used');
+            const apply = () => {
+                let v = Math.floor(Number(String(inp.value).replace(/[^\d]/g, '')) || 0);
+                if (v > max) { v = max; inp.value = max; showToast(`${max.toLocaleString()}P까지 쓸 수 있어요`); }
+                window.gPointUse = v;
+                usedEl.style.display = v ? '' : 'none';
+                usedEl.lastElementChild.innerText = `-${v.toLocaleString()}원`;
+                if (sumEl) sumEl.innerText = `${(total - v).toLocaleString()}원`;
+            };
+            inp.addEventListener('input', apply);
+            box.querySelector('.all').onclick = () => { inp.value = max; apply(); };
+        }
+        // 주문 줄 '포인트 사용' + 기록 + 잔액을 한 번에 쓴다. 잔액이 모자라면 쓰지 않는다
+        async function gWritePointUse(ph, orderKey, line, amt) {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    const now = Date.now();
+                    const r = await fetch(`${FIREBASE_DB_URL}points/${ph}.json?t=${now}`);
+                    if (!r.ok) throw new Error(`서버 응답 ${r.status}`);
+                    const d = await r.json();
+                    const bal = d ? Number(d.bal) || 0 : 0;
+                    if (bal < PT_MIN_USE || bal < amt) return { ok: false, bal };
+                    const up = {};
+                    up[`orders/${ph}/${orderKey}`] = line;
+                    up[`point_logs/${ph}/u_${orderKey}`] = { amt: -amt, why: 'use', at: now, ref: orderKey };
+                    up[`points/${ph}`] = { bal: bal - amt, last: `u_${orderKey}`, at: now };
+                    const res = await fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(up) });
+                    if (res.ok) return { ok: true, bal: bal - amt };
+                    if (res.status === 401 && attempt === 1) { try { await gFirebaseKakaoSignIn(ph); } catch (e) { } continue; }
+                    throw new Error(`서버 응답 ${res.status}`);
+                } catch (e) { console.warn(`포인트 쓰기 재시도 ${attempt}/3:`, e.message); }
+                // 응답만 못 받았을 수 있다 — 기록이 들어갔으면 된 것
+                try { const c = await fetch(`${FIREBASE_DB_URL}point_logs/${ph}/u_${orderKey}.json?t=${Date.now()}`); if (c.ok && await c.json()) return { ok: true }; } catch (e) { }
+                await new Promise(res => setTimeout(res, 400 * attempt));
+            }
+            return { ok: false };
+        }
+        // '포인트 사용' 줄을 취소하고 그만큼 돌려준다 — 돌려준 포인트 (없으면 0, 실패하면 -1)
+        async function gRefundPointUse(ph, orderKey) {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    const now = Date.now();
+                    const [lr, pr] = await Promise.all([
+                        fetch(`${FIREBASE_DB_URL}orders/${ph}/${orderKey}.json?t=${now}`),
+                        fetch(`${FIREBASE_DB_URL}points/${ph}.json?t=${now}`)
+                    ]);
+                    if (!lr.ok || !pr.ok) throw new Error(`서버 응답 ${lr.status}/${pr.status}`);
+                    const line = await lr.json(), d = await pr.json();
+                    if (!line || line.item !== POINT_USE_NAME || line.canceled === true) return 0;   // 없거나 이미 돌려받았다
+                    const amt = -(Number(line.total) || 0);
+                    if (!(amt > 0)) return 0;
+                    const bal = d ? Number(d.bal) || 0 : 0;
+                    const up = {};
+                    up[`orders/${ph}/${orderKey}/item`] = '[취소] ' + POINT_USE_NAME;
+                    up[`orders/${ph}/${orderKey}/received`] = '취소완료';
+                    up[`orders/${ph}/${orderKey}/canceled`] = true;
+                    up[`point_logs/${ph}/f_${orderKey}`] = { amt, why: 'refund', at: now, ref: orderKey };
+                    up[`points/${ph}`] = { bal: bal + amt, last: `f_${orderKey}`, at: now };
+                    const res = await fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(up) });
+                    if (res.ok) return amt;
+                    if (res.status === 401 && attempt === 1) { try { await gFirebaseKakaoSignIn(ph); } catch (e) { } continue; }
+                    throw new Error(`서버 응답 ${res.status}`);
+                } catch (e) { console.warn(`포인트 돌려받기 재시도 ${attempt}/3:`, e.message); }
+                await new Promise(res => setTimeout(res, 400 * attempt));
+            }
+            return -1;
+        }
+        // 손님이 주문을 취소한 뒤 — 같은 주문(같은 시각)에 상품이 하나도 안 남았으면 쓴 포인트를 돌려준다
+        async function gRefundPointsOfOrder(ph, targetDigitTime) {
+            const same = d => {
+                const t = normD(d.timestamp);
+                return t === targetDigitTime || (t.length > targetDigitTime.length ? t.endsWith(targetDigitTime) : targetDigitTime.endsWith(t));
+            };
+            const rows = (fullHistoryData || []).filter(d => d && same(d));
+            const ptRows = rows.filter(d => gIsPointRow(d.item) && !isOrderCancelled(d));
+            if (!ptRows.length) return 0;
+            if (rows.some(d => !isOrderCancelled(d) && !gIsPointRow(d.item) && !gIsFeeRow(d.item))) return 0;   // 상품이 남았다
+            let sum = 0;
+            for (const o of ptRows) {
+                const key = o.__fbKey || (fSafeKey(o.timestamp) + '_' + fSafeKey(POINT_USE_NAME));
+                const got = await gRefundPointUse(ph, key);
+                if (got > 0) { sum += got; o.item = '[취소] ' + POINT_USE_NAME; o.received = '취소완료'; o.canceled = true; }
+            }
+            if (sum) { try { gLoadMyPointBal(); } catch (e) { } }
+            return sum;
+        }
+        async function gOpenMyPoints() {
+            const ph = gReviewPhone();
+            if (!gIsValidPhone(ph) || gIsGuestView()) { showToast('로그인한 뒤에 볼 수 있어요'); return; }
+            const side = document.getElementById('side-menu');
+            if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
+            document.getElementById('pt-bal').innerHTML = '…';
+            document.getElementById('pt-list').innerHTML = '';
+            document.getElementById('points-modal').style.display = 'flex';
+            checkScrollLock();
+            const bal = await gLoadMyPointBal();
+            document.getElementById('pt-bal').innerHTML = `${(bal || 0).toLocaleString()}<small>P</small>`;
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}point_logs/${ph}.json?t=${Date.now()}`);
+                const d = r.ok ? await r.json() : null;
+                const rows = Object.values(d || {}).filter(Boolean).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 50);
+                const day = t => { const x = new Date(t); return `${x.getFullYear()}.${x.getMonth() + 1}.${x.getDate()}`; };
+                document.getElementById('pt-list').innerHTML = rows.length ? rows.map(x => {
+                    const a = Number(x.amt) || 0;
+                    return `<div class="pt-row"><div class="w">${POINT_WHY[x.why] || '포인트'}<small>${day(x.at)}${x.memo ? ' · ' + String(x.memo).replace(/[<>&]/g, '') : ''}</small></div><div class="a ${a >= 0 ? 'plus' : 'minus'}">${a >= 0 ? '+' : ''}${a.toLocaleString()}</div></div>`;
+                }).join('') : `<div class="dr-empty">아직 쌓인 포인트가 없어요</div>`;
+            } catch (e) { }
+        }
+
         // [ver3] 메뉴 맨 아래 — 로그아웃은 카카오로 들어온 손님만, 회원탈퇴는 가입을 마친 손님만
         function gSyncMenuFoot() {
+            try { gLoadMyPointBal(); } catch (e) { }   // [신규 2026-10-02] 메뉴 '내 포인트' 옆 숫자
             const lo = document.getElementById('sm-logout'), un = document.getElementById('sm-unlink');
             const guest = (typeof gIsGuestView === 'function') && gIsGuestView();
+            const spt = document.getElementById('sm-pt');   // [신규 2026-10-02] 둘러보기 손님은 포인트 칸을 감춘다
+            if (spt) spt.style.display = (localStorage.getItem('kakao_original_name') && !guest) ? '' : 'none';
             if (lo) lo.style.display = (localStorage.getItem('kakao_original_name') && !guest) ? '' : 'none';
             if (un) un.style.display = ((typeof gJoinDone === 'function') && gJoinDone() && !guest) ? '' : 'none';
             // 둘 다 없으면 빈 줄만 남으니 칸째로 감춘다
@@ -7429,7 +8176,7 @@
                                 ${/* [ver3] '받는 날 · 2건' 대신 배달·픽업이 몇 건인지 적는다.
                                       한 날짜에 배달과 픽업이 섞일 수 있어 따로 센다. 배달비 줄은 물건이 아니라 빼고 센다. */ ''}
                                 <span style="font-size:12.5px; font-weight:700; color:${isUnpicked ? '#d32f2f' : '#8b9682'}; flex-shrink:0;">${(() => {
-                                    const 셈 = group.items.filter(it => !gIsFeeRow(it.item) && !String(it.item || '').includes('[배달합산]'));
+                                    const 셈 = group.items.filter(it => !gIsFeeRow(it.item) && !gIsPointRow(it.item) && !String(it.item || '').includes('[배달합산]'));
                                     const 수 = (arr) => arr.reduce((a, it) => a + (parseInt(it.qty || 0) || 0), 0);
                                     const 배 = 수(셈.filter(it => String(it.shippingMethod || '') === '배달주문'));
                                     const 픽 = 수(셈) - 배;
@@ -7506,6 +8253,7 @@
                                          다른 줄에는 다 글자가 있는데 그 줄만 비어 있어,
                                          받은 것인지 표시가 빠진 것인지 알기 어려웠다. 이제 함께 적는다. -->
                                     <div style="font-size:14px; font-weight:800; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>
+                                    ${gReviewBtnHtml(order)}
                                 </div>
                             </div>
                         </div>
@@ -7527,6 +8275,7 @@
 
         function renderHistory() {
             window.deliveryPhotos = {};
+            if (!window.gMyReviewKeys && !window.__gReviewKeysLoading) gLoadMyReviewKeys();   // [신규 2026-10-02] 후기 쓴 줄
             const list = document.getElementById('history-list');
             list.innerHTML = '';
 
@@ -7790,7 +8539,7 @@
                     if (!o) return;
                     if (isOrderCancelled(o)) return;
                     if (String(o.item || '').includes('[배달합산]')) return;
-                    if (gIsFeeRow(o.item)) return;
+                    if (gIsFeeRow(o.item) || gIsPointRow(o.item)) return;
                     _qtySum += parseInt(o.qty || 0) || 0;
                 }));
 
@@ -7955,6 +8704,7 @@
                                     <div style="text-align:right; min-width:70px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:2px;">
                                         ${payText ? `<div style="font-size:12.5px; font-weight:700; color:${payColor};">${payText}</div>` : ''}
                                         <div style="font-size:12.5px; font-weight:700; color:${statusColor};">${order.onSite ? '상시판매' : statusText}</div>
+                                        ${gReviewBtnHtml(order)}
                                         ${isProcessing ? `<div style="width:70px; height:26px; display:flex; align-items:center; justify-content:center; background:#f4f6f0; color:#8b9682; border-radius:4px; font-size:12px; font-weight:700;">대기중</div>` : ''}
                                     </div>
                                 </div>
@@ -8139,7 +8889,7 @@
 
                 const feeItems = items.filter(o => String(o.item || "").trim() === '배달비');
                 const refundItems = items.filter(o => String(o.item || "").trim() === FEE_REFUND_NAME);
-                const productItems = items.filter(o => !gIsFeeRow(o.item));
+                const productItems = items.filter(o => !gIsFeeRow(o.item) && !gIsPointRow(o.item));
 
                 // 상품이 전부 취소되고 배달비만 덩그러니 남은 경우 → 남은 배달비·차감도 같이 취소.
                 if (productItems.length === 0) {
@@ -8210,6 +8960,7 @@
                     ${row('취소한 금액', '-' + won(canceledTotal))}
                     ${addedFee > 0 ? row('추가된 배달비', '+' + won(addedFee), { mt: true, color: '#d32f2f' }) : ''}
                     ${refundedFee > 0 ? row('빼드린 배달비', '-' + won(refundedFee), { mt: true, color: '#2e7d32' }) : ''}
+                    ${(feeResult && feeResult.pointBack > 0) ? row('돌려드린 포인트', '+' + feeResult.pointBack.toLocaleString() + 'P', { mt: true, color: '#2e7d32' }) : ''}
                 </div>`;
 
             if (refundedFee > 0) {
@@ -8271,7 +9022,7 @@
                 // 모든 항목을 취소해야 함. 예전엔 상품목록에 없거나 숨김인 항목(배달비, 날짜가 다른 상품,
                 // 중복명 상품 등)을 'isHiddenProduct'로 제외해서, 날짜가 다른 상품을 함께 담아 주문하면
                 // 하나만 취소되고 하나는 안 되는 문제가 있었음.
-                return !isCancelled && !isReceived && !isProcessing && !isStocked && !d.onSite && !isDelivered && !isCombined;
+                return !isCancelled && !isReceived && !isProcessing && !isStocked && !d.onSite && !isDelivered && !isCombined && !gIsPointRow(d.item);   // [신규 2026-10-02] 포인트 줄은 아래에서 돌려받기로
             });
 
             if (targetOrders.length === 0) {
@@ -8301,7 +9052,7 @@
                 let currentActiveTotal = 0;
                 dayOrders.forEach(o => {
                     const isCanceled = o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE";
-                    if (!isCanceled && o.item !== '배달비' && !isSadaOrder(o)) {
+                    if (!isCanceled && o.item !== '배달비' && !gIsPointRow(o.item) && !isSadaOrder(o)) {
                         currentActiveTotal += parseInt(o.total || 0);
                     }
                 });
@@ -8317,7 +9068,7 @@
                 const remainingActiveCount = dayOrders.filter(o => {
                     const isCanceled = o.canceled === true || o.canceled === "true" || String(o.canceled).toUpperCase() === "TRUE";
                     const isGoingToBeCanceled = targetOrders.some(to => to.orderKey === o.orderKey);
-                    return !isCanceled && !isGoingToBeCanceled && o.item !== '배달비';
+                    return !isCanceled && !isGoingToBeCanceled && o.item !== '배달비' && !gIsPointRow(o.item);
                 }).length;
                 
                 if (remainingActiveCount > 0 && remainingTotal < 15000) {
@@ -8386,7 +9137,7 @@
                         const _pForKey = (typeof productsData !== 'undefined' ? productsData : []).find(pd => pd && (pd.name === rawItemName || String(pd.name).replace(/['"]/g, '') === rawItemName));
                         const keyMatchKey = order.matchKey || (_pForKey && _pForKey.matchKey) || order.date || order.pickupDate || "";
                         const keyName = (_pForKey && _pForKey.name) ? _pForKey.name : rawItemName;
-                        const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey, keyName) : (fSafeKey(keyMatchKey) + "_" + fSafeKey(keyName));
+                        const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey, keyName, order && order.sid) : (fSafeKey(keyMatchKey) + "_" + fSafeKey(keyName));
                         const diff = parseInt(order.qty) || 1;
 
                         // [개선] 취소 시 재고 복구도 최대 5회 재시도(쓰기 성공 확인). 취소 자체(PATCH)는 이미
@@ -8448,8 +9199,13 @@
 
                     await Promise.all(promises);
 
+                    // [신규 2026-10-02] 이 주문에 상품이 하나도 안 남았으면 쓴 포인트를 돌려준다
+                    let pointBack = 0;
+                    try { pointBack = await gRefundPointsOfOrder(cleanPhone, targetDigitTime); } catch (e) { console.warn('포인트 돌려받기 실패:', e); }
+
                     // 배달비 조건 검사 및 추가 처리
                     const feeResult = await checkAndApplyDeliveryFeeAfterCustomerCancellation(cleanPhone, name);
+                    if (feeResult) feeResult.pointBack = pointBack;
 
                     // 전체 로컬 캐시 영구 저장
                     localStorage.setItem(`history_cache_${name}_${cleanPhone}`, JSON.stringify(fullHistoryData));
@@ -8536,7 +9292,7 @@
                 const _pForKey2 = (typeof productsData !== 'undefined' ? productsData : []).find(pd => pd && (pd.name === rawItemName || String(pd.name).replace(/['"]/g, '') === rawItemName));
                 const keyMatchKey2 = matchKey || (_pForKey2 && _pForKey2.matchKey) || pickupDate || "";
                 const keyName2 = (_pForKey2 && _pForKey2.name) ? _pForKey2.name : rawItemName;
-                const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey2, keyName2) : (fSafeKey(keyMatchKey2) + "_" + fSafeKey(keyName2));
+                const adjKey = (typeof fGetAdjKey === 'function') ? fGetAdjKey(keyMatchKey2, keyName2, fullHistoryData[targetIdx] && fullHistoryData[targetIdx].sid) : (fSafeKey(keyMatchKey2) + "_" + fSafeKey(keyName2));
                 const diff = parseInt(fullHistoryData[targetIdx].qty) || 1;
 
                 const stockPromise = fetch(`${FIREBASE_DB_URL}global_stock/${encodeURIComponent(adjKey)}.json`)
@@ -8798,6 +9554,7 @@
                 }
 
                 const _closedP = gLoadClosed();   // [신규] 마감 표 (몇 바이트)
+                gLoadReviewStats();               // [신규 2026-10-02] 상품별 별점 합계 (기다리지 않는다 — 오면 다시 그린다)
                 const results = await Promise.all(fetchPromises);
                 await _closedP;
                 const stockRes = results[0];
@@ -8858,6 +9615,7 @@
                 //  (rawData는 publishedProducts를 그대로 복사한 것이라 번호가 서로 같다)
                 if (Array.isArray(publishedProducts)) publishedProducts.forEach((p, i) => { if (p) p.__pubIdx = i; });
                 if (Array.isArray(rawData)) rawData.forEach((p, i) => { if (p) p.__pubIdx = i; });
+                gBuildSidIndex(publishedProducts);   // [신규 2026-10-02] 재고 열쇠(노출번호) 찾기표
 
                 // 실시간 전역 재고 변동분 처리
                 let globalAdjustments = {};
@@ -8971,7 +9729,7 @@
 
                         // 다중 키 지원으로 global_stock 연동 완벽 보장
                         const adjKey1 = fGetAdjKey(mKey, pName);
-                        const adjKey2 = pubMatch ? fGetAdjKey(pubMatch.matchKey || pubMatch.date, pubMatch.name) : adjKey1;
+                        const adjKey2 = pubMatch ? fGetAdjKey(pubMatch.matchKey || pubMatch.date, pubMatch.name, pubMatch.sid) : adjKey1;
                         const adjKey3 = fGetAdjKey(normKey(mKey), pName);
 
                         const adj = pickAdj(adjKey1, adjKey2, adjKey3);
@@ -9012,8 +9770,8 @@
 
                     // [버그수정] 캐시 항목이면 stock에 adj가 반영돼 있으므로 참 기본재고 originalStock 우선.
                     const baseStock = (pub.originalStock !== undefined && pub.originalStock !== null && pub.originalStock !== "") ? pub.originalStock : pub.stock;
-                    const adjKey1 = fGetAdjKey(pubKey, pubName);
-                    const adjKey2 = fGetAdjKey(normKey(pubKey), pubName);
+                    const adjKey1 = fGetAdjKey(pubKey, pubName, pub.sid);
+                    const adjKey2 = fGetAdjKey(normKey(pubKey), pubName, pub.sid);
 
                     const adj = pickAdj(adjKey1, adjKey2);
 
@@ -9223,9 +9981,8 @@
                             (p.show !== false && p.show !== 'false');
                         if (!isShowReserve) return false;
 
-                        // [신규] '오늘 날짜' 공동구매 상품은 예약 탭에서 제외 → 당일 탭 '공동구매'에서만 노출
-                        // (사다드림도 오늘 날짜면 동일하게 당일 탭에서만 노출. 미래 날짜 사다드림은 예약 탭 유지)
-                        const rmk = (p.matchKey || "").trim();
+                        // [수정 2026-09-30] '오늘 날짜 상품은 예약 탭에서 뺀다'는 규칙은 공동구매(합침)에서는 쓰지 않는다 — '오늘'에 나온다
+                        const rmk = (currentDeliveryType === 'reserve') ? '' : (p.matchKey || "").trim();
                         const rIsDate = dateRegex.test(rmk) && !rmk.includes("상시판매") && !rmk.includes("현장판매") && !rmk.includes("코스트코");
                         const rIsFV = /과일|야채|채소|기타/.test(rmk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
                         if (rIsDate && !rIsFV) {
@@ -9423,6 +10180,12 @@
             }
 
             let activeFilter = null;
+
+            // [신규 2026-09-30] 공동구매(당일+예약 합침)는 종류 탭 + 날짜 칩으로 따로 그린다
+            if (currentDeliveryType === 'reserve') {
+                gRenderGroupBuy(filterAreaDates, isUserAction);
+                return;
+            }
 
             if (currentDeliveryType === 'today') {
                 // 당일배송 과일에 야채가 포함되어 있는지 체크
@@ -9676,7 +10439,7 @@
             const styles = {
                 today: { text: '당일판매', bg: '#eef7e7', fg: '#3d8f19', bd: '#cfe7bd' },
                 onsite: { text: '상시판매', bg: '#eef7e7', fg: '#3d8f19', bd: '#cfe7bd' },
-                reserve: { text: '예약판매', bg: '#eef7e7', fg: '#3d8f19', bd: '#cfe7bd' }
+                reserve: { text: '공동구매', bg: '#eef7e7', fg: '#3d8f19', bd: '#cfe7bd' }
             };
             const s = styles[currentDeliveryType] || styles.reserve;
 
@@ -9774,7 +10537,7 @@
                    당일판매 모드에서 통째로 빠져 '오늘의 상품'에도 검색에도 안 나온다. */
                 const _saleRate = gIsSaleToday(p) ? 1 : 0;
                 if (_saleRate > 0) {
-                    if (currentDeliveryType !== 'today') return false;
+                    if (currentDeliveryType === 'onsite') return false;   // [수정 2026-09-30] 특가는 공동구매 '오늘'에 나온다
                 } else if (currentDeliveryType !== 'onsite') {
                     const _dt = gDisplayTabOf(p);
                     if (ONSITE_CATS.some(c => c.key === _dt)) return false;
@@ -9806,9 +10569,8 @@
                             (p.show !== false && p.show !== 'false');
                         if (!isShowReserve) return false;
 
-                        // [신규] '오늘 날짜' 공동구매 상품은 예약 탭에서 제외 → 당일 탭 '공동구매'에서만 노출
-                        // (사다드림도 오늘 날짜면 동일하게 당일 탭에서만 노출. 미래 날짜 사다드림은 예약 탭 유지)
-                        const rmk = (p.matchKey || "").trim();
+                        // [수정 2026-09-30] '오늘 날짜 상품은 예약 탭에서 뺀다'는 규칙은 공동구매(합침)에서는 쓰지 않는다 — '오늘'에 나온다
+                        const rmk = (currentDeliveryType === 'reserve') ? '' : (p.matchKey || "").trim();
                         const rIsDate = dateRegex.test(rmk) && !rmk.includes("상시판매") && !rmk.includes("현장판매") && !rmk.includes("코스트코");
                         const rIsFV = /과일|야채|채소|기타/.test(rmk) || /\[과일\]|\[야채\]|\[채소\]|\[기타\]|\[과일구매\]|\[야채구매\]|\[기타구매\]/.test(p.name);
                         if (rIsDate && !rIsFV) {
@@ -9885,8 +10647,9 @@
                                         return false; // 15시 이후이므로 제외
                                     }
                                 }
-                            } else {
+                            } else if (currentDeliveryType !== 'reserve') {
                                 // 공동구매 카테고리 상품의 경우 해당 날짜 오후 3시(15시) 이후에는 미노출 처리
+                                // [수정 2026-09-30] 공동구매 탭에서는 숨기지 않는다 — 당일 마감시각이 지나면 '마감'으로 보인다
                                 const isReserveDate = gIsDateOnlyKey(s);
                                 if (isReserveDate) {
                                     const cutoffDate = new Date(y, m - 1, d, 15, 0, 0, 0);
@@ -9999,6 +10762,12 @@
                     const st = String(p.storage || "").trim();
                     return s.includes("상온") || s.includes("실온") || st.includes("상온") || st.includes("실온");
                 });
+            } else if (String(targetKey).startsWith('gb:')) {
+                // [신규 2026-09-30] 공동구매 — 종류(all·group·fruit·sada·chuseok) × 날짜(all 또는 YYYY-MM-DD)
+                const [, _gk, _gd] = String(targetKey).split(':');
+                filteredData = visibleProducts.filter(p => gGbVisible(p)
+                    && (_gk === 'all' || gGbTabKind(p) === _gk)
+                    && (!_gd || _gd === 'all' || gGbDateOf(p) === _gd));
             } else if (targetKey === '사다드림') {
                 filteredData = visibleProducts.filter(gIsSadaProduct);
             } else if (targetKey === '추석선물') {
@@ -10134,7 +10903,8 @@
             //  · 이 탭으로 지정된 상품은 기존 규칙에 안 걸렸어도 넣는다.
             //  지정이 없는 상품(displayTab 빈 값)은 위에서 계산한 기존 결과 그대로다.
             //  검색 중에는 탭과 무관하게 찾는 것이 목적이므로 건드리지 않는다.
-            if (!_searchQ && !String(targetKey).startsWith('onsite-')) {
+            const _isGbKey = String(targetKey).startsWith('gb:');   // [신규 2026-09-30] 공동구매는 분류탭·특가를 gGbTabKind 에서 이미 반영했다
+            if (!_searchQ && !String(targetKey).startsWith('onsite-') && !_isGbKey) {
                 // [수정] 상시판매 분류 탭은 바로 위에서 이미 분류(displayTab)대로 걸렀으므로 건너뛴다.
                 const _tabKey = gTabKeyOfTarget(targetKey);
                 if (_tabKey) {
@@ -10154,7 +10924,7 @@
             /* [신규] 특가(할인) 상품은 '오늘의 상품' 탭에만 둔다.
                분류탭(displayTab)이 비어 있는 채로 저장된 상품도 있어서, 그 값에 기대지 않고
                할인율만 보고 판단한다. 검색 중에는 탭과 무관하게 찾는 것이 목적이라 건드리지 않는다. */
-            if (!_searchQ) {
+            if (!_searchQ && !_isGbKey) {
                 if (targetKey === 'today-reserve') {
                     visibleProducts.forEach(p => {
                         if (gIsSaleToday(p) && !filteredData.includes(p)) filteredData.push(p);
@@ -10171,6 +10941,14 @@
 
             // [정렬 적용] 재고 유무(품절 무조건 최하단) > 머릿말 > 일반 > 맺음말 > 날짜 > 이름 순
             filteredData.sort((a, b) => {
+                if (_isGbKey || (_searchQ && currentDeliveryType === 'reserve')) {
+                    // [수정 2026-10-01] 판매중 → 마감 → 품절이 먼저, 그 안에서 날짜순 (사장님 요청)
+                    const _st = p => (p.stock === undefined || p.stock === "" || isNaN(p.stock)) ? Infinity : parseInt(p.stock);
+                    const _rk = p => gIsClosedProduct(p) ? 1 : (_st(p) <= 0 ? 2 : 0);
+                    if (_rk(a) !== _rk(b)) return _rk(a) - _rk(b);
+                    const _da = gGbDateOf(a), _db = gGbDateOf(b);
+                    if (_da !== _db) return _da < _db ? -1 : 1;
+                }
                 const getStockVal = (p) => {
                     // 숫자가 아닌 문자열이나 빈 칸 등은 무제한(Infinity)으로 처리
                     if (p.stock === undefined || p.stock === "" || isNaN(p.stock)) return Infinity;
@@ -10184,7 +10962,10 @@
                 const isSoldOutB = stockB <= 0 || gIsClosedProduct(b);
 
                 // [강력 조건] 품절된 상품은 머릿말 우선순위와 상관없이 무조건 뒤로 보냄
-                if (isSoldOutA !== isSoldOutB) return isSoldOutA ? 1 : -1;
+                // [수정 2026-10-01] 판매중 → 마감 → 품절 차례로 (카드에 '마감'으로 뜨는 상품이 품절보다 앞)
+                const _rank = (p, st) => gIsClosedProduct(p) ? 1 : (st <= 0 ? 2 : 0);
+                const _ra = _rank(a, stockA), _rb = _rank(b, stockB);
+                if (_ra !== _rb) return _ra - _rb;
 
                 // [신규] 오늘의추천·사다드림으로 표시해 둔 상품은 품절이 아닌 한 목록 맨 위로 올린다.
                 //  예전에는 이름 앞 [오늘의추천] 말머리 덕분에 아래 머릿말 규칙(getPriority)에 걸려 올라갔는데,
@@ -10277,7 +11058,7 @@
                 const emptyMsg = document.createElement('div');
                 emptyMsg.style = "text-align:center; padding:80px 20px; color:#8b9682; font-weight:700;";
                 if (_searchQ) {
-                    emptyMsg.innerHTML = `'${productSearchQuery.trim()}' 검색 결과가 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#b6bcac; display:block; margin-top:8px;">(현재 ${currentDeliveryType === 'today' ? '당일판매' : (currentDeliveryType === 'onsite' ? '상시판매' : '예약판매')} 탭에서 검색 중)</span>`;
+                    emptyMsg.innerHTML = `'${productSearchQuery.trim()}' 검색 결과가 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#b6bcac; display:block; margin-top:8px;">(현재 ${currentDeliveryType === 'onsite' ? '상시판매' : '공동구매'} 탭에서 검색 중)</span>`;
                 } else if (targetKey === 'today-fruit' || targetKey === 'today-fruit-only' || targetKey === 'today-veg-only') {
                     emptyMsg.style = "text-align:center; padding:80px 20px; color:#8b9682; font-weight:700; font-size:18px; line-height:1.5;";
                     const now = new Date();
@@ -10291,6 +11072,11 @@
                         subText = "과일은 평일 오전에 올라옵니다.";
                     }
                     emptyMsg.innerHTML = `현재 주문 가능한 상품이 없습니다.<br><span style="font-size:16px; font-weight:normal; color:#b6bcac; display:block; margin-top:8px;">(${subText})</span>`;
+                } else if (String(targetKey).startsWith('gb:fruit:')) {
+                    // [신규 2026-09-30] 공동구매 › 과일 탭이 비었을 때 — 예전 당일 과일 안내를 바탕으로
+                    emptyMsg.style = "text-align:center; padding:70px 20px; color:#8b9682; font-weight:700; font-size:17px; line-height:1.55;";
+                    const _sub = '과일은 매일 새벽에 올라와요 (일요일·공휴일 제외)';   // 사장님이 정한 한 문구 (설정 따라 바뀌지 않게)
+                    emptyMsg.innerHTML = `지금 주문할 수 있는 과일이 없어요<br><span style="font-size:14.5px; font-weight:600; color:#b6bcac; display:block; margin-top:8px;">${_sub}<br>새벽시장에서 골라 오면 바로 올려 드릴게요</span>`;
                 } else if (targetKey === '과일') {
                     emptyMsg.innerHTML = `현재 주문 가능한 상품이 없습니다.<br><span style="font-size:13px; font-weight:normal; color:#b6bcac; display:block; margin-top:8px;">(평일 오전에 상품이 올라옵니다.)</span>`;
                 } else {
@@ -10305,7 +11091,8 @@
                 // [수정] 사다드림 탭도 날짜별로 묶어서 배달 예정일이 보이게 한다 (날짜가 다르면 합배송 불가)
                 /* [수정] 추석선물 탭도 날짜별로 묶는다. 선물세트는 받는 날이 정해져 있어서
                    언제 오는지가 값보다 먼저 궁금하다. 사다드림과 같은 규칙으로 둔다. */
-                if ((currentMainTab === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || targetKey === '전체상품_현장' || _searchQ) && p.matchKey !== lastGroupKey) {
+                const _gKey = (currentDeliveryType === 'reserve') ? gGbDateOf(p) : p.matchKey;   // [신규 2026-09-30] 공동구매는 날짜로 묶는다
+                if ((currentDeliveryType === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || targetKey === '전체상품_현장' || _searchQ) && _gKey !== lastGroupKey) {
                     // 새 그룹 박스 생성
                     currentGroupBox = document.createElement('div');
                     currentGroupBox.className = "product-group-box";
@@ -10318,7 +11105,12 @@
                        예전에는 달력 그림 + '픽업/배달 예정일 : 9월30일(수)' 로 앞말이 길고 날짜가 주황이었다. */
                     let dateHtml = p.displayDate || p.matchKey;
                     let tail = '';
-                    if (currentMainTab === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || _searchQ) {
+                    if (currentDeliveryType === 'reserve' && _gKey) {
+                        // [신규 2026-09-30] 공동구매 — '9월 30일 수요일 · 오늘 · 픽업 · 배달'
+                        dateHtml = gLongDateLabel(formatDateWithDay(_gKey));
+                        tail = (_gKey === gTodayYmd() ? `<span style="margin-left:8px; font-size:12.5px; font-weight:800; color:#3d8f19;">오늘</span>` : '')
+                            + `<span style="margin-left:8px; font-size:12.5px; font-weight:700; color:#8b9682;">픽업 · 배달</span>`;
+                    } else if (currentMainTab === 'reserve' || currentMainTab === 'sada' || currentMainTab === CHUSEOK_TAB || _searchQ) {
                         const isDate = /(\d{2,4})[./-]\d{1,2}[./-]\d{1,2}|(\d{1,2})[./-](\d{1,2})/.test(p.matchKey);
                         if (isDate) {
                             dateHtml = gLongDateLabel(dateHtml);
@@ -10330,15 +11122,16 @@
 
                     // 상품이 담길 내부 컨테이너 (여백 조정)
                     const itemContainer = document.createElement('div');
-                    itemContainer.className = "group-item-container";
+                    itemContainer.className = "group-item-container card-grid";   // [수정 2026-10-02] 한 줄에 두 개
                     itemContainer.style = "padding:12px 10px 2px 10px;";
                     currentGroupBox.appendChild(itemContainer);
 
                     container.appendChild(currentGroupBox);
-                    lastGroupKey = p.matchKey;
+                    lastGroupKey = _gKey;
                 }
 
-                const imgId = p.images[0];
+                // [버그수정] 사진 없이 등록된 상품은 images 칸이 아예 없다 → 그대로 읽으면 목록 그리기가 통째로 멈췄다
+                const imgId = (Array.isArray(p.images) && p.images[0]) || '';
                 const thumbUrl = imgId ? getImgUrl(imgId, 300) : '';
 
                 // [수정] 현재 탭 배송 유형과 상품이 실제로 담겼을 때의 배송 탭 유형이 일치할 때만 화면 수량을 표시 (양방향 수량 연동 방지)
@@ -10353,9 +11146,7 @@
 
                 // [신규] 예약배송 과일 상품 수량 무제한 처리
                 const isFruit = /과일/.test(p.matchKey || "") || /\[과일\]/.test(p.name || "");
-                if (currentDeliveryType === 'reserve' && isFruit) {
-                    stock = Infinity;
-                }
+                // [수정 2026-09-30] '예약 과일은 무제한' 규칙은 뺐다 — 공동구매로 합친 뒤 과일도 재고대로 판다
 
                 const isClosed = gIsClosedProduct(p);   // [신규] 주문관리에서 마감한 상품
                 const isSoldOut = stock <= 0 || isClosed;
@@ -10391,7 +11182,12 @@
                     //  사진을 누르면 상세가 열리니, 누를 수 있다는 것을 여기서 알린다.
                     `<div class="thumb-notice">상세보기 <span>›</span></div>` +
                     // [신규] 할인 상품은 사진 위쪽에 '15% 할인!' 띠를 두른다 (아래 '예시이미지입니다.'와 짝)
-                    (gIsSale(p) ? `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>` : '') +
+                    // [수정 2026-10-02] 문구를 적어 두었으면 띠에 그 문구만, 없으면 '2,000원 할인!' (사장님 요청)
+                    (gIsSale(p) ? ((gSaleBadgeOn(p) && gSaleBadgeText(p))
+                        ? `<div class="thumb-sale txt">${gSaleBadgeText(p).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</div>`
+                        : `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>`) : '') +
+                    // [수정 2026-10-02] 두 칸 카드 — 신선·냉장·당일배송 딱지는 사진 아래쪽에 겹쳐 둔다
+                    `<div class="thumb-badges">` + gFreshBadge(p) + gStorageBadge(p) + gTagBadges(p) + `</div>` +
                     `</div>` +
                     `<div class="item-info-top">` +
                     // [수정] [오늘의추천]은 이름이 아니라 isRecommend 값으로 그린다 (gRecommendMark).
@@ -10403,15 +11199,16 @@
                     //  색 글씨 말머리와 회색 수식어가 섞여 두 모양이었다. 땡처리 특가만 빨강을 남긴다(값 신호).
                     gCardNameHtml(p) +
                     `</div>` +
-                    gSaleNote(p) +
+                    gRatingHtml(p) +   // [수정 2026-10-02] 별 5개(반 개씩) + (후기 수) — 제목 바로 아래
                     gDeadlineHtml(p, isClosed) +   // [신규] 마감 시각 · 마감 날 카운트다운
                     // [신규] 할인 상품은 판매가 바로 위에 할인 전 금액을 작게 적어 준다.
                     (gOrigPriceLabel(p)
-                        ? `<div class="item-orig-price"><span class="off">${gDiscLabelOf(p)}</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`
+                        ? (gOrigWord(p)
+                            ? `<div class="item-orig-price"><span class="orig">${gOrigWord(p)} ${gOrigPriceLabel(p)}</span></div>`   // [수정 2026-10-02] 정상가 방식 (사장님 요청)
+                            : `<div class="item-orig-price"><span class="off">${gDiscLabelOf(p)}</span><span class="orig">${gOrigPriceLabel(p)}</span></div>`)
                         : '') +
                     `<div class="item-price-row">` +
-                    `<div class="item-badges">` + gStorageBadge(p) + gTagBadges(p) + `</div>` +   // [신규] 냉동·냉장 옆 딱지
-                    `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div>` +
+                    `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gSalePctHtml(p)}${gCardPriceLabel(p)}</div>` +
                     `</div>` +
                     `</div></div>` +
                     // [ver3] 수량(- 1 +)과 담기를 아래 한 줄로 모았다. 상세보기도 같은 줄 왼쪽에 둔다.
@@ -10437,7 +11234,14 @@
                 if (currentGroupBox) {
                     currentGroupBox.querySelector('.group-item-container').appendChild(card);
                 } else {
-                    container.appendChild(card);
+                    // [수정 2026-10-02] 묶음이 없는 목록도 두 칸 판에 담는다
+                    let _grid = container.lastElementChild;
+                    if (!_grid || !_grid.classList.contains('card-grid')) {
+                        _grid = document.createElement('div');
+                        _grid.className = 'card-grid';
+                        container.appendChild(_grid);
+                    }
+                    _grid.appendChild(card);
                 }
 
                 // [추가] 상품명 폰트 사이즈 자동 조절 (3줄까지 허용 후 축소)
@@ -10500,6 +11304,8 @@
         function gIsSale(p) { return gDiscountRateOf(p) > 0 || gDiscAmountOf(p) > 0; }
         function gIsSaleToday(p) { return gIsSale(p) && !(p.saleToToday === false || p.saleToToday === 'false'); }
         function gSaleBadgeOn(p) { return gIsSale(p) && !(p.saleBadge === false || p.saleBadge === 'false'); }
+        // [신규 2026-10-02] 할인 섬네일 문구 — 주문관리 상세옵션에서 직접 쓴다. 비우면 문구 없음 (사장님 요청: 기본은 공란)
+        function gSaleBadgeText(p) { return String((p && p.saleBadgeText) || '').trim(); }
         function gDiscLabelOf(p) { return gDiscAmountOf(p) > 0 ? `${gDiscAmountOf(p).toLocaleString()}원 할인` : `${gDiscountRateOf(p)}% 할인`; }
 
         // 100원 단위로 버린다 (관리자 화면의 '예상 가격'과 똑같은 계산이라야 한다)
@@ -10516,6 +11322,18 @@
         }
 
         // 할인 전 금액. 할인이 없거나 값이 0이면 빈 문자열 → 카드에 줄 자체가 안 나온다.
+        // [신규 2026-10-02] 주문관리에서 '정상가'로 적은 할인이면 그어진 금액 앞에 '정상가'를 붙인다 (사장님 요청)
+        function gOrigWord(p) {
+            return (p && p.discountType === 'amount' && p.discountAmountMode === 'list') ? '정상가' : '';
+        }
+        // [신규 2026-10-02] 정상가 방식 — 최종 금액 앞에 빨간 'n%' 딱지. 반올림 (사장님 요청)
+        function gSalePctHtml(p) {
+            if (!gOrigWord(p)) return '';
+            const before = parseInt(p && p.price) || 0;
+            if (before <= 0) return '';
+            const pct = Math.round((before - gApplyDiscount(p, before)) / before * 100);
+            return pct > 0 ? `<span class="sale-pct">${pct}%</span>` : '';
+        }
         function gOrigPriceLabel(p) {
             if (!gIsSale(p)) return '';
             const base = parseInt(p && p.price) || 0;
@@ -10536,29 +11354,41 @@
                    (앞말은 4~40자, 그 안에 [ ] ( ) ! ? 가 없어야 한다. 뒤 이름은 4자 이상)
                 ①②가 같이 있어도 된다: '[사다드림] 한지민의 최애 떡볶이!! 신토불이 떡볶이' */
         function gNameSplit(name) {
+            // [수정] 대괄호는 따로 모은다(brs) — 예전처럼 색을 입혀 보여 주려고. (괄호)·수식어는 회색 줄(leads)로
+            const brs = [];
             const takeBr = (str) => {
                 const m = str.match(/^((?:\s*\[[^\]]*\]|\s*\([^)]*\))+)\s*/);
                 if (!m || str.length <= m[0].length) return { pre: '', rest: str };
-                return { pre: m[1].trim().replace(/\]\s*\[/g, ' · ').replace(/[\[\]]/g, ''), rest: str.slice(m[0].length) };
+                const paren = [];
+                (m[1].match(/\[[^\]]*\]|\([^)]*\)/g) || []).forEach(t => {
+                    if (t[0] === '[') { const v = t.slice(1, -1).trim(); if (v) brs.push(v); }
+                    else paren.push(t);
+                });
+                return { pre: paren.join(' '), rest: str.slice(m[0].length) };
             };
             const a = takeBr(String(name || '').trim());
             const lm = a.rest.match(/^([^!?[\]()]{4,40}[!?]+)\s+(.{4,})$/);
             const mid = lm ? lm[1].replace(/[!?\s]+$/, '') : '';
             const b = takeBr(lm ? lm[2].trim() : a.rest);
-            return { leads: [a.pre, mid, b.pre].filter(Boolean), main: b.rest };
+            return { brs, leads: [a.pre, mid, b.pre].filter(Boolean), main: b.rest };
         }
         function gNameParts(p) {
             const ns = gNameSplit(gDisplayName(p));
             // [신규] 주문관리에서 따로 적은 대괄호(nameTags)·수식어(nameLead). 예전 상품은 이름 안에 든 것을 떼어 쓴다
             const E = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-            const own = [...(Array.isArray(p.nameTags) ? p.nameTags : []), p.nameLead || ''].map(x => String(x || '').trim()).filter(Boolean).map(E);
-            const lead = [
-                gSaleBadgeOn(p) ? '<span class="lead-sale">땡처리 특가</span>' : '',
-                gIsRecommendProduct(p) ? '오늘의추천' : '',
-                gIsFreshProduct(p) ? '신선식품' : '',
-                ...own,
-                ...ns.leads
-            ].filter(Boolean).join(' · ');
+            const clean = arr => arr.map(x => String(x || '').trim().replace(/^\[|\]$/g, '').trim()).filter(Boolean);
+            // [수정] 대괄호 말머리는 예전처럼 색을 입힌다 — 특가 빨강, 신선식품 초록, 오늘의추천·그 밖의 대괄호 주황
+            const br = (t, cls) => `<span class="${cls}">[${E(t)}]</span>`;
+            const tags = [
+                // [수정 2026-10-02] 할인 문구는 말머리 줄에서 빼고 섬네일 띠에만 둔다 (사장님 요청)
+                gIsRecommendProduct(p) ? br('오늘의추천', 'lead-br') : '',
+                // [수정 2026-10-02] 신선식품은 말머리 줄 [신선식품] 대신 딱지 줄 맨 앞 초록 '신선' 딱지로 (gFreshBadge, 사장님 요청)
+                ...clean(Array.isArray(p.nameTags) ? p.nameTags : []).map(t => br(t, 'lead-br')),
+                ...ns.brs.map(t => br(t, 'lead-br'))
+            ].filter(Boolean).join(' ');
+            // 수식어는 지금처럼 회색
+            const words = [p.nameLead ? E(String(p.nameLead).trim()) : '', ...ns.leads].filter(Boolean).join(' · ');
+            const lead = [tags, words].filter(Boolean).join(' ');
             return { lead, main: ns.main };
         }
         function gCardNameHtml(p) {
@@ -10577,13 +11407,22 @@
            고를 옵션이 있는 상품은 'N가지 중 선택'이 저절로 붙는다. 모양은 보관방법 딱지와 같다. */
         function gTagBadges(p) {
             const raw = Array.isArray(p && p.tags) ? p.tags : String((p && p.tags) || '').split(',');
-            const tags = raw.map(t => String(t || '').trim()).filter(Boolean).slice(0, 2);
+            // [수정 2026-10-01] '당일배송'은 손으로 붙이지 않고 저절로 붙인다 — 오늘 날짜 공동구매 상품에는 전부 (마감·품절이어도)
+            const tags = raw.map(t => String(t || '').trim()).filter(t => t && t !== '당일배송').slice(0, 2);
+            if (p && gIsGbProduct(p) && gGbDateOf(p) === gTodayYmd()) tags.unshift('당일배송');
             if (gHasChoiceOptions(p)) {
                 const g = (p.options || []).find(g => Array.isArray(g.items) && g.items.length > 1);
                 if (g) tags.push(`${g.items.length}가지 중 선택`);
             }
             const E = t => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
             return tags.map(t => `<span style="flex:0 0 auto; font-size:14px; font-weight:800; color:#4f5b46; background:#f1f4f7; padding:6px 11px; border-radius:8px; white-space:nowrap; line-height:1.2;">${E(t)}</span>`).join('');
+        }
+
+        // [신규 2026-10-02] 신선식품 딱지 — 다른 딱지와 같은 크기, 색만 초록. 딱지 줄 맨 앞에 둔다 (사장님 요청)
+        function gFreshBadge(p) {
+            if (!gIsFreshProduct(p)) return '';
+            return `<span style="flex:0 0 auto; font-size:14px; font-weight:800; color:#2e7d32; background:#e8f5e9;` +
+                ` padding:6px 11px; border-radius:8px; white-space:nowrap; line-height:1.2;">신선</span>`;
         }
 
         function gStorageBadge(p) {
@@ -10657,7 +11496,7 @@
         function gGetDeliveryDateKey(p) {
             const s = String((p && (p.matchKey || p.date)) || "").replace(/[.\/]/g, '-').trim();
             const m = s.match(/(\d{2,4})-(\d{1,2})-(\d{1,2})/);
-            if (!m) return "";
+            if (!m) return (p && typeof gGbDateOf === 'function' && gIsGbProduct(p)) ? gGbDateOf(p) : "";   // [수정 2026-09-30]
             let y = parseInt(m[1]); if (y < 100) y += 2000;
             return `${y}-${String(parseInt(m[2])).padStart(2, '0')}-${String(parseInt(m[3])).padStart(2, '0')}`;
         }
@@ -10675,8 +11514,10 @@
         //  (배달비·차감 줄은 상품이 아니므로 other)
         function gOrderCategory(it) {
             if (!it) return 'other';
-            if (gIsFeeRow(it.name)) return 'other';
+            if (gIsFeeRow(it.name) || gIsPointRow(it.name)) return 'other';
             if (it.isSada === true) return 'sada';
+            if (it.kind === 'fruit' || it.kind === 'veg') return 'fruit';   // [신규 2026-09-30] 공동구매 종류
+            if (it.kind === 'sada') return 'sada';
             const mk = String(it.matchKey || it.date || '').trim();
             if (/과일|야채|채소/.test(mk)) return 'fruit';
             if (/^(?:\d{4}|\d{2})[.\-]\d{1,2}[.\-]\d{1,2}$/.test(mk)) return 'group';
@@ -10692,6 +11533,13 @@
         function gIsFeeRow(itemName) {
             const n = String(itemName || "").replace(/\[취소\]/g, "").trim();
             return n === "배달비" || n === FEE_REFUND_NAME;
+        }
+
+        // [신규 2026-10-02] 주문할 때 쓴 포인트 줄 — 상품도 배달비도 아니다 (재고·무료배달 기준·물건 개수에서 뺀다)
+        //  이 이름은 규칙관리가 그대로 본다. 바꾸면 규칙도 같이 바꿔야 한다
+        const POINT_USE_NAME = '포인트 사용';
+        function gIsPointRow(itemName) {
+            return String(itemName || '').replace(/\[취소\]/g, '').trim() === '포인트 사용';
         }
 
         // [신규] 주문내역에서 배달비·배달비 차감은 상품 뒤에 오도록 정렬한다.
@@ -10735,7 +11583,148 @@
         //  사다드림과 신선식품이 여기에 든다. 둘 다 그날 드셔야 하는 물건이라
         //  더 늦은 날짜 상품과 한 차에 실어 보낼 수 없다.
         function gIsDateBoundProduct(p) {
+            // 과일도 제날 배달해야 하면 주문관리에서 '신선'을 켜 둔다 (2026-09-30 사장님 결정)
             return gIsSadaProduct(p) || gIsFreshProduct(p);
+        }
+
+        /* ===== [신규 2026-09-30] 공동구매(당일판매 + 예약판매 합침) =====
+           · 공동구매에 드는 상품: 날짜 공구 · 사다드림 · 날짜 없는 옛 당일 과일(오늘로 본다) · 오늘 특가
+           · 종류(kind): 주문관리가 저장한 값이 먼저, 없는 옛 상품은 사다드림·신선식품·이름·분류로 짐작
+           · 오늘 상품은 당일 마감시각이 지나거나 휴무일이면 '마감' (목록에는 남는다) */
+        const GB_KINDS = ['group', 'fruit', 'veg', 'sada', 'fresh'];
+        function gTodayYmd() { return gYmdOf(new Date()); }
+        function gYmdFrom(v) {
+            const m = String(v || '').replace(/[.\/]/g, '-').trim().match(/^(\d{2,4})-(\d{1,2})-(\d{1,2})$/);
+            if (!m) return '';
+            let y = parseInt(m[1]); if (y < 100) y += 2000;
+            return `${y}-${String(parseInt(m[2])).padStart(2, '0')}-${String(parseInt(m[3])).padStart(2, '0')}`;
+        }
+        // 날짜 없이 올라간 옛 당일 과일·야채·기타 (상시판매로 넘긴 것은 빼고)
+        function gIsLegacyTodayProduct(p) {
+            if (!p || p.kind) return false;
+            if (String(gDisplayTabOf(p) || '').startsWith('onsite-')) return false;
+            const mk = String(p.matchKey || '').trim();
+            return mk === '과일' || mk === '야채' || mk === '기타' || /^(과일|야채|기타)_예약$/.test(mk);
+        }
+        function gKindOf(p) {
+            if (!p) return 'group';
+            if (GB_KINDS.includes(p.kind)) return p.kind;
+            if (gIsSadaProduct(p)) return 'sada';
+            const dt = String(p.displayTab || '');
+            if (dt === 'sada') return 'sada';
+            const mk = String(p.matchKey || ''), nm = String(p.name || '');
+            if (/야채|채소/.test(mk) || /\[야채\]|\[채소\]/.test(nm)) return 'veg';
+            if (/과일/.test(mk) || /\[과일\]/.test(nm) || dt === 'today-fruit') return 'fruit';
+            return 'group';
+        }
+        function gIsGbProduct(p) {
+            if (!p || p.name === '배달비') return false;
+            if (gIsSaleToday(p)) return true;
+            const dt = String(gDisplayTabOf(p) || '');
+            if (dt.startsWith('onsite-')) return false;
+            const mk = String(p.matchKey || '').trim();
+            if (mk.includes('코스트코')) return false;
+            if (gIsSadaProduct(p) || gIsLegacyTodayProduct(p)) return true;
+            return gIsDateOnlyKey(mk);
+        }
+        // 공동구매 상품의 받는 날 (옛 당일 과일·날짜 없는 특가는 오늘)
+        function gGbDateOf(p) {
+            if (!p) return '';
+            const d = gYmdFrom(p.matchKey) || gYmdFrom(p.date);
+            if (d) return d;
+            return (gIsLegacyTodayProduct(p) || gIsSaleToday(p)) ? gTodayYmd() : '';
+        }
+        // 종류 탭: chuseok · sada · fruit(과일·야채) · group(공구·신선식품·특가)
+        function gGbTabKind(p) {
+            if (gIsChuseokProduct(p)) return 'chuseok';
+            const k = gKindOf(p);
+            if (k === 'sada') return 'sada';
+            if (k === 'fruit' || k === 'veg') return 'fruit';
+            return 'group';
+        }
+        // 공동구매 목록에 보이는 상품 (노출·비공개·날짜 지남까지 본다)
+        function gGbVisible(p) {
+            if (!p) return false;
+            const status = String(p.status || '').trim(), mk = String(p.matchKey || '').trim();
+            if ((status === '비공개' || mk === '비공개') && !isAdminMode) return false;
+            if (!isAdminMode) {
+                const sr = p.showReserve !== undefined ? (p.showReserve === true || p.showReserve === 'true') : (p.show !== false && p.show !== 'false');
+                if (!sr && !(gIsSaleToday(p) && p.show !== false && p.show !== 'false')) return false;
+            }
+            if (!gIsGbProduct(p)) return false;
+            /* [신규 2026-09-30] 날짜 없는 예전 과일은 어제까지 켜 둔 것이면 자정부터 숨긴다.
+               예전에는 날이 바뀐 뒤 주문관리를 처음 열 때에야 숨겨져, 그때까지 손님 화면에 '마감'으로 떠 있었다.
+               오늘 노출을 켜거나 고친 것(updatedAt 이 오늘)은 그대로 보인다 — 주문관리 자동 숨김과 같은 잣대. */
+            if (!isAdminMode && gIsLegacyTodayProduct(p)) {
+                const n = new Date();
+                if ((Number(p.updatedAt) || 0) < new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime()) return false;
+            }
+            const d = gGbDateOf(p);
+            return !!d && d >= gTodayYmd();
+        }
+        // 오늘이 쉬는 날인지 (토·일 영업 설정, 임시휴무일)
+        function gIsOffDay(ymd) {
+            const d = new Date(ymd + 'T12:00:00'), w = d.getDay();
+            return (w === 0 && !isSundayAsWeekday) || (w === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(ymd);
+        }
+        // 오늘 받는 공동구매 상품인데 지금 주문할 수 없는지 (당일 마감시각 지남·아직 안 열림·휴무일)
+        function gIsTodayGbClosed(p) {
+            if (isAdminMode || !gIsGbProduct(p)) return false;
+            const t = gTodayYmd();
+            /* [신규 2026-09-30] 날짜 없는 예전 과일은 '오늘' 노출을 켜거나 고친 것만 오늘 상품이다.
+               어제 켜 둔 채 남은 것은 주문관리가 숨기기 전까지 '마감'으로 보여, 어제 과일이 다시 팔리지 않게 한다. */
+            if (gIsLegacyTodayProduct(p)) {
+                const n = new Date();
+                if ((Number(p.updatedAt) || 0) < new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime()) return true;
+            }
+            if (gGbDateOf(p) !== t) return false;
+            return gTodayClosedNow(new Date()) || gIsOffDay(t);
+        }
+        // 오늘 상품의 당일 마감 시각(ms). 카드에 '마감까지 00:00:00'을 띄우는 데 쓴다
+        function gTodayGbCloseAt(p) {
+            if (!gIsGbProduct(p) || gGbDateOf(p) !== gTodayYmd() || gIsTodayGbClosed(p)) return 0;
+            if (gTodayManual(new Date()) || (gTodaySale || {}).auto === false) return 0;
+            const mi = gHMOf(gTodaySale.close, 900), d = new Date();
+            d.setHours(Math.floor(mi / 60), mi % 60, 0, 0);
+            return d.getTime();
+        }
+        // 장바구니에 오늘 받는 공동구매 상품이 있는지
+        function gCartHasTodayGb() {
+            const t = gTodayYmd();
+            for (const k in cart) {
+                if (!cart[k] || cart[k] <= 0) continue;
+                const p = gFindCartProduct(k);
+                if (p && gIsGbProduct(p) && gGbDateOf(p) === t) return true;
+            }
+            return false;
+        }
+        // 공동구매 화면 — 종류 탭은 initMainTabs 가 그리고, 여기서는 날짜 칩과 목록을 그린다
+        function gRenderGroupBuy(area, isUserAction) {
+            let kindKey = (currentMainTab === CHUSEOK_TAB) ? 'chuseok' : String(currentMainTab || '').replace(/^gb-/, '');
+            if (!['all', 'group', 'fruit', 'sada', 'chuseok'].includes(kindKey)) kindKey = 'all';
+            const list = (productsData || []).filter(p => gGbVisible(p) && (kindKey === 'all' || gGbTabKind(p) === kindKey));
+            const t = gTodayYmd();
+            const dates = [...new Set(list.map(gGbDateOf))].filter(Boolean).sort();
+            if (!window.gGbPickedDate || (window.gGbPickedDate !== 'all' && !dates.includes(window.gGbPickedDate))) window.gGbPickedDate = 'all';
+            if (dates.length >= 1) {   // [수정 2026-09-30] 날짜가 하나뿐이어도 칩을 보여 준다 (과일 탭 등 — 사장님 요청)
+                area.style.display = 'flex';
+                ['all'].concat(dates).forEach(d => {
+                    const btn = document.createElement('button');
+                    btn.className = 'date-btn' + (window.gGbPickedDate === d ? ' active' : '');
+                    btn.dataset.date = `gb:${kindKey}:${d}`;
+                    btn.innerText = d === 'all' ? '전체' : (d === t ? '오늘' : gShortDateLabel(formatDateWithDay(d)));
+                    btn.onclick = () => {
+                        window.gGbPickedDate = d;
+                        document.querySelectorAll('#date-filters .date-btn').forEach(b => b.classList.toggle('active', b === btn));
+                        renderList(btn.dataset.date);
+                        if (isUserAction) btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    };
+                    area.appendChild(btn);
+                });
+            } else {
+                window.gGbPickedDate = 'all';
+            }
+            renderList(`gb:${kindKey}:${window.gGbPickedDate}`);
         }
 
         // [신규] '오늘의추천' 상품인지 — 사다드림과 같은 방식.
@@ -10775,15 +11764,12 @@
            이름이 곧 상품의 열쇠(재고 조정키·주문 기록·중복 차단)라서 이름을 건드리면
            지난 주문과 재고가 통째로 어긋나기 때문이다. */
         function gSaleMark(p, size) {
-            if (!gSaleBadgeOn(p)) return '';   // [수정] '[땡처리 특가]' 문구는 고른 상품에만
-            return `<span style="color:#e11d48; font-size: ${size || '0.9em'};">[땡처리 특가]</span><br>`;
+            if (!gSaleBadgeOn(p) || !gSaleBadgeText(p)) return '';   // [수정] 문구는 고른 상품에만 (지금은 쓰는 곳 없음)
+            const t = gSaleBadgeText(p).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            return `<span style="color:#e11d48; font-size: ${size || '0.9em'};">[${t}]</span><br>`;
         }
 
-        // [신규] 특가 상품 안내 문구. 상품명 바로 아랫줄에 붙는다.
-        function gSaleNote(p) {
-            if (!gSaleBadgeOn(p)) return '';
-            return `<div class="item-sale-note">(수량이 많지 않습니다.)</div>`;
-        }
+        // [삭제 2026-10-02] 특가 상품 안내 문구 '(수량이 많지 않습니다.)'(gSaleNote) — 사장님 요청으로 뺐다
 
         /* ===== [신규] 재고 선점 (오버셀 방지) =====
            Firebase 실시간DB REST의 조건부 쓰기를 쓴다.
@@ -10803,7 +11789,7 @@
 
         // 옵션 항목 하나를 가리키는 키. 상품키 + 옵션그룹 + 항목이름.
         function gOptStockKey(p, groupName, itemName) {
-            const base = fGetAdjKey((p && (p.matchKey || p.date)) || '', (p && p.name) || '');
+            const base = fGetAdjKey((p && (p.matchKey || p.date)) || '', (p && p.name) || '', p && p.sid);
             return base + '__' + fSafeKey(groupName) + '__' + fSafeKey(itemName);
         }
 
@@ -11834,9 +12820,7 @@
             // [신규] 예약배송 과일 상품 수량 무제한 처리
             const p = productsData.find(pd => pd.name === gCartName(name));
             const isFruit = p && (/과일/.test(p.matchKey || "") || /\[과일\]/.test(p.name || ""));
-            if (currentDeliveryType === 'reserve' && isFruit) {
-                stock = Infinity;
-            }
+            // [수정 2026-09-30] '예약 과일은 무제한' 규칙은 뺐다
 
             // [수정] 당일구매 / 예약구매 혼합 차단은 담을 때가 아니라 탭 진입 시점(switchDeliveryType)에서 처리한다.
 
@@ -12039,7 +13023,7 @@
 
             // 예약구매 과일은 수량 무제한 (상품 목록과 동일 규칙)
             const isFruit = p && (/과일/.test(p.matchKey || "") || /\[과일\]/.test(p.name || ""));
-            if ((cartDeliveryType[name] || currentDeliveryType) === 'reserve' && isFruit) stock = Infinity;
+            // [수정 2026-09-30] '예약 과일은 무제한' 규칙은 뺐다
 
             const val = Math.max(0, (cart[name] || 0) + change);
             if (change > 0 && val > stock) {
@@ -12128,26 +13112,23 @@
 
             // [수정] 상품카드와 같은 방식 — [오늘의추천]은 isRecommend 값으로 그리고 이름에서는 떼어낸다.
             // [ver3] 카드와 같이 말머리·수식어는 회색 작은 줄로 위에, 이름은 아래에
+            try { gRenderDetailReviews(p); } catch (e) { }   // [신규 2026-10-02] 상세 아래 후기
             const _np = gNameParts(p);
             document.getElementById('detail-title').innerHTML =
                 (_np.lead ? `<div class="item-lead detail-lead">${_np.lead}</div>` : '') + _np.main;
             // [수정] 할인 상품은 상세보기에서도 할인 전 금액을 위에 작게 적고, 판매가를 빨간색으로 바꾼다.
             //  글자 크기 22px의 0.6배로, 카드와 같은 비율을 쓴다.
-            // [신규] 특가 상품은 상품명 아랫줄에 안내 문구를 붙인다 (상품카드와 같은 문구)
-            if (gSaleBadgeOn(p)) {
-                document.getElementById('detail-title').insertAdjacentHTML('beforeend',
-                    `<div style="margin-top:6px; font-size:16px; font-weight:700; color:#e11d48;">(수량이 많지 않습니다.)</div>`);
-            }
+            // [삭제 2026-10-02] 특가 상품 이름 밑 '(수량이 많지 않습니다.)' — 카드와 함께 뺐다 (사장님 요청)
             const _dPriceEl = document.getElementById('detail-price');
             const _dRate = gIsSale(p);
             _dPriceEl.style.color = _dRate ? '#e11d48' : 'var(--nego-orange)';
             _dPriceEl.innerHTML =
                 (gOrigPriceLabel(p)
                     ? `<div style="display:flex; align-items:baseline; gap:6px; font-size:17px; font-weight:900; margin-bottom:3px;">`
-                      + `<span style="color:#e11d48;">${gDiscLabelOf(p)}</span>`
-                      + `<span style="color:#8b9682; font-weight:700; text-decoration:line-through;">${gOrigPriceLabel(p)}</span></div>`
+                      + (gOrigWord(p) ? '' : `<span style="color:#e11d48;">${gDiscLabelOf(p)}</span>`)   // [수정 2026-10-02] 정상가 방식은 'n원 할인' 대신 n% 딱지
+                      + `<span style="color:#8b9682; font-weight:700; text-decoration:line-through;">${gOrigWord(p) ? gOrigWord(p) + ' ' : ''}${gOrigPriceLabel(p)}</span></div>`
                     : '')
-                + gCardPriceLabel(p);
+                + gSalePctHtml(p) + gCardPriceLabel(p);
             document.getElementById('detail-desc').style.whiteSpace = 'pre-wrap';
             // 설명은 따로 받아 온다. 나머지 화면은 기다리지 않고 먼저 그린다.
             document.getElementById('detail-desc').innerText = "";
@@ -12297,11 +13278,26 @@
             if (selectedShippingMethod === '배달주문') {
                 // [수정] 당일구매 탭이 열려 있어도 장바구니에 예약(공동구매) 상품이 섞였으면 예약 기준 안내로 표시
                 // [ver3] 긴 문장 목록을 '말머리 + 짧은 한 줄'로. 가장 중요한 것(입금)을 맨 위에 둔다
-                const payBy = (currentDeliveryType === 'reserve' || gHasFutureReserveInCart()) ? '오늘 밤 12시' : gTodayCloseWords();
+                // [수정 2026-09-30] 오늘 받는 공동구매 상품만 있으면 당일 마감시각까지, 뒷날 상품이 있으면 밤 12시까지
+                /* [수정 2026-10-01] 상시판매만 담은 주문도 오늘 나가면(마감 전·영업일) 마감시각까지 — 완료 안내와 같은 잣대 (사장님 요청).
+                   예전에는 보고 있는 탭(currentDeliveryType)으로 갈라서, 상시판매만 담고 공동구매 탭에서 주문하면 밤 12시로,
+                   상시판매 탭에서 마감 뒤 주문하면(실제로는 다음 영업일 배달) 이미 지난 마감시각으로 나왔다. */
+                const _cartOnlyOnsite = (() => {
+                    let n = 0;
+                    for (const k in cart) {
+                        if (!(cart[k] > 0)) continue;
+                        const p = gFindCartProduct(k);
+                        if (!p || gIsGbProduct(p) || gIsSadaProduct(p)) return false;
+                        n++;
+                    }
+                    return n > 0;
+                })();
+                const _goesToday = !gIsOffDay(gTodayYmd()) && !gTodayAfterClose(new Date());
+                const payBy = (!gHasFutureReserveInCart() && (gCartHasTodayGb() || (_cartOnlyOnsite && _goesToday))) ? gTodayCloseWords() : '오늘 밤 12시';
                 noticeArea.innerHTML = `
                     <div class="cf-notes">
                         <div><span>입금</span><span><b>${payBy}까지</b> 입금해 주세요. 입금이 없으면 주문이 자동으로 취소돼요.</span></div>
-                        <div><span>배달</span><span>도착하면 바로 확인해 주세요. 바깥에 오래 두면 상할 수 있어요.</span></div>
+                        <div><span>배달</span><span><b>오후 3시~6시</b> 사이에 순차적으로 배달돼요. 배달이 완료되면 <b>개별 문자로 알려드려요.</b></span></div>
                         <div><span>취소</span><span>주문서에서 상품이 내려간 뒤에는 취소가 어려워요.</span></div>
                         <div><span>일정</span><span>업체·물류 사정으로 날짜가 바뀌거나 취소될 수 있어요.</span></div>
                     </div>
@@ -12322,6 +13318,7 @@
 
             let totalSum = 0;
             let totalQty = 0;
+            let _ptGoods = 0;   // [신규 2026-10-02] 포인트를 쓸 수 있는 상품 금액 (사다드림·배달비 빼고)
 
             const grouped = {};
             for (const itemName in cart) {
@@ -12334,11 +13331,17 @@
                     let currentPrice = gCartPaidUnitPrice(product, itemName);
                     const lineTotal = gCartLineTotal(product, itemName);
 
-                    const date = product.displayDate;
+                    /* [수정] 묶음 머리를 상품의 날짜 칸 글자로만 정했더니, 날짜 칸에 '🌡️상온'·'🧊냉동'이
+                       남아 있는 일부 상시판매 상품만 따로 떨어져 나왔다. 상시판매는 보관 방식과 상관없이
+                       '상시판매' 한 묶음으로 모은다. 예약 상품은 그대로 날짜별로 묶는다. */
+                    const isOnsite = String(product.displayTab || '').startsWith('onsite')
+                        || ['냉장', '냉동', '상온', '실온', '현장판매', '상시판매'].includes(String(mKey).trim());
+                    const date = isOnsite ? '상시판매' : product.displayDate;
                     if (!grouped[date]) grouped[date] = [];
                     grouped[date].push({ ...product, qty: q, price: currentPrice, optionText: gCartOptionText(itemName), lineTotal: lineTotal });
                     totalSum += lineTotal;
                     totalQty += q;
+                    if (!gIsSadaProduct(product)) _ptGoods += lineTotal;
                 }
             }
 
@@ -12392,6 +13395,8 @@
             }
 
             const sortedDates = Object.keys(grouped).filter(d => d !== "배달비").sort((a, b) => {
+                // 상시판매 묶음은 날짜 묶음들 뒤에 둔다
+                if ((a === '상시판매') !== (b === '상시판매')) return a === '상시판매' ? 1 : -1;
                 const ka = grouped[a][0].matchKey;
                 const kb = grouped[b][0].matchKey;
                 const da = new Date(ka.replace(/\./g, '-')).getTime();
@@ -12403,10 +13408,77 @@
                 sortedDates.push("배달비"); // 배달비 항목은 항상 정렬 맨 마지막에 깔끔하게 배치
             }
 
+            /* [신규] 합배송 — 배달이면 주문을 저장할 때 사다드림을 뺀 모든 상품의 배달일을
+               담긴 예약 상품 중 가장 늦은 날로 맞춘다(아래 주문 저장 쪽 '합배송 처리'와 같은 잣대).
+               그런데 확인 창은 상품마다 제 날짜를 보여 줘서, 손님이 따로따로 오는 줄 알았다. */
+            const isSadaGroup = d => (grouped[d] || []).every(x => x.isSada === true || /사다드림/.test(String(x.name || '')) || x.name === '배달비');
+            let mergeDate = null;
+            if (selectedShippingMethod === '배달주문') {
+                const ymd = s => {
+                    const m = String(s || '').trim().match(/^(\d{2,4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+                    if (!m) return null;
+                    return `${m[1].length === 2 ? '20' + m[1] : m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+                };
+                let maxDate = null;
+                for (const k in cart) {
+                    if (!(cart[k] > 0)) continue;
+                    const p = gFindCartProduct(k);
+                    const d = p && ymd(p.matchKey);
+                    if (d && (!maxDate || d > maxDate)) maxDate = d;
+                }
+                if (maxDate) {
+                    const now = new Date();
+                    const f = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    const todayYmd = f(now);
+                    const tmr = new Date(now); tmr.setDate(now.getDate() + 1);
+                    const dow = now.getDay();
+                    const off = (dow === 0 && !isSundayAsWeekday) || (dow === 6 && !isSaturdayAsWeekday) || publicHolidays.includes(todayYmd);
+                    const late = off || gTodayAfterClose(new Date());
+                    let u = maxDate;
+                    if (maxDate === todayYmd && late) u = f(tmr);
+                    if (u > todayYmd || !late) mergeDate = u;
+                }
+            }
+            /* [수정] 배달이면 사다드림을 뺀 상품(예약·상시 모두)을 실제로 함께 가는 날 한 묶음으로 모은다.
+               머리는 '10월1일(목) 배송일' 하나다. 사다드림은 저장할 때도 제 날짜로 가므로 따로 둔다.
+               묶음 열쇠는 사다드림 날짜 묶음과 글자가 겹칠 수 있어 따로 만든 이름을 쓴다. */
+            const MERGED = '__배송일__';
+            let mergedFrom = 0;   // 몇 묶음을 합쳤나 — 둘 이상이면 '합배송'이라고 날짜 위에 적는다
+            if (mergeDate) {
+                const merged = [];
+                sortedDates.filter(d => d !== '배달비' && !isSadaGroup(d)).forEach(d => {
+                    mergedFrom++;
+                    merged.push(...grouped[d]);
+                    delete grouped[d];
+                });
+                if (merged.length) {
+                    grouped[MERGED] = merged;
+                    const rest = sortedDates.filter(d => grouped[d]);
+                    sortedDates.length = 0;
+                    sortedDates.push(MERGED, ...rest);
+                }
+            }
+
+            /* [신규] 오늘 받는 묶음이면 날짜 뒤에 초록 '오늘'을 붙인다.
+               목록에서는 '오늘'이라고 보고 담았는데 확인 창에는 날짜만 있어 당일인지 헷갈렸다.
+               묶음 머리가 '9월 30일 (화)' 같은 말이라, 오늘 날짜도 같은 말로 바꿔 놓고 견준다. */
+            const _todayHead = String(formatDateWithDay(gTodayYmd())).replace(/\s/g, '');
+            const _todayTag = lab => (String(lab || '').replace(/\s/g, '') === _todayHead)
+                ? ' <span style="font-size:12px; font-weight:800; color:#3d8f19;">오늘</span>' : '';
+
             sortedDates.forEach(date => {
+                // 날짜 묶음은 그 날이 무슨 날인지 옆에 적는다 (픽업이면 픽업일, 배달이면 배송일)
+                const dayWord = selectedShippingMethod === '배달주문' ? '배송일' : '픽업일';
+                const _dateLabel = date === MERGED ? formatDateWithDay(mergeDate) : date;
+                const head = (date === MERGED || /\d+월\s*\d+일/.test(String(date || '')))
+                    ? `${_dateLabel}${_todayTag(_dateLabel)} <span class="cf-date-word">${dayWord}</span>`
+                    : (date || '');
+                const mergeNote = (date === MERGED && mergedFrom >= 2)
+                    ? `<div class="cf-merge-note"><span>합배송</span>받는 날이 다른 상품을 한꺼번에 보내드려요</div>` : '';
                 let groupHtml = `
                     <div class="cf-group">
-                        <div class="cf-date">${date}</div>
+                        ${mergeNote}
+                        <div class="cf-date">${head}</div>
                         <div>
                 `;
 
@@ -12437,8 +13509,12 @@
 
             const summary = document.getElementById('confirm-summary-area');
             summary.innerHTML = `
-                <div class="cf-sum"><span>합계 <small>총 ${totalQty}개</small></span><b>${totalSum.toLocaleString()}원</b></div>
+                <div id="cf-points"></div>
+                <div class="cf-sum"><span>합계 <small>총 ${totalQty}개</small></span><b id="cf-sum-val">${totalSum.toLocaleString()}원</b></div>
             `;
+            // [신규 2026-10-02] 포인트 쓰기 — 창을 열 때마다 '안 쓰기'로 시작한다
+            window.gPointUse = 0;
+            try { gPaintConfirmPoints(totalSum, _ptGoods); } catch (e) { }
 
             const submitBtn = document.getElementById('btn-submit-order');
             if (submitBtn) {
@@ -12477,7 +13553,8 @@
                 }
             }
 
-            if (hasTodayOnlyItem && hasReserveOnlyItem) {
+            // [수정 2026-09-30] 당일·예약을 공동구매 하나로 합쳐 이 막기는 쓰지 않는다 (날짜가 다른 것은 아래 합배송 규칙이 맡는다)
+            if (false && hasTodayOnlyItem && hasReserveOnlyItem) {
                 showSystemModal("당일판매 상품과 예약판매 상품은 함께 주문할 수 없습니다.<br><br>구매 유형별(당일판매 및 예약판매)로 각각 나누어 따로 주문해 주세요.", 'alert');
                 return;
             }
@@ -12499,7 +13576,7 @@
                 return;
             }
             const _shipSub = document.getElementById('ship-opt-delivery-sub');   // [ver3] 배달비는 설정값으로
-            if (_shipSub) _shipSub.textContent = `15,000원 이상 무료 · 아니면 ${Number(deliveryFee || 3000).toLocaleString()}원`;
+            if (_shipSub) _shipSub.textContent = `15,000원 이상 무료 · 미만 ${Number(deliveryFee || 3000).toLocaleString()}원`;
             document.getElementById('shipping-overlay').style.display = 'flex';
             checkScrollLock();
         }
@@ -12829,8 +13906,9 @@
                             //  기존에는 날짜 없는 상품을 무조건 다음날로 기록해서, 당일구매 과일만 주문하거나
                             //  상시판매만 주문하면 주문서에 내일 날짜로 올라가던 문제가 있었다.
                             //  (예약 상품과 함께 담긴 경우에는 아래 합배송 처리에서 배달일이 다시 맞춰진다)
-                            const _cartTab = cartDeliveryType[cartKey];
-                            if ((_cartTab === 'today' || _cartTab === 'onsite') && !isTodayOffOrAfterCutoff) {
+                            // [수정 2026-09-30] 공동구매로 합친 뒤에는 어느 탭에서 담았든 날짜 없는 상품(상시판매·예전 과일·특가)은
+                            //  당일 마감 전이고 휴무일이 아니면 오늘로 기록한다
+                            if (!isTodayOffOrAfterCutoff) {
                                 finalDate = todayStr;
                             }
                         } else {
@@ -12891,7 +13969,7 @@
                            지금까지 주문에는 상품 '이름'만 남아, 같은 물건이라도 이름을 조금 바꿔 올리면
                            딴 물건으로 세어졌다 (계란 한 가지가 아홉 이름으로 갈렸다).
                            번호가 함께 남으면 이름이 어떻든 하나로 묶인다. */
-                        allItems.push({ name: itemName, productCode: String((pData && pData.productCode) || '').trim(), qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada, cartKey: cartKey });   /* [신규] cartKey를 실어 보내 옵션 재고를 깎을 때 고른 항목을 찾는다 */
+                        allItems.push({ kind: gKindOf(pData), isGb: gIsGbProduct(pData), name: itemName, productCode: String((pData && pData.productCode) || '').trim(), sid: String((pData && pData.sid) || '').trim(), qty: q, price: currentPrice, subtotal: gCartLineTotal(pData, cartKey), date: finalDate, matchKey: mKey, isCategorized: isCategorized, isFV: isFV, isOnSite: isOnSite, isPushedByCutoff: isPushedByCutoff, optionText: optionText, agencyFee: agencyFee, isSada: _isSada, cartKey: cartKey });   /* [신규] cartKey를 실어 보내 옵션 재고를 깎을 때 고른 항목을 찾는다 */
                     }
                 }
 
@@ -13088,7 +14166,7 @@
                 // 2. [배달전용] 날짜 검증 (USER 요청: 배달 날짜가 다른 상품 혼합 방지, 공휴일 스킵 적용)
                 if (shippingMethod === '배달주문') {
                     let targetDateObj = new Date(now);
-                    if (currentDeliveryType === 'reserve' || gTodayAfterClose(new Date())) {
+                    if (gTodayAfterClose(new Date())) {   // [수정 2026-09-30]
                         targetDateObj.setDate(targetDateObj.getDate() + 1);
                     }
 
@@ -13171,6 +14249,17 @@
                     }
                 }
 
+                /* [신규 2026-10-02] 포인트를 쓰면 '포인트 사용' 마이너스 줄을 하나 붙인다.
+                   날짜·받는 방법은 함께 가는 상품(사다드림 뺀 첫 상품)과 같게 — 주문내역에서 같은 날 묶음에 들어간다 */
+                {
+                    const _goods = allItems.filter(it => !it.isExtra && !gIsFeeRow(it.name) && !gIsSadaOrder(it));
+                    const _ptUse = Math.min(parseInt(window.gPointUse) || 0, _goods.reduce((a, it) => a + (parseInt(it.subtotal) || 0), 0));
+                    if (_ptUse > 0 && _goods.length) {
+                        const base = _goods[0];
+                        allItems.push({ name: POINT_USE_NAME, qty: 1, price: -_ptUse, subtotal: -_ptUse, date: base.date, matchKey: base.matchKey, isCategorized: base.isCategorized, isFV: false, isOnSite: base.isOnSite, isPushedByCutoff: false, isSada: false, isPoint: true, optionText: '' });
+                    }
+                }
+
                 // 6. 주문 확인 및 결제 안내 흐름
                 if (shippingMethod === '배달주문') {
                     // [수정] 15,000원 이상 시 배달이 가능하고 배달비는 전면 무료이므로 즉시 주문 처리 진행
@@ -13188,7 +14277,10 @@
                     submitBtn.innerText = "주문확정";
                     submitBtn.style.opacity = "1";
                 }
-                if (err.message !== "EMPTY_CART" && err.message !== "INVALID_DATE" && err.message !== "MISSING_ADDRESS" && err.message !== "MIXED_DELIVERY_DATES") {
+                if (gIsLoginErr(err)) {
+                    gShowLoginExpired();
+                } else if (err.message !== "EMPTY_CART" && err.message !== "INVALID_DATE" && err.message !== "MISSING_ADDRESS" && err.message !== "MIXED_DELIVERY_DATES") {
+                    gReportError('주문 확인', err, { saved: false, ship: shippingMethod, cart: gCartLineForLog() });   // [신규 2026-10-01]
                     showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
                 }
             }
@@ -13243,7 +14335,13 @@
 
             if (isFinal) {
                 // [4번 단계] 주문 완료 후 입금 안내 — [ver3] 계좌번호 창과 같은 모양. 주황은 금액에만
-                const payBy = (currentDeliveryType === 'today' && !gHasFutureReserveItem(allItems)) ? `${gTodayCloseWords()}까지` : '오늘 밤 12시까지';
+                // [버그수정 2026-10-01] todayStr 은 주문 보내는 함수 안에만 있어 여기서는 없는 이름이었다.
+                //  주문이 저장된 뒤 이 안내를 그리다 멈춰, 배달 주문이 들어갔는데도 손님에게 '주문 처리 중 오류'가 떴다.
+                // [수정 2026-10-01] 상시판매만 담은 주문도 마감시각까지 — 확인 창과 맞춘다 (사장님 요청).
+                //  마감 뒤·휴무일 주문은 상시판매도 다음 영업일 날짜가 붙어 gHasFutureReserveItem 에 걸리므로 밤 12시로 간다.
+                const _mine = allItems.filter(it => !it.isExtra && !gIsFeeRow(it.name) && !it.isPoint);
+                const _onlyOnsite = _mine.length > 0 && _mine.every(it => !it.isGb && !gIsSadaOrder(it));
+                const payBy = (!gHasFutureReserveItem(allItems) && (_onlyOnsite || allItems.some(it => it.isGb && !gIsFeeRow(it.name) && String(it.date) === gTodayYmd()))) ? `${gTodayCloseWords()}까지` : '오늘 밤 12시까지';   // [수정 2026-09-30]
                 msg += `
                     <div class="pg">
                         <div class="pg-done">주문이 접수되었습니다</div>
@@ -13340,6 +14438,7 @@
         // 실질적인 주문 전송 로직 분리 (배달비 확인 후 실행을 위함)
         async function executeOrder(allItems, name, phone, shippingMethod, cashReceipt = "미발행", receiptPhone = "", cashReceiptType = "개인") {
             const submitBtn = document.getElementById('btn-submit-order');
+            let _orderSaved = false;   // [신규 2026-10-01] 주문이 DB에 다 들어갔나 — 그 뒤에 난 오류인지 오류 기록에 남긴다
 
             // 전송 시작 시 배달 마감 플래그 초기화
             // window.deliveryCutoffConfirmed = false; // 파라미터 방식으로 변경되어 필요없음
@@ -13551,7 +14650,7 @@
                 const newHistoryItems = saveItems.map(it => ({
                     timestamp: jsFormatDate(new Date(tempTimestamp)),
                     item: it.name,
-                    productCode: it.productCode || "",   // [신규] 이름이 바뀌어도 같은 물건으로 묶으려고 함께 남긴다
+                    productCode: it.productCode || "", sid: it.sid || "",   // [신규] 이름이 바뀌어도 같은 물건으로 묶으려고 함께 남긴다
                     qty: it.qty,
                     price: it.price,
                     total: it.subtotal,
@@ -13652,7 +14751,7 @@
                 {
                     const failed = [];
                     for (const it of saveItems) {
-                        if (gIsFeeRow(it.name)) continue;              // 배달비는 재고와 무관
+                        if (gIsFeeRow(it.name) || it.isPoint) continue;   // 배달비·포인트는 재고와 무관
                         if (it.isExtra) continue;                      // 지난 주문은 그때 이미 깎았다
 
                         /* [수정] 이름으로만 찾으면 같은 이름이 당일용·예약용으로 둘 이상 등록된 경우
@@ -13683,8 +14782,12 @@
                         }
 
                         // [신규] 그 사이 마감됐는지 먼저 본다 (무제한 상품도 마감은 막는다)
-                        const [_cl, _ex] = await Promise.all([gFetchLiveClosed(fGetAdjKey(it.matchKey || it.date, it.name)), gFetchLiveExpired(pData)]);
-                        if (_cl || _ex) {
+                        const [_cl, _ex] = await Promise.all([gFetchLiveClosed(fGetAdjKey(it.matchKey || it.date, it.name, it.sid || (pData && pData.sid))), gFetchLiveExpired(pData)]);
+                        /* [신규 2026-09-30] 확정 직전에 숨김도 한 번 더 본다 (공동구매 상품만 — 상시판매는 따로 논다).
+                           주문서를 켜 둔 채 자정을 넘기면 어제 상품이 목록에선 사라져도 장바구니엔 남는데,
+                           당일 마감 검사는 '받는 날이 오늘'인 것만 보므로 날이 바뀐 상품이 그대로 주문됐다. */
+                        const _hid = !!pData && gIsGbProduct(pData) && !gGbVisible(pData);
+                        if (_cl || _ex || _hid || gIsTodayGbClosed(pData)) {   // [수정 2026-09-30] 오늘 상품의 당일 마감도 막는다
                             failed.push({ name: it.name, need: parseInt(it.qty) || 0, remain: 0, closed: true });
                             continue;
                         }
@@ -13692,7 +14795,7 @@
                         if (gIsUnlimitedStock(pData)) continue;
 
                         let base = parseInt((pData && pData.originalStock) || 0) || 0;
-                        const adjKey = fGetAdjKey(it.matchKey || it.date, it.name);
+                        const adjKey = fGetAdjKey(it.matchKey || it.date, it.name, it.sid || (pData && pData.sid));
                         const need = parseInt(it.qty) || 0;
                         if (need <= 0) continue;
 
@@ -13764,9 +14867,46 @@
                     }
                 }
 
+                /* [신규 2026-10-02] 포인트를 썼으면 '포인트 사용' 줄부터 쓴다 — 포인트 기록·잔액과 한 번에 (규칙관리가 셋을 같이 본다).
+                   못 쓰면(다른 기기에서 그새 썼거나 모자라면) 주문을 만들지 않고, 잡아 둔 재고를 놓아 준다. */
+                const _ptItem = saveItems.find(it => it.isPoint);
+                const _ptKey = _ptItem ? fSafeKey(jsFormatDate(new Date(tempTimestamp))) + "_" + fSafeKey(_ptItem.name) + (_ptItem.__keySuffix || '') : '';
+                if (_ptItem) {
+                    const _ptLine = {
+                        ...payload,
+                        timestamp: jsFormatDate(new Date(tempTimestamp)),
+                        item: POINT_USE_NAME, productCode: "", sid: "",
+                        qty: 1, price: _ptItem.price, total: _ptItem.subtotal,
+                        pickupDate: jsFormatPickup(getDisplayDate(_ptItem)),
+                        optionText: "", optionPicks: [], agencyFee: 0, isSada: false, category: 'other'
+                    };
+                    delete _ptLine.items;
+                    const pw = await gWritePointUse(cleanPhone, _ptKey, _ptLine, -_ptItem.subtotal);
+                    if (!pw.ok) {
+                        for (const rv of reserved) { try { await gReleaseStockCAS(rv.adjKey, rv.qty); } catch (e) {} }
+                        for (const rv of reservedOpt) { try { await gReleaseOptionCAS(rv.optKey, rv.qty); } catch (e) {} }
+                        window.isDeliveryFeeAddedUnder15000 = false;
+                        window.isSadaDeliveryFeeAdded = false;
+                        window.isReserveDeliveryFeeAdded = false;
+                        window.gPointUse = 0;
+                        // 미리 넣어 둔 주문내역도 걷어 낸다 (주문을 만들지 않았으므로)
+                        fullHistoryData = (fullHistoryData || []).filter(x => !newHistoryItems.includes(x));
+                        try { localStorage.setItem(cacheKey_hist, JSON.stringify(fullHistoryData)); } catch (e) {}
+                        isHistoryProcessing = false;
+                        showSystemModal(`포인트를 쓰지 못했어요.<br>${pw.bal != null ? `남은 포인트 <b>${pw.bal.toLocaleString()}P</b><br>` : ''}다시 주문해 주세요.`, 'alert');
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerText = "주문확정 (재시도)";
+                            submitBtn.style.opacity = "1";
+                        }
+                        try { gLoadMyPointBal(); } catch (e) {}
+                        return;
+                    }
+                }
+
                 // 1. Firebase 주문 데이터 전송 (병렬 실행 및 대기)
                 //  [수정] 같은 상품을 합친 saveItems로 저장한다 (키 겹침 방지)
-                const fbPromises = saveItems.map(async it => {
+                const fbPromises = saveItems.filter(it => !it.isPoint).map(async it => {
                     const formattedTimestamp = jsFormatDate(new Date(tempTimestamp));
                     const orderKey = fSafeKey(formattedTimestamp) + "_" + fSafeKey(it.name) + (it.__keySuffix || '');
                     const fbItemUrl = `${FIREBASE_DB_URL}orders/${cleanPhone}/${orderKey}.json`;
@@ -13775,7 +14915,7 @@
                         ...payload,
                         timestamp: formattedTimestamp,
                         item: it.name,
-                        productCode: it.productCode || "",   // [신규] 이름이 바뀌어도 같은 물건으로 묶으려고 함께 남긴다
+                        productCode: it.productCode || "", sid: it.sid || "",   // [신규] 이름이 바뀌어도 같은 물건으로 묶으려고 함께 남긴다
                         qty: it.qty,
                         price: it.price,
                         // [버그수정] price × qty로 다시 계산하면 줄당 한 번 붙는 사다드림 대행료가 빠진다.
@@ -13833,7 +14973,10 @@
                 });
                 try {
                     await Promise.all(fbPromises);
+                    _orderSaved = true;
+                    if (_ptItem) { window.gPointUse = 0; try { gLoadMyPointBal(); } catch (e2) {} }   // [신규 2026-10-02] 메뉴 '내 포인트' 숫자
                 } catch (e) {
+                    if (_ptItem) { try { await gRefundPointUse(cleanPhone, _ptKey); } catch (e2) {} }   // [신규 2026-10-02] 쓴 포인트도 돌려준다
                     // [신규] 주문을 못 남겼으면 잡아 둔 재고를 도로 놓아 준다 (재고만 줄어드는 일 방지)
                     for (const rv of reserved) { try { await gReleaseStockCAS(rv.adjKey, rv.qty); } catch (e2) {} }
                     for (const rv of reservedOpt) { try { await gReleaseOptionCAS(rv.optKey, rv.qty); } catch (e2) {} }   // [신규] 옵션 재고도 도로 놓아 준다
@@ -13925,7 +15068,12 @@
                 window.isSadaDeliveryFeeAdded = false;
                 window.isReserveDeliveryFeeAdded = false;
                 document.getElementById('system-modal').style.display = 'none';
-                showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
+                if (gIsLoginErr(err)) gShowLoginExpired();
+                else {
+                    // [신규 2026-10-01] 저장된 뒤의 오류면 주문은 들어간 것이다 — 주문관리에서 바로 가려 볼 수 있게 남긴다
+                    gReportError(_orderSaved ? '주문 저장 뒤' : '주문 보내기', err, { saved: _orderSaved, ship: shippingMethod, cart: (allItems || []).filter(it => !it.isExtra).map(it => `${it.name}×${it.qty}`).join(', ') });
+                    showSystemModal("주문 처리 중 오류가 발생했습니다.<br><br><b>상세내용:</b> " + err.message + "<br><br>새로고침 후 다시 시도해보시기 바랍니다.", 'alert');
+                }
                 isHistoryProcessing = false;
                 if (submitBtn) {
                     submitBtn.disabled = false;
