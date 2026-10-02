@@ -1511,12 +1511,15 @@
         .card-grid .item-info-top > .item-price-row { margin-top: auto; padding-top: 6px; }
         .card-grid .item-info-top > .item-orig-price + .item-price-row { margin-top: 0 !important; padding-top: 0; }
         .card-grid .item-price-val { font-size: 19px !important; }
-        .card-grid .item-controls-bottom-v { padding: 8px 10px 0; gap: 6px !important; grid-column: auto !important; grid-row: auto !important; }
-        .card-grid .item-controls-bottom-v .qty-stepper.wide { flex: 0 0 auto; height: 36px !important; padding: 2px; }
-        .card-grid .item-controls-bottom-v .qty-stepper.wide .qty-step-btn { width: 24px; height: 32px; font-size: 15px; }
-        .card-grid .item-controls-bottom-v .qty-stepper.wide .qty-sel { width: 20px; flex: 0 0 20px; font-size: 14px; }
-        .card-grid .item-controls-bottom-v .btn-add-cart { height: 36px !important; font-size: 14px !important; padding: 0 4px; }
-        .card-grid .item-controls-bottom-v .qty-group { min-width: 0; }
+        /* [수정 2026-10-02] 수량 칸과 담기 단추가 칸 너비를 빈틈없이 나눠 채운다 (수량 : 담기 = 1 : 1.15) — 사장님 요청 */
+        .card-grid .item-controls-bottom-v { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: stretch; align-self: stretch; width: auto !important; box-sizing: border-box; padding: 8px 10px 0; gap: 6px !important; grid-column: auto !important; grid-row: auto !important; }
+        .card-grid .item-controls-bottom-v > :only-child { grid-column: 1 / -1; }   /* 품절 등 단추 하나뿐이면 한 줄 다 */
+        .card-grid .item-controls-bottom-v .qty-stepper.wide { display: flex !important; width: 100% !important; min-width: 0; box-sizing: border-box; height: 38px !important; padding: 2px; margin: 0 !important; }
+        .card-grid .item-controls-bottom-v .qty-stepper.wide .qty-step-btn { flex: 1 1 0; min-width: 0; width: auto; height: 34px; font-size: 16px; }
+        .card-grid .item-controls-bottom-v .qty-stepper.wide .qty-sel { width: 22px; flex: 0 0 22px; font-size: 15px; }
+        .card-grid .item-controls-bottom-v .qty-group { min-width: 0; width: 100% !important; margin: 0 !important; }
+        .card-grid .item-controls-bottom-v .add-cart-wrap { width: 100% !important; }
+        .card-grid .item-controls-bottom-v .btn-add-cart { width: 100% !important; height: 38px !important; font-size: 14px !important; padding: 0 4px; white-space: nowrap; }
 
         /* [신규 2026-10-02] 후기 쓰기 */
         .rv-item { font-size: 15px; font-weight: 800; color: #16200f; line-height: 1.4; margin-bottom: 10px; word-break: keep-all; }
@@ -1529,6 +1532,9 @@
         .rv-stars button b::before { content: '★'; }
         .rv-stars .rv-star-num { margin-left: 6px; font-size: 18px; font-weight: 800; color: #16200f; font-variant-numeric: tabular-nums; }
         .rv-count { margin-top: 6px; font-size: 13px; font-weight: 700; color: #8b9682; text-align: right; }
+        .rv-guide { margin: 12px 0 0; padding: 10px 12px 10px 26px; background: #f7f8f4; border-radius: 10px; font-size: 12.5px; font-weight: 600; color: #6f7a66; line-height: 1.65; word-break: keep-all; }
+        .rv-guide b { color: #3d8f19; font-weight: 800; }
+        .rv-guide li + li { margin-top: 2px; }
         .rv-count b { color: #3d8f19; }
         /* [수정 2026-10-02] 상태 글자(픽업완료) 밑에 같은 결로 — 테두리 없이 옅은 초록 바탕의 작은 글자 */
         .rv-write-btn { border: none; background: #eef7e8; color: #3d8f19; font-size: 12px; font-weight: 800; line-height: 1.2; padding: 4px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-family: inherit; }
@@ -2775,7 +2781,13 @@
                 <div class="rv-stars" id="rv-stars"></div>
                 <textarea id="rv-text" class="v3-input" rows="4" maxlength="500" placeholder="맛·상태·양은 어땠나요? 다른 손님에게 큰 도움이 돼요" oninput="gReviewPaint()"></textarea>
                 <div class="rv-count" id="rv-count"></div>
-                <div class="v3-sub v3-sub-note">글을 쓰면 50P, 띄어쓰기 빼고 20자 이상이면 100P를 드려요. 1,000P부터 주문할 때 쓸 수 있어요.</div>
+                <!-- [수정 2026-10-02] 후기 쓸 때 안내 — 포인트 받기·쓰기·사라짐, 지워질 수 있는 글 (사장님 요청) -->
+                <ul class="rv-guide">
+                    <li>후기를 남기면 <b>50P</b>, 20자 이상(띄어쓰기 제외)이면 <b>100P</b>를 드려요</li>
+                    <li><b>1,000P</b>부터 주문할 때나 매장 픽업 때 자유롭게 쓸 수 있어요</li>
+                    <li>포인트는 받은 날부터 <b>1년</b>이 지나면 사라져요</li>
+                    <li>욕설·비방이나 상품과 관계없는 글은 삭제될 수 있으며, 이때 받은 포인트도 회수돼요</li>
+                </ul>
                 <div class="v3-btn-row"><button type="button" id="rv-send" class="v3-btn v3-btn-main" onclick="gSubmitReview()">등록</button></div>
             </div>
         </div>
@@ -11187,7 +11199,7 @@
                         ? `<div class="thumb-sale txt">${gSaleBadgeText(p).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</div>`
                         : `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>`) : '') +
                     // [수정 2026-10-02] 두 칸 카드 — 신선·냉장·당일배송 딱지는 사진 아래쪽에 겹쳐 둔다
-                    `<div class="thumb-badges">` + gFreshBadge(p) + gStorageBadge(p) + gTagBadges(p) + `</div>` +
+                    `<div class="thumb-badges">` + gStorageBadge(p) + gTagBadges(p) + `</div>` +
                     `</div>` +
                     `<div class="item-info-top">` +
                     // [수정] [오늘의추천]은 이름이 아니라 isRecommend 값으로 그린다 (gRecommendMark).
@@ -11382,7 +11394,8 @@
             const tags = [
                 // [수정 2026-10-02] 할인 문구는 말머리 줄에서 빼고 섬네일 띠에만 둔다 (사장님 요청)
                 gIsRecommendProduct(p) ? br('오늘의추천', 'lead-br') : '',
-                // [수정 2026-10-02] 신선식품은 말머리 줄 [신선식품] 대신 딱지 줄 맨 앞 초록 '신선' 딱지로 (gFreshBadge, 사장님 요청)
+                // [수정 2026-10-02] 신선식품은 다시 말머리 줄의 초록 [신선식품]으로 (사장님 요청 — 사진 위 '신선' 딱지는 뺐다)
+                gIsFreshProduct(p) ? br('신선식품', 'lead-fresh') : '',
                 ...clean(Array.isArray(p.nameTags) ? p.nameTags : []).map(t => br(t, 'lead-br')),
                 ...ns.brs.map(t => br(t, 'lead-br'))
             ].filter(Boolean).join(' ');
