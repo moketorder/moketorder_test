@@ -1484,7 +1484,7 @@
         .card-grid > .product-card .thumb { border-radius: 0 !important; overflow: hidden; border: none !important; box-sizing: border-box; }   /* 사진은 칸 끝까지 꽉 (테두리 1px 때문에 화면이 옆으로 2px 넘치던 것도 막는다) */
         .card-grid > .product-card .card-top { display: flex !important; flex-direction: column; flex: 1 1 auto; min-width: 0; }
         .card-grid > .product-card .thumb {
-            position: relative; width: 100% !important; height: auto !important; min-height: 0 !important; aspect-ratio: 1 / 1;
+            position: relative; width: 100% !important; height: auto !important; min-height: 0 !important; aspect-ratio: 12 / 11;   /* [수정 2026-10-02] 세로를 살짝(약 8%) 줄인다 — 너비는 칸 끝까지 그대로, 넘치는 위아래만 잘린다 */
             flex: 0 0 auto; grid-row: auto !important; grid-column: auto !important;
         }
         .card-grid > .product-card .thumb img { object-fit: cover !important; }
@@ -1514,6 +1514,9 @@
         /* [수정 2026-10-02] 수량 칸과 담기 단추가 칸 너비를 빈틈없이 나눠 채운다 (수량 : 담기 = 1 : 1.15) — 사장님 요청 */
         .card-grid .item-controls-bottom-v { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: stretch; align-self: stretch; width: auto !important; box-sizing: border-box; padding: 8px 10px 0; gap: 6px !important; grid-column: auto !important; grid-row: auto !important; }
         .card-grid .item-controls-bottom-v > :only-child { grid-column: 1 / -1; }   /* 품절 등 단추 하나뿐이면 한 줄 다 */
+        /* [수정 2026-10-02] 날짜가 바뀌는 곳은 조금 더 진한 선으로 (사장님 요청) */
+        .product-group-box > div:first-child { border-top: 2px solid #c3ccb8 !important; }
+        .product-group-box:first-child > div:first-child { border-top: none !important; }
         .card-grid .item-controls-bottom-v .qty-stepper.wide { display: flex !important; width: 100% !important; min-width: 0; box-sizing: border-box; height: 38px !important; padding: 2px; margin: 0 !important; }
         .card-grid .item-controls-bottom-v .qty-stepper.wide .qty-step-btn { flex: 1 1 0; min-width: 0; width: auto; height: 34px; font-size: 16px; }
         .card-grid .item-controls-bottom-v .qty-stepper.wide .qty-sel { width: 22px; flex: 0 0 22px; font-size: 15px; }
