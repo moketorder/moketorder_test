@@ -73,14 +73,25 @@
             //  배포되는 https 환경에서는 기존과 동일하게 동작한다.
             if (window.location.protocol === 'file:') return;
 
-            var now = Date.now();
-            var version = new URLSearchParams(window.location.search).get('v');
-            // 10분(600초) 이상 지난 'v' 파라미터가 있거나 없으면 강제 리로드 (너무 잦은 리로드 방지)
-            if (!version || (now - parseInt(version)) > 600000) {
-                var separator = window.location.href.indexOf('?') !== -1 ? '&' : '?';
-                var newUrl = window.location.href.split('#')[0].split('?')[0] + "?v=" + now;
-                window.location.replace(newUrl);
+            /* [수정 2026-10-03] 새 판이 있을 때만 다시 불러온다 (사장님 요청 — 데이터 줄이기).
+               예전엔 열 때마다 주소에 ?v=시각 을 붙여 무조건 한 번 더 불러와서, 저장해 둔 화면을 못 쓰고 매번 화면 파일(압축 240KB)을 새로 받았다.
+               (덤으로 ?tab=history 같은 주소 값도 지워져 주문내역 바로 열기가 안 됐다)
+               이제 서버에 '언제 바뀌었나'만 묻고(머리글 몇 바이트), 내가 가진 화면보다 새것이면 그때만 ?v= 를 붙여 새로 받는다.
+               같은 판으로 두 번 새로고침하지 않게 한 번 한 판은 적어 둔다. 앱으로 돌아올 때도 한 번 본다. */
+            function check() {
+                try {
+                    fetch(window.location.pathname + '?h=' + Date.now(), { method: 'HEAD', cache: 'no-store' }).then(function (r) {
+                        var lm = r && r.ok && r.headers.get('Last-Modified');
+                        if (!lm) return;
+                        var srv = Date.parse(lm), mine = Date.parse(document.lastModified);
+                        if (!srv || !mine || srv - mine <= 1000) return;   // 내 화면이 최신
+                        try { if (sessionStorage.getItem('moket_reload_for') === lm) return; sessionStorage.setItem('moket_reload_for', lm); } catch (e) { }
+                        window.location.replace(window.location.href.split('#')[0].split('?')[0] + '?v=' + Date.now());
+                    }).catch(function () { });
+                } catch (e) { }
             }
+            check();
+            document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
         })();
     </script>
     <link rel="preconnect" href="https://drive.google.com">
@@ -280,6 +291,7 @@
         .hm-mine-row .n { flex: 1 1 auto; min-width: 0; font-size: 13.5px; font-weight: 600; color: #4f5b46; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .hm-mine-row .s { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: #8b9682; }
         .hm-mine-row .s.go { color: #FF6D00; }
+        .hm-mine-row .s.done { color: #3d8f19; }   /* [신규 2026-10-03] 오늘 받은 것 — 초록 */
         .hm-link { display: block; width: 100%; padding: 11px 14px; border: 0; border-top: 1px solid #f1f3ee; background: #f8faf4; font: inherit; font-size: 13.5px; font-weight: 700; color: #3d8f19; text-align: center; cursor: pointer; }
         .hm-empty { font-size: 13.5px; font-weight: 600; color: #8b9682; line-height: 1.6; }
         /* 받는 날로 보기 */
@@ -2906,7 +2918,8 @@
                 <!-- [수정 2026-10-02] 후기 쓸 때 안내 — 포인트 받기·쓰기·사라짐, 지워질 수 있는 글 (사장님 요청) -->
                 <ul class="rv-guide">
                     <li>후기를 남기면 <b>50P</b>, 20자 이상(띄어쓰기 제외)이면 <b>100P</b>를 드려요</li>
-                    <li>후기는 상품을 받은 날부터 <b>2주</b> 안에 쓸 수 있어요</li>
+                    <li>후기는 픽업·배달일로부터 <b>2주</b> 안에 쓸 수 있어요</li><!-- [수정 2026-10-03] 받은 날 → 픽업·배달일 (사장님 요청) -->
+                    <li>후기는 같은 상품당 <b>1번</b>만 쓸 수 있어요</li><!-- [신규 2026-10-03] 사장님 요청 -->
                     <li><b>1,000P</b>부터 주문할 때나 매장 픽업 때 자유롭게 쓸 수 있어요</li>
                     <li>포인트는 받은 날부터 <b>1년</b>이 지나면 사라져요</li>
                     <li>욕설·비방이나 상품과 관계없는 글은 삭제될 수 있으며, 이때 받은 포인트도 회수돼요</li>
@@ -3924,6 +3937,8 @@
 
                     const modal = document.getElementById('profile-modal');
                     if (modal) modal.classList.remove('login-forced');
+                    // [신규 2026-10-03] 로그인·가입 화면이 떠 있으면 닫는다 — 사장님 모드에서는 로그인 없이 둘러본다
+                    try { gSetProfileClosable(true); closeModal('profile-modal'); checkScrollLock(); gSyncMenuFoot(); } catch (e2) { }
                 } else {
                     showSystemModal("관리자 모드가 해제되었습니다.<br>(일반 사용자 화면으로 전환됩니다)", 'alert');
                     setTimeout(() => location.reload(), 1000);
@@ -4100,10 +4115,11 @@
                    → 카카오 토큰이 살아 있으면 조용히 받아 두고, 만료됐으면 카카오 로그인을 한 번 다시 하게 한다 */
                 if (localStorage.getItem('kakao_original_name') && typeof gFirebaseKakaoSignIn === 'function' && !(await gFirebaseHasUser())) {
                     const _fb = await gFirebaseKakaoSignIn(localStorage.getItem('kakao_original_phone') || '');
-                    if (_fb === 'no-kakao' && isLoginEntryEnabled && !gIsGuestView()) localStorage.removeItem('kakao_original_name');
+                    if (_fb === 'no-kakao' && isLoginEntryEnabled && !gIsGuestView() && !isAdminMode) localStorage.removeItem('kakao_original_name');
                 }
                 const kakaoInfo = localStorage.getItem('kakao_original_name');
-                if (!kakaoInfo && isLoginEntryEnabled && !gIsGuestView()) {
+                // [수정 2026-10-03] 사장님 모드면 로그인 화면을 띄우지 않는다 (사장님 요청 — 로그인해야 보이는 화면을 빈 채로 둘러본다)
+                if (!kakaoInfo && isLoginEntryEnabled && !gIsGuestView() && !isAdminMode) {
                     const modal = document.getElementById('profile-modal');
                     if (modal) {
                         modal.classList.add('login-forced');
@@ -4112,7 +4128,7 @@
                     }
                 }
                 /* [신규] 로그인은 했는데 가입을 안 마친 손님 — 못 닫는 가입 화면으로 붙잡는다 */
-                else if (kakaoInfo && isLoginEntryEnabled && !gIsGuestView() && !gJoinDone()) {
+                else if (kakaoInfo && isLoginEntryEnabled && !gIsGuestView() && !isAdminMode && !gJoinDone()) {
                     gForceJoin();
                 }
             } catch (e) { console.error("로그인 설정 로드 실패:", e); }
@@ -5859,7 +5875,7 @@
            · 포인트(1P=1원) : 글 1~19자 50P · 20자 이상 100P — 띄어쓰기( )만 빼고 센다. 규칙관리와 똑같이 세야 저장된다
            · 한 번에 같이 쓰는 것 : 후기 · 내 후기 표시(review_keys) · 상품 별점 합계 · (포인트가 있으면) 포인트 기록과 잔액 */
         const REVIEW_DONE_STATUS = ['픽업', '배달완료', '픽업완료'];
-        window.gMyReviewKeys = null;   // { 주문키: true }
+        window.gMyReviewKeys = null;   // { 주문키: { code(상품번호), rid, at } }
         function gReviewPts(text) {
             const n = String(text || '').replace(/ /g, '').length;
             return n >= 20 ? 100 : (n >= 1 ? 50 : 0);
@@ -5893,16 +5909,23 @@
             if (!gIsValidPhone(ph) || gIsGuestView()) return;
             window.__gReviewKeysLoading = true;
             try {
-                const r = await fetch(`${FIREBASE_DB_URL}review_keys/${ph}.json?shallow=true&t=${Date.now()}`);
+                // [수정 2026-10-03] 상품번호(code)까지 받는다 — 같은 상품은 후기 1번만 (사장님 요청)
+                const r = await fetch(`${FIREBASE_DB_URL}review_keys/${ph}.json?t=${Date.now()}`);
                 window.gMyReviewKeys = (r.ok ? await r.json() : null) || {};
             } catch (e) { window.gMyReviewKeys = window.gMyReviewKeys || null; }
             window.__gReviewKeysLoading = false;
             const hm = document.getElementById('history-modal');
             if (window.gMyReviewKeys && hm && getComputedStyle(hm).display !== 'none') renderHistory();
         }
+        // [신규 2026-10-03] 이 상품(번호)에 이미 후기를 썼나 — 다른 날 주문한 같은 상품도 1번만 (사장님 요청)
+        function gReviewedCode(o) {
+            const code = String((o && o.productCode) || '').trim();
+            return !!code && Object.values(window.gMyReviewKeys || {}).some(v => v && String(v.code || '').trim() === code);
+        }
         function gReviewBtnHtml(o) {
             if (!gCanReview(o) || !window.gMyReviewKeys) return '';
             if (window.gMyReviewKeys[o.__fbKey]) return `<div class="rv-done">후기 완료</div>`;
+            if (gReviewedCode(o)) return `<div class="rv-done">후기 쓴 상품</div>`;   // [신규 2026-10-03] 다른 주문에서 이미 후기를 쓴 같은 상품 (사장님 요청)
             return `<button type="button" class="rv-write-btn" onclick="gOpenReview('${encodeURIComponent(o.__fbKey)}')">후기 쓰기</button>`;
         }
         let _gRv = null;   // 지금 쓰는 후기 { order, stars }
@@ -5910,6 +5933,7 @@
             const key = decodeURIComponent(encKey);
             const o = (fullHistoryData || []).find(x => x.__fbKey === key);
             if (!o || !gCanReview(o)) { showToast('후기를 쓸 수 없는 상품이에요'); return; }
+            if (gReviewedCode(o)) { showToast('이 상품은 이미 후기를 썼어요'); return; }   // [신규 2026-10-03] 같은 상품 1번만
             _gRv = { order: o, stars: 0 };
             document.getElementById('rv-item').innerText = String(o.item || '');
             document.getElementById('rv-text').value = '';
@@ -5949,6 +5973,7 @@
             const o = _gRv.order, ph = gReviewPhone();
             if (!gIsValidPhone(ph)) { showToast('로그인한 뒤에 쓸 수 있어요'); return; }
             const code = String(o.productCode).trim(), ref = o.__fbKey;
+            if (gReviewedCode(o)) { showToast('이 상품은 이미 후기를 썼어요'); return; }   // [신규 2026-10-03] 같은 상품 1번만
             const text = String(document.getElementById('rv-text').value || '').trim().slice(0, 500);
             const pts = gReviewPts(text);
             const btn = document.getElementById('rv-send');
@@ -5974,7 +5999,7 @@
                     const res = await fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(up) });
                     if (res.ok) {
                         window.gMyReviewKeys = window.gMyReviewKeys || {};
-                        window.gMyReviewKeys[ref] = true;
+                        window.gMyReviewKeys[ref] = { code, rid, at: now };   // [수정 2026-10-03] 상품번호도 적어 둔다 (같은 상품 1번만)
                         closeModal('review-modal');
                         showToast(pts ? `후기를 남겼어요 · ${pts}P 적립` : '후기를 남겼어요');
                         try { renderHistory(); } catch (e) { }
@@ -6085,7 +6110,7 @@
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         // ── 내 포인트
-        const POINT_WHY = { review: '후기 포인트', use: '주문에 사용', refund: '주문 취소로 돌려받음', expire: '1년 지나 사라짐', delete: '후기 삭제', adjust: '가게에서 조정' };
+        const POINT_WHY = { review: '후기 포인트', use: '주문에 사용', refund: '주문 취소로 돌려받음', expire: '1년 지나 사라짐', delete: '후기 삭제', adjust: '가게에서 조정', withdraw: '탈퇴로 사라짐' };
         async function gLoadMyPointBal() {
             const ph = gReviewPhone();
             const el = document.getElementById('menu-points');
@@ -6108,6 +6133,10 @@
             const sumEl = document.getElementById('cf-sum-val');
             if (!box) return;
             const ph = gKeyPhone(document.getElementById('input-phone').value);
+            if ((!gIsValidPhone(ph) || gIsGuestView()) && isAdminMode && goods > 0) {   // [신규 2026-10-03] 사장님 모드 — 빈 화면(0P)
+                box.innerHTML = `<div class="cf-pt-note">포인트 0P · ${PT_MIN_USE.toLocaleString()}P부터 쓸 수 있어요 (사장님 모드)</div>`;
+                return;
+            }
             if (!gIsValidPhone(ph) || gIsGuestView() || !(goods > 0)) return;
             let bal = 0;
             try {
@@ -6228,8 +6257,17 @@
         }
         async function gOpenMyPoints() {
             const ph = gReviewPhone();
-            if (!gIsValidPhone(ph) || gIsGuestView()) { showToast('카카오로 로그인하면 포인트를 볼 수 있어요'); return; }
+            const _owner = (!gIsValidPhone(ph) || gIsGuestView()) && isAdminMode;   // [신규 2026-10-03] 사장님 모드 — 손님 없이 빈 화면으로 연다
+            if ((!gIsValidPhone(ph) || gIsGuestView()) && !_owner) { showToast('카카오로 로그인하면 포인트를 볼 수 있어요'); return; }
             const side = document.getElementById('side-menu');
+            if (_owner) {
+                if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
+                document.getElementById('pt-bal').innerHTML = `0<small>P</small>`;
+                document.getElementById('pt-list').innerHTML = `<div class="dr-empty">아직 쌓인 포인트가 없어요<br><small>(사장님 모드 — 손님 로그인 없이 빈 화면)</small></div>`;
+                document.getElementById('points-modal').style.display = 'flex';
+                checkScrollLock();
+                return;
+            }
             if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
             document.getElementById('pt-bal').innerHTML = '…';
             document.getElementById('pt-list').innerHTML = '';
@@ -6981,6 +7019,12 @@
                     ? [{ what: fromDevice ? '폰에서 올림' : '가입', from: '', to: next.name || key }]
                     : diffs.slice();
                 if (wasOut) rows.unshift({ what: '재가입', from: '', to: next.name || key });
+                // [신규 2026-10-03] 탈퇴 회원 기록에 '다시 가입한 날'을 붙인다 (주문관리 탈퇴 회원 관리에서 본다)
+                if (wasOut && Number(before.withdrawnAt)) {
+                    fetch(`${FIREBASE_DB_URL}withdrawn_logs/${key}/${Number(before.withdrawnAt)}/rejoinedAt.json`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(now.getTime())
+                    }).catch(() => { });
+                }
                 if (movedFrom) rows.unshift({ what: '카카오 번호로 옮김', from: movedFrom, to: key });
                 if (!rows.length) return;
                 const body = {};
@@ -7363,10 +7407,55 @@
             return Object.keys(out).length ? out : null;
         }
 
+        /* [수정 2026-10-03] 회원탈퇴 (사장님 요청)
+           순서 — ① 서버에서 먼저 지운다(그래야 실패하면 다시 로그인해 한 번 더 할 수 있다) ② 카카오 연결 끊기 ③ 이 폰 정보 지우기.
+           예전엔 카카오를 먼저 끊고 서버 결과를 안 봐서, 서버가 거절해도 '탈퇴되었습니다'가 떴다.
+           서버에 한 번에 쓰는 것:
+             · customers/<번호>       = { withdrawn, withdrawnAt } — 개인정보는 지운다
+             · withdrawn_logs/<번호>/<탈퇴시각> = { at, name(아이디), lostPts, pending } — 탈퇴 회원 관리(주문관리)에서 본다. 다시 가입하면 rejoinedAt 이 붙는다
+             · 포인트가 있으면 point_logs/<번호>/w_<탈퇴시각> = { amt: -잔액, why: 'withdraw' } + points/<번호>.bal = 0 (탈퇴하면 포인트는 사라진다)
+           주문 기록은 법(전자상거래법)에 따라 남긴다. 다시 가입하면 탈퇴 전 주문은 가린다(gDropWithdrawn). */
+        async function gLoadPtBal(key) {
+            try {
+                const r = await fetch(`${FIREBASE_DB_URL}points/${key}.json?t=${Date.now()}`);
+                if (!r.ok) return null;
+                const d = await r.json();
+                return d ? (Number(d.bal) || 0) : 0;
+            } catch (e) { return null; }
+        }
+        async function gWithdrawOnServer(key, pending) {
+            const name = String(localStorage.getItem('moket_user_name') || localStorage.getItem('kakao_original_name') || '').trim().slice(0, 40);
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                const now = Date.now();
+                const bal = await gLoadPtBal(key);
+                if (bal === null && attempt < 3) { await gFirebaseKakaoSignIn(key); continue; }
+                const lost = Math.max(0, Number(bal) || 0);
+                const up = {};
+                up[`customers/${key}`] = { withdrawn: true, withdrawnAt: now };
+                up[`withdrawn_logs/${key}/${now}`] = { at: now, name, lostPts: lost, pending: pending || 0 };
+                if (lost > 0) {
+                    up[`point_logs/${key}/w_${now}`] = { amt: -lost, why: 'withdraw', at: now };
+                    up[`points/${key}`] = { bal: 0, last: `w_${now}`, at: now };
+                }
+                try {
+                    const res = await fetch(`${FIREBASE_DB_URL}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(up) });
+                    if (res.ok) {
+                        fetch(`${FIREBASE_DB_URL}customers_updated.json`, {
+                            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now())
+                        }).catch(() => { });
+                        return true;
+                    }
+                    if (res.status === 401 || res.status === 403) await gFirebaseKakaoSignIn(key);   // 서버 로그인이 풀렸다 — 다시 받아 한 번 더
+                } catch (e) { }
+                await new Promise(r => setTimeout(r, 400 * attempt));   // 그 사이 포인트가 바뀌었을 수도 있다 — 잔액을 다시 읽어 한 번 더
+            }
+            return false;
+        }
+
         async function unlinkKakao() {
             // [신규] 받지 않은 주문이 있으면 알려 주고 묻는다
             const key = gKeyPhone();
-            let pending = 0;
+            let pending = 0, bal = 0;
             try {
                 if (gIsValidPhone(key)) {
                     const r = await fetch(`${FIREBASE_DB_URL}orders/${key}.json?t=${Date.now()}`);
@@ -7376,51 +7465,42 @@
                         return nm.trim() !== '배달비' && !nm.includes('[배달합산]')
                             && !isOrderCancelled(o) && !isOrderReceived(o) && !isOrderDelivered(o);
                     }).length;
+                    bal = Number(await gLoadPtBal(key)) || 0;
                 }
             } catch (e) { }
-            const msg = pending
-                ? `받지 않은 주문이 ${pending}건 있어요.<br>그래도 탈퇴하시겠어요?`
-                : '탈퇴하시겠어요?';
+            // [신규 2026-10-03] 남은 포인트는 사라진다고 미리 알린다
+            const lines = [];
+            if (pending) lines.push(`받지 않은 주문이 ${pending}건 있어요.<br><small>(주문은 그대로 준비돼요)</small>`);
+            if (bal > 0) lines.push(`포인트 <b>${bal.toLocaleString()}P</b>가 사라져요.`);
+            const msg = lines.length ? `${lines.join('<br><br>')}<br><br>그래도 탈퇴하시겠어요?` : '탈퇴하시겠어요?';
 
-            showSystemModal(msg, "confirm", function () {
-                const forceClear = async () => {
-                    // [수정] 손님 정보(개인정보)는 지우고 번호 자리에 탈퇴 표시와 탈퇴한 때만 남긴다.
-                    //  주문 기록은 법(전자상거래법)에 따라 남긴다. 탈퇴한 때는 다시 가입했을 때 그 전 주문을 가리는 데 쓴다.
-                    if (gIsValidPhone(key)) {
-                        try {
-                            await fetch(`${FIREBASE_DB_URL}customers/${key}.json`, {
-                                method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ withdrawn: true, withdrawnAt: Date.now() })
-                            });
-                            fetch(`${FIREBASE_DB_URL}customers_updated.json`, {
-                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now())
-                            }).catch(() => { });
-                        } catch (e) { }
+            showSystemModal(msg, "confirm", async function () {
+                showSystemModal("탈퇴하는 중이에요...", 'loading');
+                // ① 서버 먼저 — 실패하면 카카오도 끊지 않고 그대로 둔다
+                if (gIsValidPhone(key)) {
+                    const ok = await gWithdrawOnServer(key, pending);
+                    if (!ok) {
+                        showSystemModal("탈퇴를 처리하지 못했어요.<br>인터넷을 확인하고 잠시 뒤 다시 해 주세요.", 'alert');
+                        return;
                     }
-                    if (typeof gFirebaseSignOut === 'function') await gFirebaseSignOut();
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    showSystemModal("탈퇴되었습니다.", "alert", () => location.reload());
-                };
-
-                if (typeof Kakao === 'undefined' || !Kakao.isInitialized() || !Kakao.Auth.getAccessToken()) {
-                    console.log('No valid Kakao token, clearing local storage only.');
-                    forceClear();
-                    return;
                 }
-
-                Kakao.API.request({
-                    url: '/v1/user/unlink',
-                    success: function (res) {
-                        console.log('Unlink success:', res);
-                        forceClear();
-                    },
-                    fail: function (err) {
-                        console.error('Unlink failed:', err);
-                        console.log('Forcing local clear anyway.');
-                        forceClear();
-                    }
+                // ② 카카오 연결 끊기 — 실패해도 서버는 이미 지웠으니 계속한다
+                await new Promise(done => {
+                    try {
+                        if (typeof Kakao === 'undefined' || !Kakao.isInitialized() || !Kakao.Auth.getAccessToken()) return done();
+                        const t = setTimeout(done, 4000);
+                        Kakao.API.request({
+                            url: '/v1/user/unlink',
+                            success: () => { clearTimeout(t); done(); },
+                            fail: (err) => { console.warn('카카오 연결 끊기 실패(서버는 이미 탈퇴됨):', err); clearTimeout(t); done(); }
+                        });
+                    } catch (e) { done(); }
                 });
+                // ③ 이 폰 정보 지우기
+                if (typeof gFirebaseSignOut === 'function') await gFirebaseSignOut();
+                try { localStorage.clear(); } catch (e) { }
+                try { sessionStorage.clear(); } catch (e) { }
+                showSystemModal("탈퇴되었습니다.", "alert", () => location.reload());
             });
         }
 
@@ -7753,6 +7833,14 @@
             const phone = String(document.getElementById('input-phone').value || '').trim()
                 || _ls('moket_user_phone') || _ls('kakao_original_phone');
 
+            // [신규 2026-10-03] 사장님 모드 — 손님 로그인이 없으면 주문내역 화면을 빈 채로 연다
+            if (isAdminMode && (!phone || !/^010\d{8}$/.test(gKeyPhone(phone)) || gIsGuestView())) {
+                if (isSilent) return;
+                fullHistoryData = [];
+                setupHistoryUI('사장님 모드');
+                renderHistory();
+                return;
+            }
             if (!phone) {
                 if (!isSilent) {
                     showSystemModal("주문자명과 연락처를 입력해주세요.", 'alert', () => {
@@ -7840,6 +7928,9 @@
                         fullHistoryData = [];
                         if (document.getElementById('history-modal').style.display === 'flex') renderHistory();
                     }
+                    window.__hmMineAt = Date.now();
+                    // [신규 2026-10-03] 새로 받은 주문내역으로 홈 '내 주문'도 다시 그린다 (사장님 요청 — 예전엔 주문내역을 열어야 바뀌었다)
+                    if (window.gHomeOn && typeof gScheduleHome === 'function') gScheduleHome();
                 }
             } catch (e) {
                 console.warn("Firebase History Load Error", e);
@@ -11152,6 +11243,8 @@
                         : '') +
                     `<div class="item-price-row">` +
                     `<div class="item-price-val${gIsSale(p) ? ' sale' : ''}">${gSalePctHtml(p)}${gCardPriceLabel(p)}</div>` +
+                    // [수정 2026-10-03] 사장님 모드 잔여 수량은 가격 줄 오른쪽에 — 담기 위에 두면 담기가 수량보다 아래로 내려갔다 (사장님 요청)
+                    (stockText ? `<div class="stock-status" style="color:${stockColor}; font-weight:800; margin-left:auto; padding-left:6px; font-size:12px; white-space:nowrap; align-self:center;">${stockText.replace(': ', ' ')}</div>` : '') +
                     `</div>` +
                     `</div></div>` +
                     // [ver3] 수량(- 1 +)과 담기를 아래 한 줄로 모았다. 상세보기도 같은 줄 왼쪽에 둔다.
@@ -11163,7 +11256,6 @@
                     `<button class="qty-step-btn" onclick="stepQty(this, 1)">+</button>` +
                     `</div>` +
                     `<div class="qty-group">` +
-                    (stockText ? `<div class="stock-status" style="color:${stockColor}; font-weight:800;">${stockText}</div>` : '') +
                     // [수정] 수량 조절(- 0 +) 대신 '담기' 버튼. 누를 때마다 1개씩 늘어난다.
                     `<div class="add-cart-wrap ${currentQty > 0 ? 'selected' : ''}" style="${isSoldOut ? 'pointer-events:none;' : ''}">` +
                     `<input type="hidden" class="qty-num" value="${currentQty}" data-name="${p.name}" data-price="${p.price}" data-stock="${stock}">` +
@@ -11714,6 +11806,11 @@
             gApplyHomeView(true);
             gRenderHome();
             gHomeLoadExtras();
+            // [신규 2026-10-03] 홈을 열 때 주문내역을 뒤에서 새로 받는다 (1분 안에 받았으면 건너뜀) — 받으면 '내 주문'이 다시 그려진다
+            if (!window.__hmMineAt || Date.now() - window.__hmMineAt > 60000) {
+                window.__hmMineAt = Date.now();
+                try { openHistoryModal(false, true).catch(() => { }); } catch (e) { }
+            }
             if (!silent) window.scrollTo(0, 0);
         }
         function gCloseHome() { gApplyHomeView(false); }
@@ -11745,7 +11842,9 @@
         }
         function gHomeStockOf(p) { return (p && p.stock !== undefined && p.stock !== '') ? parseInt(p.stock) : Infinity; }
         // 홈에는 지금 담을 수 있는 상품만 (마감·품절은 뺀다)
-        function gHomeBuyable(p) { return !!gHomeTypeOf(p) && !gIsClosedProduct(p) && !(gHomeStockOf(p) <= 0); }
+        // [수정 2026-10-03] 숨긴 상품(hide)은 사장님 모드여도 홈에 안 넣는다 — 홈은 손님이 보는 모습 그대로 (사장님 요청: '주문이 많아요'에 숨긴 과일이 나왔다)
+        function gHomeHiddenProd(p) { return p.hidden === true || p.hidden === "true" || p.hide === true || p.hide === "true"; }
+        function gHomeBuyable(p) { return !!gHomeTypeOf(p) && !gHomeHiddenProd(p) && !gIsClosedProduct(p) && !(gHomeStockOf(p) <= 0); }
         function gHomeEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
         // 홈 상품 카드 — 목록 카드와 같은 담기 단추(.qty-num + .btn-add-cart)를 써서 담는 처리를 그대로 탄다
@@ -11876,36 +11975,41 @@
         function gHomeMineHtml() {
             const name = String(localStorage.getItem('moket_user_name') || '').trim();
             const phone = String(localStorage.getItem('moket_user_phone') || '').trim();
-            if (!name || !phone || gIsGuestView()) return '';
+            if ((!name || !phone || gIsGuestView()) && !isAdminMode) return '';   // [수정 2026-10-03] 사장님 모드면 빈 칸으로라도 보인다
             let rows = (Array.isArray(fullHistoryData) && fullHistoryData.length) ? fullHistoryData : null;
             if (!rows) { try { rows = JSON.parse(localStorage.getItem(`history_cache_${name}_${gKeyPhone(phone)}`) || '[]'); } catch (e) { rows = []; } }
             if (!Array.isArray(rows)) rows = [];
             const t = gTodayYmd();
             const groups = {};
             rows.forEach(o => {
-                if (!o || isOrderCancelled(o) || isOrderReceived(o) || isOrderDelivered(o)) return;
+                if (!o || isOrderCancelled(o)) return;
                 if (gIsFeeRow(o.item) || gIsPointRow(o.item)) return;
                 const d = parseKRDate(o.pickupDate);
                 if (!d) return;
                 const ymd = gYmdOf(d), stocked = isOrderStocked(o);
-                if (ymd < t && !stocked) return;   // 지난 날짜는 들어와서 찾아가야 하는 것만
-                const g = groups[ymd] || (groups[ymd] = { ymd, n: 0, first: '', stocked: false, del: false });
+                // [수정 2026-10-03] 받은 것(픽업완료·배달완료)은 받는 날이 오늘이면 남겨 둔다 (사장님 요청). 완료 시각은 따로 없어 받는 날로 본다
+                const done = isOrderReceived(o) || isOrderDelivered(o);
+                if (done && ymd !== t) return;
+                if (!done && ymd < t && !stocked) return;   // 지난 날짜는 들어와서 찾아가야 하는 것만
+                const g = groups[ymd] || (groups[ymd] = { ymd, n: 0, first: '', stocked: false, del: false, left: 0 });
                 g.n += 1;   // '외 N개'는 상품 가짓수로 센다
                 if (!g.first) g.first = String(o.item || '');
-                if (stocked) g.stocked = true;
+                if (!done) { g.left += 1; if (stocked) g.stocked = true; }   // 상태는 아직 안 받은 것으로 정한다
                 if (String(o.shippingMethod || '').includes('배달')) g.del = true;
             });
             const list = Object.values(groups).sort((a, b) => a.ymd < b.ymd ? -1 : 1).slice(0, 3);
             const body = list.length
                 ? list.map(g => {
                     const d = new Date(g.ymd + 'T12:00:00');
-                    const st = g.stocked ? (g.del ? '배달 준비' : '찾아가세요') : (g.del ? '배달 예정' : '픽업 예정');
+                    const st = !g.left ? (g.del ? '배달 완료' : '픽업 완료')   // [신규 2026-10-03] 그 날 것을 다 받았으면
+                        : g.stocked ? (g.del ? '배달 준비' : '픽업 가능') : (g.del ? '배달 예정' : '픽업 예정');   // [수정 2026-10-03] '찾아가세요' → '픽업 가능' (사장님 요청)
                     return `<div class="hm-mine-row"><span class="d">${gHomeDayLabel(g.ymd)} ${HM_WEEK[d.getDay()]}</span>` +
                         `<span class="n">${gHomeEsc(g.first)}${g.n > 1 ? ` 외 ${g.n - 1}개` : ''}</span>` +
-                        `<span class="s${g.stocked && !g.del ? ' go' : ''}">${st}</span></div>`;
+                        `<span class="s${!g.left ? ' done' : (g.stocked ? ' go' : '')}">${st}</span></div>`;   // [수정 2026-10-03] 배달 준비도 픽업 가능처럼 주황 (사장님 요청)
                 }).join('')
                 : `<div class="hm-mine-row"><span class="hm-empty">다가오는 픽업·배달이 없어요.</span></div>`;
-            return `<section class="hm-sec"><div class="hm-sec-h"><b>내 주문</b><small>마지막으로 본 주문내역 기준</small></div>` +
+            // [수정 2026-10-03] '마지막으로 본 주문내역 기준' 설명은 뺐다 — 홈에서 새로 받아 오므로 (사장님 요청)
+            return `<section class="hm-sec"><div class="hm-sec-h"><b>내 주문</b></div>` +
                 `<div class="hm-mine">${body}<button type="button" class="hm-link" onclick="openHistoryModal()">주문내역 전체 보기</button></div></section>`;
         }
         // 받는 날로 보기 — 공동구매 받는 날마다 상품 수, 누르면 그 날짜 목록으로
@@ -11921,6 +12025,55 @@
                     `<small>${HM_WEEK[new Date(d + 'T12:00:00').getDay()]} · ${cnt[d]}개</small></button>`).join('') + `</div></section>`;
         }
 
+        /* [신규 2026-10-03] 홈 사진 깜빡임 막기 (사장님 요청).
+           앱을 켜면 설정·상품·소식이 차례로 와서 홈을 0.5초 사이 5번쯤 다시 그린다. 예전엔 그때마다 통째로 지워
+           사진 35장을 새로 만들어 깜빡였다. 이제 줄(칸)마다 글이 같으면 그대로 두고, 상품 줄은 카드마다 같으면 그대로 둔다.
+           · 줄 이름표(_k) = 상품 줄은 data-rail, 나머지는 class + 제목 글자 */
+        function gHomeKeyOf(el) {
+            const r = el.querySelector && el.querySelector('[data-rail]');
+            if (r) return 'rail:' + r.dataset.rail;
+            const t = el.querySelector && el.querySelector('b, .t1');
+            return (el.className || el.nodeName) + ':' + (t ? t.textContent : '');
+        }
+        function gHomePatch(box, out) {
+            const tpl = document.createElement('template');
+            tpl.innerHTML = out.join('');
+            const fresh = [...tpl.content.children];
+            const olds = new Map();
+            [...box.children].forEach(el => { if (el._k !== undefined) olds.set(el._k, el); });
+            const next = fresh.map(nw => {
+                const k = gHomeKeyOf(nw), html = nw.outerHTML;
+                const old = olds.get(k);
+                if (old) olds.delete(k);
+                if (old && old._h === html) return old;   // 글이 같으면 그대로
+                const or = old && old.querySelector('[data-rail]'), nr = nw.querySelector('[data-rail]');
+                if (or && nr) {
+                    // 상품 줄 — 위 제목칸은 새것으로, 카드는 같은 것끼리 그대로 둔다
+                    const oh = old.firstElementChild, nh = nw.firstElementChild;
+                    if (oh && nh && oh !== or && nh !== nr && oh.outerHTML !== nh.outerHTML) oh.replaceWith(nh);
+                    const oc = new Map();
+                    [...or.children].forEach(c => { const a = oc.get(c._h) || []; a.push(c); oc.set(c._h, a); });
+                    const cards = [...nr.children].map(c => {
+                        const h = c.outerHTML, a = oc.get(h);
+                        if (a && a.length) return a.shift();
+                        c._h = h; return c;
+                    });
+                    gHomePlace(or, cards);
+                    old._h = html;
+                    return old;
+                }
+                nw._k = k; nw._h = html;
+                [...(nw.querySelectorAll('[data-rail] > *'))].forEach(c => { c._h = c.outerHTML; });
+                return nw;
+            });
+            gHomePlace(box, next);
+        }
+        // 차례대로 놓되, 이미 제자리인 것은 건드리지 않는다 (떼었다 붙이면 사진이 다시 그려질 수 있다)
+        function gHomePlace(parent, list) {
+            const keep = new Set(list);
+            [...parent.children].forEach(el => { if (!keep.has(el)) el.remove(); });
+            list.forEach((el, i) => { if (parent.children[i] !== el) parent.insertBefore(el, parent.children[i] || null); });
+        }
         function gRenderHome() {
             const box = document.getElementById('home-view');
             if (!box) return;
@@ -11929,7 +12082,7 @@
             const out = [gHomeTodayHtml(), gHomeNoticeHtml()];
             if (!isAdminMode && !isProductListEnabled) {
                 out.push(`<div class="hm-closed">현재는 주문이 불가능 합니다.<br>(주문 가능 시간 - 오전 10시 ~ 다음날 오전 6시)</div>`);
-                box.innerHTML = out.join('');
+                gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
                 return;
             }
             const buy = (productsData || []).filter(p => p && gHomeBuyable(p));
@@ -11965,7 +12118,7 @@
                 // [신규 2026-10-03] 문의는 1:1 카톡으로 (사장님 요청) — 메뉴 '카카오톡 문의하기'와 같은 주소
                 `<div class="hm-ask"><p>배달·상품 문의와 AS 신청은<br><b>1:1 카톡</b>으로 문의해 주세요.</p>` +
                 `<button type="button" class="hm-ask-btn" onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기 ›</button></div></section>`);
-            box.innerHTML = out.join('');
+            gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
             box.querySelectorAll('[data-rail]').forEach(r => { if (keep[r.dataset.rail]) r.scrollLeft = keep[r.dataset.rail]; });
         }
 
