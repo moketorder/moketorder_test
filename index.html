@@ -3397,6 +3397,8 @@
                 initMainTabs();
                 processAndRender(productsData, true);
                 updateFooter();
+                // [수정 2026-10-03] 판매유형을 바꾸면 맨 위부터 보여 준다 — 홈에서 내려 둔 만큼 새 목록도 내려간 채로 보였다 (사장님 요청)
+                window.scrollTo(0, 0);
                 return;
             }
 
@@ -6117,12 +6119,18 @@
                 return;
             }
             // [수정 2026-10-02] 쓸 금액을 손님이 적는다 (사장님 요청) — 상품 금액과 가진 포인트 중 작은 쪽까지
-            // [수정 2026-10-03] 포인트는 100P 단위로만 쓴다 (사장님 요청) — 쓸 수 있는 최대도 100P 단위로 내린다
-            const PT_UNIT = 100;
+            // [수정 2026-10-03] 포인트는 10P 단위로만 쓴다 (사장님 요청 — 100P에서 10P로) — 쓸 수 있는 최대도 10P 단위로 내린다
+            const PT_UNIT = 10;
             const max = Math.floor(Math.min(bal, goods) / PT_UNIT) * PT_UNIT;
+            // [신규 2026-10-03] 한 번에 1,000P 이상 써야 한다 (사장님 요청) — 상품 금액이 그보다 작으면 칸 대신 안내만
+            if (max < PT_MIN_USE) {
+                box.innerHTML = `<div class="cf-pt-note">포인트 ${bal.toLocaleString()}P · 상품 금액이 ${PT_MIN_USE.toLocaleString()}원 이상일 때 쓸 수 있어요</div>`;
+                window.gPointUse = 0;
+                return;
+            }
             //  적는 대로 바로 합계에서 빠진다 ('사용' 단추 없음 — 사장님 요청)
             box.innerHTML = `<div class="cf-pt">
-                <div class="cf-pt-top"><span>포인트</span><small>${bal.toLocaleString()}P 보유</small></div>
+                <div class="cf-pt-top"><span>포인트</span><small>${bal.toLocaleString()}P 보유 · ${PT_MIN_USE.toLocaleString()}P 이상 ${PT_UNIT}P 단위</small></div>
                 <div class="cf-pt-in"><input type="number" inputmode="numeric" min="0" max="${max}" placeholder="0"><button type="button" class="all">전액</button></div>
                 <div class="cf-pt-used" style="display:none;"><span>포인트 사용</span><span></span></div>
             </div>`;
@@ -6130,15 +6138,16 @@
             const apply = () => {
                 let v = Math.floor(Number(String(inp.value).replace(/[^\d]/g, '')) || 0);
                 if (v > max) { v = max; inp.value = max; showToast(`${max.toLocaleString()}P까지 쓸 수 있어요`); }
-                v = Math.floor(v / PT_UNIT) * PT_UNIT;   // 적는 중에는 글자를 그대로 두고, 빠지는 금액만 100P 단위로 내린다
+                v = Math.floor(v / PT_UNIT) * PT_UNIT;   // 적는 중에는 글자를 그대로 두고, 빠지는 금액만 10P 단위로 내린다
+                if (v < PT_MIN_USE) v = 0;               // [신규 2026-10-03] 1,000P 이상만 쓴다 — 그보다 적으면 빠지지 않는다
                 window.gPointUse = v;
                 usedEl.style.display = v ? '' : 'none';
                 usedEl.lastElementChild.innerText = `-${v.toLocaleString()}원`;
                 if (sumEl) sumEl.innerText = `${(total - v).toLocaleString()}원`;
             };
             inp.addEventListener('input', apply);
-            // 칸을 벗어나면 적은 글자도 100P 단위로 맞춰 보여 준다 (예: 1550 → 1500)
-            inp.addEventListener('blur', () => { const v = window.gPointUse || 0; const raw = Number(String(inp.value).replace(/[^\d]/g, '')) || 0; if (raw && raw !== v) { inp.value = v || ''; if (raw < PT_UNIT) showToast(`포인트는 ${PT_UNIT}P 단위로 쓸 수 있어요`); } });
+            // 칸을 벗어나면 적은 글자도 10P 단위로 맞춰 보여 준다 (예: 1555 → 1550)
+            inp.addEventListener('blur', () => { const v = window.gPointUse || 0; const raw = Number(String(inp.value).replace(/[^\d]/g, '')) || 0; if (raw && raw !== v) { inp.value = v || ''; showToast(raw < PT_MIN_USE ? `포인트는 ${PT_MIN_USE.toLocaleString()}P부터 쓸 수 있어요` : `포인트는 ${PT_UNIT}P 단위로 써요`); } });
             box.querySelector('.all').onclick = () => { inp.value = max; apply(); };
         }
         // 주문 줄 '포인트 사용' + 기록 + 잔액을 한 번에 쓴다. 잔액이 모자라면 쓰지 않는다
