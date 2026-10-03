@@ -239,7 +239,8 @@
            상자 모양은 '내 주문'처럼 따로 봐야 하는 칸에만 쓴다. */
         .hm-wrap { display: flex; flex-direction: column; gap: 24px; padding: 6px 14px 130px; }
         .hm-wrap[hidden] { display: none !important; }
-        .hm-hide { display: none !important; }   /* 홈일 때 가리는 분류·검색 줄과 상품 목록 */
+        .hm-hide { display: none !important; }
+        .hm-skel { background: #f1f3ee !important; color: transparent !important; border-radius: 6px; display: block; height: 1.2em; }   /* [신규 2026-10-03] 불러오는 동안 회색 자리 */   /* 홈일 때 가리는 분류·검색 줄과 상품 목록 */
         .hm-sec { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
         .hm-sec-h { display: flex; align-items: baseline; gap: 8px; }
         .hm-sec-h b { font-size: 17.5px; font-weight: 800; letter-spacing: -0.3px; color: #16200f; text-wrap: balance; }
@@ -2918,14 +2919,15 @@
         <!-- [신규] 배송 유형 대분류 탭 영역 -->
         <div class="delivery-type-tabs">
             <!-- [신규 2026-10-03] 홈 — 주문서를 열면 먼저 보이는 화면 (사장님 요청). 안쪽 판매유형(currentDeliveryType)은 건드리지 않는다 -->
-            <button class="delivery-type-btn" data-type="home" onclick="switchDeliveryType('home')">홈</button>
+            <button class="delivery-type-btn active" data-type="home" onclick="switchDeliveryType('home')">홈</button>
             <!-- [수정 2026-09-30] 당일판매·예약판매를 '공동구매' 하나로 합쳤다 (안쪽 값은 reserve 그대로) -->
-            <button class="delivery-type-btn active" data-type="reserve" onclick="switchDeliveryType('reserve')">공동구매</button>
+            <button class="delivery-type-btn" data-type="reserve" onclick="switchDeliveryType('reserve')">공동구매</button>
             <button class="delivery-type-btn" data-type="onsite" onclick="switchDeliveryType('onsite')">상시판매</button>
         </div>
     </div>
     <!-- [ver3] 여기부터(분류·날짜·검색)는 고정하지 않는다 — 판매유형 안내처럼 내리면 함께 올라가 사라진다 -->
-    <div class="sub-header-group">
+    <!-- [수정 2026-10-03] 처음부터 홈 모양으로 연다 — 공동구매 화면이 잠깐 비쳤다가 홈으로 바뀌던 것 (사장님 요청). 홈이 아니면 JS가 hm-hide 를 뗀다 -->
+    <div class="sub-header-group hm-hide">
         <!-- [신규] 대분류 탭 영역 -->
         <div class="main-tabs" id="main-tabs-container">
             <!-- JavaScript에서 동적으로 버튼들을 생성하여 주입합니다. -->
@@ -2955,9 +2957,9 @@
     <!-- [수정] 판매유형 안내는 sticky 헤더 밖으로 뺐다. 접었다 펴는 움직임이 스크롤과 어긋나
          뚝뚝 끊겨 보였기 때문. 이제는 그냥 화면 내용처럼 스크롤에 맞춰 위로 밀려 사라진다. -->
     <!-- [신규 2026-10-03] 홈 화면. 홈일 때는 위의 분류·검색 줄과 아래 상품 목록을 가리고 이것만 보인다 -->
-    <div id="home-view" class="hm-wrap" hidden></div>
-    <div class="date-section-title" id="main-section-title" style="display:none;"></div>
-    <div class="container" id="product-list"></div>
+    <div id="home-view" class="hm-wrap"><div class="hm-today"><span class="hm-pill off hm-skel" style="width:96px;">&nbsp;</span><p class="hm-big hm-skel" style="width:70%;">&nbsp;</p><p class="hm-small hm-skel" style="width:50%;">&nbsp;</p></div></div>
+    <div class="date-section-title hm-hide" id="main-section-title" style="display:none;"></div>
+    <div class="container hm-hide" id="product-list"></div>
     <div id="detail-overlay" class="modal-overlay" onclick="if(event.target === this) closeModal('detail-overlay')">
         <div class="modal-content">
             <div class="detail-scroll-area">
@@ -3537,6 +3539,7 @@
                     if (_saved.listKey) window.lastRenderedTargetKey = _saved.listKey;
                     if (_saved.gbDate) window.gGbPickedDate = _saved.gbDate;
                     if (_saved.home) window.gHomeStart = true;   // [신규 2026-10-03] 홈에서 주문했으면 홈으로 돌아온다
+                    else gApplyHomeView(false);                  // [신규 2026-10-03] 처음 모양이 홈이라, 목록으로 돌아올 때는 홈을 걷는다
                 } else {
                     // [수정 2026-09-30] 당일·예약을 합친 '공동구매'로 늘 시작한다
                     currentDeliveryType = 'reserve';
@@ -6114,7 +6117,9 @@
                 return;
             }
             // [수정 2026-10-02] 쓸 금액을 손님이 적는다 (사장님 요청) — 상품 금액과 가진 포인트 중 작은 쪽까지
-            const max = Math.min(bal, goods);
+            // [수정 2026-10-03] 포인트는 100P 단위로만 쓴다 (사장님 요청) — 쓸 수 있는 최대도 100P 단위로 내린다
+            const PT_UNIT = 100;
+            const max = Math.floor(Math.min(bal, goods) / PT_UNIT) * PT_UNIT;
             //  적는 대로 바로 합계에서 빠진다 ('사용' 단추 없음 — 사장님 요청)
             box.innerHTML = `<div class="cf-pt">
                 <div class="cf-pt-top"><span>포인트</span><small>${bal.toLocaleString()}P 보유</small></div>
@@ -6125,12 +6130,15 @@
             const apply = () => {
                 let v = Math.floor(Number(String(inp.value).replace(/[^\d]/g, '')) || 0);
                 if (v > max) { v = max; inp.value = max; showToast(`${max.toLocaleString()}P까지 쓸 수 있어요`); }
+                v = Math.floor(v / PT_UNIT) * PT_UNIT;   // 적는 중에는 글자를 그대로 두고, 빠지는 금액만 100P 단위로 내린다
                 window.gPointUse = v;
                 usedEl.style.display = v ? '' : 'none';
                 usedEl.lastElementChild.innerText = `-${v.toLocaleString()}원`;
                 if (sumEl) sumEl.innerText = `${(total - v).toLocaleString()}원`;
             };
             inp.addEventListener('input', apply);
+            // 칸을 벗어나면 적은 글자도 100P 단위로 맞춰 보여 준다 (예: 1550 → 1500)
+            inp.addEventListener('blur', () => { const v = window.gPointUse || 0; const raw = Number(String(inp.value).replace(/[^\d]/g, '')) || 0; if (raw && raw !== v) { inp.value = v || ''; if (raw < PT_UNIT) showToast(`포인트는 ${PT_UNIT}P 단위로 쓸 수 있어요`); } });
             box.querySelector('.all').onclick = () => { inp.value = max; apply(); };
         }
         // 주문 줄 '포인트 사용' + 기록 + 잔액을 한 번에 쓴다. 잔액이 모자라면 쓰지 않는다
@@ -11801,6 +11809,9 @@
              · 가능일 때는 마감까지 남은 시간을 1초마다 줄여 보여 준다 (상품 카드 카운트다운과 같은 장치)
            마감·여는 시각은 주문관리 ⚙️일반 '오늘 주문 마감'(today_sale), 배달 시간은 '운영시간'(store_hours)을 쓴다. */
         function gHomeTodayHtml() {
+            // [신규 2026-10-03] 서버 설정(배달·휴무·마감 시각)을 받기 전에는 회색 자리만 — 틀린 상태가 잠깐 보이지 않게
+            if (window.__hmEarly) return `<div class="hm-today"><span class="hm-pill off hm-skel" style="width:96px;">&nbsp;</span>` +
+                `<p class="hm-big hm-skel" style="width:70%;">&nbsp;</p><p class="hm-small hm-skel" style="width:50%;">&nbsp;</p></div>`;
             const t = gTodayYmd(), now = new Date();
             const off = gIsOffDay(t);
             const after = gTodayAfterClose(now), before = gTodayBeforeOpen(now);
@@ -15432,6 +15443,25 @@
                  결과는 보지 않는다 — 카카오 토큰이 만료된 손님을 여기서 섣불리 로그아웃시키지 않으려고.
                  만료 처리는 예전대로 fetchLoginEntryStatus 가 한다. */
             loadProfile();
+            /* [신규 2026-10-03] 홈을 먼저 그린다 (사장님 요청 — 들어갈 때 오래 걸리는 것 같다).
+               예전엔 서버 설정 여덟 가지를 다 받은 뒤에야 첫 화면을 그려, 그동안 빈 공동구매 화면이 보였다.
+               이제 기기에 담아 둔 상품 목록으로 홈부터 바로 그리고(맨 위 상태 줄만 회색 자리), 설정·상품이 오면 다시 그린다.
+               재고·마감은 주문 확정 때 서버로 다시 확인하므로 잠깐 옛 값이 보여도 잘못 주문되지 않는다. */
+            try {
+                const _sv = (() => { try { const r = sessionStorage.getItem(VIEW_STATE_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } })();
+                const _homeFirst = !_sv || _sv.home || !_sv.at || (Date.now() - _sv.at) > 5 * 60 * 1000;
+                const _admin = sessionStorage.getItem('moket_admin_mode') === 'true';
+                if (_homeFirst && !_admin) {
+                    if (!productsData.length) {
+                        const _c = JSON.parse(localStorage.getItem('moket_products_cache_v3') || '[]');
+                        if (Array.isArray(_c)) productsData = _c.filter(Boolean);
+                    }
+                    window.__hmEarly = true;
+                    gApplyHomeView(true);
+                    gRenderHome();
+                    gHomeLoadExtras();
+                }
+            } catch (e) { console.warn('홈 먼저 그리기 실패 — 예전처럼 그린다:', e); }
             if (localStorage.getItem('kakao_original_name') && typeof gFirebaseKakaoSignIn === 'function') {
                 gFirebaseHasUser()
                     .then(has => { if (!has) return gFirebaseKakaoSignIn(localStorage.getItem('kakao_original_phone') || ''); })
@@ -15453,6 +15483,9 @@
 
             // [추가] 시간 기반 카테고리 순서 동적 설정 및 기본 탭 설정
             initMainTabs(true);
+            // [신규 2026-10-03] 설정을 받았으니 홈 맨 위 상태를 채운다 (상품은 아래 loadData 가 새로 받아 다시 그린다)
+            window.__hmEarly = false;
+            if (window.gHomeOn) gRenderHome();
 
             // [신규] 쓸모없는 주문내역 캐시 정리 (아래 함수 설명 참고)
             gCleanupHistoryCaches();
