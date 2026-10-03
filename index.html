@@ -325,6 +325,8 @@
         .hm-card .thumb-badges { display: flex; position: absolute; left: 6px; right: 6px; top: 6px; flex-wrap: wrap; gap: 4px; z-index: 2; pointer-events: none; }
         .hm-card .hm-info { display: flex; flex-direction: column; gap: 3px; padding: 8px 9px 0; flex: 1 1 auto; min-width: 0; }
         .hm-card .item-head { cursor: pointer; min-width: 0; }
+        .hm-card .hm-day { font-size: 12px; font-weight: 800; color: #3d8f19; line-height: 1.3; }   /* [신규 2026-10-03] 받는 날 */
+        .hm-card .hm-day.onsite { color: #8b9682; }
         .hm-card .item-name { font-size: 14px !important; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
         .hm-card .item-deadline { font-size: 11.5px; }
         .hm-card .hm-price { margin-top: auto; padding-top: 2px; font-size: 15.5px; font-weight: 800; color: #16200f; font-variant-numeric: tabular-nums; }
@@ -11742,7 +11744,13 @@
                 `<div class="hm-thumb" ${open}>` +
                 (img ? `<img src="${getImgUrl(img, 300)}" loading="lazy" referrerpolicy="no-referrer" alt="" onerror="this.onerror=null; this.src=getImgUrl('${img}', 300, true);">` : `<span class="hm-noimg">사진 없음</span>`) +
                 sale + `<div class="thumb-badges">${gStorageBadge(p)}${gTagBadges(p)}</div></div>` +
-                `<div class="hm-info"><div class="item-head" ${open}>${gCardNameHtml(p)}</div>` +
+                // [신규 2026-10-03] 받는 날 — 공동구매는 '10/6(화) 픽업·배달', 오늘·내일은 말로. 상시판매는 '상시판매' (사장님 요청 — 홈 카드에 날짜가 없었다)
+                `<div class="hm-info">${(() => {
+                    const d = gHomeTypeOf(p) === 'reserve' ? gGbDateOf(p) : '';
+                    if (!d) return `<div class="hm-day onsite">상시판매</div>`;
+                    const lab = gHomeDayLabel(d), w = HM_WEEK[new Date(d + 'T12:00:00').getDay()];
+                    return `<div class="hm-day">${lab === '오늘' || lab === '내일' ? `${lab}(${w})` : `${lab}(${w})`} 픽업·배달</div>`;
+                })()}<div class="item-head" ${open}>${gCardNameHtml(p)}</div>` +
                 gRatingHtml(p) + gDeadlineHtml(p, closed) +
                 (gOrigPriceLabel(p) ? `<div class="hm-orig">${gOrigPriceLabel(p)}</div>` : '') +
                 `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div></div>` +
