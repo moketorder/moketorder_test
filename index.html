@@ -3389,7 +3389,9 @@
             // 홈에서 나가면 같은 판매유형이라도 목록을 새로 그린다 (홈에서 담느라 판매유형이 바뀌어 있을 수 있다)
             if (window.gHomeOn) { gCloseHome(); currentDeliveryType = ''; }
             if (type === 'today') type = 'reserve';   // [수정 2026-09-30] 당일판매는 공동구매로 합쳤다
-            if (currentDeliveryType === type) return;
+            // [수정 2026-10-03] 보고 있는 탭을 한 번 더 누르면 맨 위로 올라간다 (사장님 요청)
+            //  (부드럽게 올리기는 긴 상시판매 목록에서 사진이 들어오며 중간에 멈춰서, 바로 올린다)
+            if (currentDeliveryType === type) { window.scrollTo(0, 0); return; }
             if (type === 'reserve' || type === 'onsite') {
                 currentDeliveryType = type;
                 currentMainTab = (type === 'onsite') ? ONSITE_ALL.key : 'gb-all';   // [수정 2026-10-03] 상시판매는 '전체'로 시작 (사장님 요청)
@@ -6087,7 +6089,7 @@
         async function gLoadMyPointBal() {
             const ph = gReviewPhone();
             const el = document.getElementById('menu-points');
-            if (!gIsValidPhone(ph) || gIsGuestView()) { if (el) el.innerText = ''; return null; }
+            if (!gIsValidPhone(ph) || gIsGuestView()) { if (el) el.innerText = '0P'; return null; }   // [수정 2026-10-03] 로그인 전에도 0P로 보여 준다 (홈과 같게)
             try {
                 const r = await fetch(`${FIREBASE_DB_URL}points/${ph}.json?t=${Date.now()}`);
                 const d = r.ok ? await r.json() : null;
@@ -6226,7 +6228,7 @@
         }
         async function gOpenMyPoints() {
             const ph = gReviewPhone();
-            if (!gIsValidPhone(ph) || gIsGuestView()) { showToast('로그인한 뒤에 볼 수 있어요'); return; }
+            if (!gIsValidPhone(ph) || gIsGuestView()) { showToast('카카오로 로그인하면 포인트를 볼 수 있어요'); return; }
             const side = document.getElementById('side-menu');
             if (side && side.classList.contains('open') && typeof toggleMenu === 'function') toggleMenu();
             document.getElementById('pt-bal').innerHTML = '…';
@@ -6252,8 +6254,8 @@
             try { gLoadMyPointBal(); } catch (e) { }   // [신규 2026-10-02] 메뉴 '내 포인트' 옆 숫자
             const lo = document.getElementById('sm-logout'), un = document.getElementById('sm-unlink');
             const guest = (typeof gIsGuestView === 'function') && gIsGuestView();
-            const spt = document.getElementById('sm-pt');   // [신규 2026-10-02] 둘러보기 손님은 포인트 칸을 감춘다
-            if (spt) spt.style.display = (localStorage.getItem('kakao_original_name') && !guest) ? '' : 'none';
+            const spt = document.getElementById('sm-pt');   // [수정 2026-10-03] 홈처럼 늘 보인다 (사장님 요청) — 로그인 전에는 0P, 누르면 로그인 안내
+            if (spt) spt.style.display = '';
             if (lo) lo.style.display = (localStorage.getItem('kakao_original_name') && !guest) ? '' : 'none';
             if (un) un.style.display = ((typeof gJoinDone === 'function') && gJoinDone() && !guest) ? '' : 'none';
             // 둘 다 없으면 빈 줄만 남으니 칸째로 감춘다
