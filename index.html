@@ -330,12 +330,17 @@
             font-size: 11px !important; font-weight: 800 !important; padding: 3px 6px !important; border-radius: 6px !important;
             background: rgba(255, 255, 255, 0.93) !important; line-height: 1.2 !important;
         }
-        .hm-card .thumb-sale.txt { font-size: 12px; }
+        /* [삭제 2026-10-05] 홈 카드 문구 띠 12px — '할인!' 띠(15px)와 크기를 맞추려고 뺐다 (사장님 요청) */
         .hm-card .hm-thumb { position: relative; aspect-ratio: 1 / 1; max-width: 100%; background: #f6f7f3; cursor: pointer; overflow: hidden; }
         .hm-card .hm-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .hm-card .hm-noimg { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; font-size: 12px; color: #b6bcac; }
         .hm-card .thumb-sale { top: auto !important; bottom: 0 !important; }
         .hm-card .thumb-badges { display: flex; position: absolute; left: 6px; right: 6px; top: 6px; flex-wrap: wrap; gap: 4px; z-index: 2; pointer-events: none; }
+        /* [신규 2026-10-04] '주문이 많아요' 순위 — 사진 오른쪽 위. 1~3위는 주황, 나머지는 짙은 회색 */
+        /* [수정 2026-10-04] 크기·모양은 왼쪽 '냉장' 딱지와 똑같이 — 글자 11px, 여백 3px 6px, 둥글기 6px (사장님 요청: 높이 맞추기) */
+        .hm-card .hm-rank { position: absolute; top: 6px; right: 6px; z-index: 3; display: block; padding: 3px 6px; border-radius: 6px; background: rgba(31, 41, 55, .85); color: #fff; font-size: 11px; font-weight: 900; line-height: 1.2; letter-spacing: -0.02em; pointer-events: none; }
+        .hm-card .hm-rank.top { background: #FF6D00; }
+        .hm-card.ranked .thumb-badges { right: 40px; }   /* 순위와 겹치지 않게 */
         .hm-card .hm-info { display: flex; flex-direction: column; gap: 3px; padding: 8px 9px 0; flex: 1 1 auto; min-width: 0; }
         .hm-card .item-head { cursor: pointer; min-width: 0; }
         .hm-card .hm-day { font-size: 12px; font-weight: 800; color: #3d8f19; line-height: 1.3; }   /* [신규 2026-10-03] 받는 날 */
@@ -1770,7 +1775,8 @@
         }
 
         /* [신규 2026-10-02] 사장님이 적은 문구 띠 — 사진이 좁아 길면 두 줄까지 접는다 */
-        .thumb-sale.txt { font-size: 13px; line-height: 1.3; padding: 4px 6px; word-break: keep-all; box-sizing: border-box; }
+        /* [수정 2026-10-05] 13px → 15px. '할인!' 띠와 글씨 크기를 맞춘다 (사장님 요청) */
+        .thumb-sale.txt { font-size: 15px; line-height: 1.3; padding: 4px 6px; word-break: keep-all; box-sizing: border-box; }
 
         .item-price-val {
             color: var(--nego-orange);
@@ -2548,6 +2554,9 @@
             background: #f4f6f0 !important; border-color: #e2e8da !important;
         }
         #sys-modal-msg [style*="#c2610a"] { color: #4f5b46 !important; }
+        /* [수정 2026-10-05] '함께 배달할 수 없어요' 창의 사다드림은 주황을 남긴다 — 초록 신선식품 옆에서 회색이라 눈에 안 띄었다 (사장님 요청) */
+        #sys-modal-msg .sm-sada { color: #c2610a !important; }
+        #sys-modal-msg span.sm-sada { background: #fff4e9 !important; }
 
         /* 받는 방법 — 두 줄 같은 크기, 누르면 다음으로 */
         .ship-opts { display: flex; flex-direction: column; gap: 10px; }
@@ -2696,6 +2705,15 @@
            세로로 긴 사진(.tall)은 위아래를 잘라 칸을 꽉 채우고, 넓거나 정사각인 사진은 잘리지 않게 둔다. */
         .product-card .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
         .product-card .thumb img.tall { object-fit: cover; object-position: center; }
+        /* [신규 2026-10-05] PC — 창이 넓으면 목록 판을 넓혀 한 줄에 칸 수를 늘린다 (한 칸 240px 이상, 최대 4개) (사장님 요청)
+           칸 수가 바뀌므로 세로줄은 모든 칸 오른쪽에 긋고, 판 맨 오른쪽 1px(마지막 칸의 줄)은 잘라 낸다.
+           앞쪽 #product-list.container 600px 를 덮어야 해서 맨 끝에 둔다 */
+        @media (min-width: 700px) {
+            #product-list.container { max-width: 1130px; }
+            .card-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); clip-path: inset(0 1px 0 0); }
+            .card-grid > .product-card { border-right: 1px solid #eef1e9 !important; }
+            .card-grid > .product-card .thumb { width: calc(100% + 1px) !important; margin-right: -1px !important; z-index: 1; }
+        }
     </style>
 </head>
 
@@ -11358,8 +11376,9 @@
 
         // 할인 전 금액. 할인이 없거나 값이 0이면 빈 문자열 → 카드에 줄 자체가 안 나온다.
         // [신규 2026-10-02] 주문관리에서 '정상가'로 적은 할인이면 그어진 금액 앞에 '정상가'를 붙인다 (사장님 요청)
+        // [수정 2026-10-05] 깎을 금액·팔 금액으로 적은 원 할인도 정상가 방식과 똑같이 보여 준다 (사장님 요청)
         function gOrigWord(p) {
-            return (p && p.discountType === 'amount' && p.discountAmountMode === 'list') ? '정상가' : '';
+            return gDiscAmountOf(p) > 0 ? '정상가' : '';
         }
         // [신규 2026-10-02] 정상가 방식 — 최종 금액 앞에 빨간 'n%' 딱지. 반올림 (사장님 요청)
         function gSalePctHtml(p) {
@@ -11425,12 +11444,14 @@
             ].filter(Boolean).join(' ');
             // 수식어는 지금처럼 회색
             const words = [p.nameLead ? E(String(p.nameLead).trim()) : '', ...ns.leads].filter(Boolean).join(' · ');
-            const lead = [tags, words].filter(Boolean).join(' ');
+            // [수정 2026-10-05] 대괄호는 수식어 윗줄에 따로 (사장님 요청) — 둘 다 있으면 줄을 나눈다
+            const lead = [tags, words].filter(Boolean).join('<br>');
             return { lead, main: ns.main };
         }
         function gCardNameHtml(p) {
             const { lead, main } = gNameParts(p);
-            return (lead ? `<div class="item-lead">${lead}</div>` : '') + `<div class="item-name">${main}</div>`;
+            // [수정 2026-10-05] 말머리가 없어도 빈 칸을 둔다 — 옆 카드와 이름 줄을 맞추려고 (gAlignLeads, 사장님 요청)
+            return `<div class="item-lead">${lead}</div>` + `<div class="item-name">${main}</div>`;
         }
 
         function gSplitLead(name) {
@@ -11526,7 +11547,26 @@
         /* [ver3] 하는 일이 없어졌다.
            수량 박스가 담기 단추 위에 있던 시절, 두 칸의 오른쪽 선을 맞추려고 너비를 재서 붙여 주던 함수다.
            이제 둘이 한 줄에 나란히 서서 자리를 반반 나누므로 손댈 것이 없다. (부르는 곳이 여럿이라 껍데기는 남긴다) */
-        function gSyncQtyStepperWidths(root) { /* 아무것도 하지 않는다 */ }
+        // [수정 2026-10-05] 이 자리를 빌려 나란히 선 카드끼리 말머리 줄 높이를 맞춘다 (gAlignLeads)
+        function gSyncQtyStepperWidths(root) { gAlignLeads(root); }
+
+        /* [신규 2026-10-05] 대괄호·수식어가 있는 카드와 없는 카드가 나란히 서면 이름 줄이 어긋났다 (사장님 요청).
+           같은 줄(목록은 두 칸 한 줄, 홈은 가로 한 줄)에서 가장 높은 말머리 높이에 모두 맞춘다. */
+        function gAlignLeads(root) {
+            (root || document).querySelectorAll('.card-grid, .hm-rail').forEach(grid => {
+                const cards = [...grid.children].filter(c => c.classList.contains('product-card'));
+                cards.forEach(c => { const l = c.querySelector('.item-lead'); if (l) l.style.minHeight = ''; });
+                const rows = new Map();
+                cards.forEach(c => { const t = c.offsetTop; if (!rows.has(t)) rows.set(t, []); rows.get(t).push(c); });
+                rows.forEach(row => {
+                    const leads = row.map(c => c.querySelector('.item-lead')).filter(Boolean);
+                    const h = Math.max(0, ...leads.map(l => l.offsetHeight));
+                    if (h > 0) leads.forEach(l => { l.style.minHeight = h + 'px'; });
+                });
+            });
+        }
+        // 글꼴이 늦게 들어오면 높이가 바뀌므로 한 번 더
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => gAlignLeads());
 
         let _qtyWidthTimer = null;
         window.addEventListener('resize', () => {
@@ -11801,6 +11841,7 @@
                 if (el) el.classList.toggle('hm-hide', !!on);
             });
             document.querySelectorAll('.delivery-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === (on ? 'home' : currentDeliveryType)));
+            gAlignLeads();   // [신규 2026-10-05] 가려져 있던 목록은 높이를 못 쟀으므로 보일 때 다시 맞춘다
         }
         function gOpenHome(silent) {
             gApplyHomeView(true);
@@ -11848,7 +11889,7 @@
         function gHomeEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
         // 홈 상품 카드 — 목록 카드와 같은 담기 단추(.qty-num + .btn-add-cart)를 써서 담는 처리를 그대로 탄다
-        function gHomeCard(p) {
+        function gHomeCard(p, rank) {
             let q = 0;
             for (const ck in cart) if (gCartName(ck) === p.name) q += (cart[ck] || 0);
             const closed = gIsClosedProduct(p), stock = gHomeStockOf(p), sold = closed || stock <= 0;
@@ -11858,8 +11899,9 @@
                 ? ((gSaleBadgeOn(p) && gSaleBadgeText(p)) ? `<div class="thumb-sale txt">${gHomeEsc(gSaleBadgeText(p))}</div>` : `<div class="thumb-sale">${gDiscLabelOf(p)}!</div>`)
                 : '';
             const label = closed ? '마감' : (sold ? '품절' : (q > 0 ? `담김 <b>${q}</b>개` : (gHasChoiceOptions(p) ? '옵션 선택' : '담기')));
-            return `<div class="product-card hm-card${sold ? ' soldout' : ''}">` +
+            return `<div class="product-card hm-card${sold ? ' soldout' : ''}${rank ? ' ranked' : ''}">` +
                 `<div class="hm-thumb" ${open}>` +
+                (rank ? `<span class="hm-rank${rank <= 3 ? ' top' : ''}">${rank}위</span>` : '') +   // [신규 2026-10-04] 주문 많은 순위
                 (img ? `<img src="${getImgUrl(img, 300)}" loading="lazy" referrerpolicy="no-referrer" alt="" onerror="this.onerror=null; this.src=getImgUrl('${img}', 300, true);">` : `<span class="hm-noimg">사진 없음</span>`) +
                 sale + `<div class="thumb-badges">${gStorageBadge(p)}${gTagBadges(p)}</div></div>` +
                 // [신규 2026-10-03] 받는 날 — 공동구매는 '10/6(화) 픽업·배달', 오늘·내일은 말로. 상시판매는 '상시판매' (사장님 요청 — 홈 카드에 날짜가 없었다)
@@ -11870,8 +11912,9 @@
                     return `<div class="hm-day">${lab === '오늘' || lab === '내일' ? `${lab}(${w})` : `${lab}(${w})`} 픽업·배달</div>`;
                 })()}<div class="item-head" ${open}>${gCardNameHtml(p)}</div>` +
                 gRatingHtml(p) + gDeadlineHtml(p, closed) +
-                (gOrigPriceLabel(p) ? `<div class="hm-orig">${gOrigPriceLabel(p)}</div>` : '') +
-                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gCardPriceLabel(p)}</div></div>` +
+                // [수정 2026-10-05] 홈 카드도 목록 카드처럼 원 할인은 '정상가'와 빨간 n% 딱지 (사장님 요청)
+                (gOrigPriceLabel(p) ? `<div class="hm-orig">${gOrigWord(p) ? gOrigWord(p) + ' ' : ''}${gOrigPriceLabel(p)}</div>` : '') +
+                `<div class="hm-price${gIsSale(p) ? ' sale' : ''}">${gSalePctHtml(p)}${gCardPriceLabel(p)}</div></div>` +
                 `<div class="add-cart-wrap${q > 0 ? ' selected' : ''}"${sold ? ' style="pointer-events:none;"' : ''}>` +
                 `<input type="hidden" class="qty-num" value="${q}" data-name="${gHomeEsc(p.name)}" data-price="${gHomeEsc(p.price)}" data-stock="${stock}">` +
                 `<button type="button" class="btn-add-cart${sold ? ' soldout' : ''}" onclick="gHomeAdd(this)">${label}</button></div></div>`;
@@ -11899,7 +11942,8 @@
                 `<span class="hm-arrows"><button type="button" class="hm-arrow" aria-label="왼쪽으로" onclick="gHomeRailMove(this, -1)">‹</button>` +
                 `<button type="button" class="hm-arrow" aria-label="오른쪽으로" onclick="gHomeRailMove(this, 1)">›</button></span>` +
                 (more ? `<button type="button" class="hm-more" onclick="${more}">전체 보기 ›</button>` : '') + `</div>` +
-                `<div class="hm-rail" data-rail="${key}">${items.slice(0, 12).map(gHomeCard).join('')}</div></section>`;
+                // [수정 2026-10-04] '주문이 많아요'는 10개까지, 사진 오른쪽 위에 1~10위 (사장님 요청)
+                `<div class="hm-rail" data-rail="${key}">${(key === 'hot' ? items.slice(0, 10).map((p, i) => gHomeCard(p, i + 1)) : items.slice(0, 12).map(p => gHomeCard(p))).join('')}</div></section>`;
         }
         function gHomeDayLabel(ymd) {
             const t = gTodayYmd();
@@ -12120,6 +12164,7 @@
                 `<button type="button" class="hm-ask-btn" onclick="window.open('https://open.kakao.com/me/moketstore')">카카오톡 문의하기 ›</button></div></section>`);
             gHomePatch(box, out);   // [수정 2026-10-03] 통째로 갈지 않고 바뀐 곳만 (사진 깜빡임)
             box.querySelectorAll('[data-rail]').forEach(r => { if (keep[r.dataset.rail]) r.scrollLeft = keep[r.dataset.rail]; });
+            gAlignLeads(box);   // [신규 2026-10-05] 홈 줄도 말머리 높이를 맞춘다
         }
 
         /* [신규 2026-10-03] 컴퓨터에서도 상품 줄을 좌우로 넘겨 볼 수 있게 (사장님 요청)
@@ -12599,7 +12644,7 @@
             const kindTag = (item) => item.isFresh
                 ? `<span style="display:inline-block; background:#eafaf2; color:#3d8f19; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">신선식품</span>`
                 : (item.isSada
-                    ? `<span style="display:inline-block; background:#fff4e9; color:#c2610a; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">사다드림</span>`
+                    ? `<span class="sm-sada" style="display:inline-block; background:#fff4e9; color:#c2610a; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:4px;">사다드림</span>`
                     : ``);
 
             const row = (item) => {
@@ -12638,7 +12683,7 @@
                 `<div style="line-height:1.7; word-break:keep-all;">` +
                 `<div style="font-weight:900; color:var(--nego-orange); font-size:1.05em; margin-bottom:10px;">🛵 함께 배달할 수 없어요</div>` +
                 `배달은 가장 늦은 입고일에<br>한 번에 나갑니다.<br><br>` +
-                `<b style="color:#c2610a;">사다드림</b>·<b style="color:#3d8f19;">신선식품</b>은<br>당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
+                `<b class="sm-sada" style="color:#c2610a;">사다드림</b>·<b style="color:#3d8f19;">신선식품</b>은<br>당일 드셔야 하는 상품이라<br>더 늦은 날짜와 함께 보낼 수 없어요.<br><br>` +
                 `<div style="background:#f8f9fa; border-radius:10px; padding:12px 14px; text-align:left;">` +
                 listHtml +
                 `</div><br>` +
@@ -13194,8 +13239,8 @@
                 const r = gAgencyRule(p);
                 if (r && r.stepFee > 0 && r.threshold > 0) {
                     return gAgencyFeeTableBox(
-                        row(`${r.threshold.toLocaleString()}원 미만`, `${r.baseFee.toLocaleString()}원`) +
-                        row(`${r.threshold.toLocaleString()}원 이상`, `${r.step.toLocaleString()}원당 +${r.stepFee.toLocaleString()}원`)
+                        row(`${r.threshold.toLocaleString()}원 이하`, `${r.baseFee.toLocaleString()}원`) +
+                        row(`${r.threshold.toLocaleString()}원 초과`, `${r.step.toLocaleString()}원당 +${r.stepFee.toLocaleString()}원`)
                     );
                 }
             }
@@ -13268,8 +13313,9 @@
             const rule = gAgencyRule(p);
             if (rule) {
                 const amt = parseInt(amount) || 0;
-                if (amt < rule.threshold) return rule.baseFee;
-                return rule.baseFee + rule.stepFee * (Math.floor((amt - rule.threshold) / rule.step) + 1);
+                // [수정 2026-10-05] 기준금액 '이하'까지 기본료 (사장님 요청 — 예전 '미만'). 주문관리 gAgencyFeeByRule 와 같게
+                if (amt <= rule.threshold) return rule.baseFee;
+                return rule.baseFee + rule.stepFee * Math.ceil((amt - rule.threshold) / rule.step);
             }
 
             const tiers = Array.isArray(p.agencyFeeTiers) ? p.agencyFeeTiers : [];
@@ -15794,6 +15840,49 @@
             <img id="customer-photo-modal-img" src="" style="display: block; margin: 0 auto; width: 100%; height: auto; max-height: 400px; object-fit: contain; border-radius: 8px; border: 1.5px solid #e2e8da; background: #f8faf4;">
         </div>
     </div>
+
+    <!-- [신규 2026-10-04] 창이 떠 있는 동안 뒤 화면 멈추기 (사장님 요청 — 주문서·주문관리·배달기사 세 앱 공통)
+         화면을 거의 다 덮는 창(위치 고정·보임·불투명)이 하나라도 떠 있으면 뒤 화면을 그 자리에 고정하고, 다 닫히면 보던 자리로 돌려놓는다.
+         예전엔 body 에 overflow:hidden 만 걸어서 아이폰·카카오톡 안 브라우저에서는 그래도 뒤가 굴러갔다.
+         창을 열고 닫을 때마다 부를 필요 없이 화면이 바뀌는 것을 지켜보다 알아서 맞춘다.
+         빼고 싶은 큰 덮개가 있으면 그 칸에 data-no-scroll-lock 을 붙인다. -->
+    <script>
+    (function () {
+        let lockY = null, raf = 0;
+        function covers(el) {
+            if (!el || el.nodeType !== 1 || el.hasAttribute('data-no-scroll-lock')) return false;
+            const cs = getComputedStyle(el);
+            if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') return false;
+            if (parseFloat(cs.opacity) < 0.05) return false;
+            const r = el.getBoundingClientRect();
+            return r.width >= window.innerWidth * 0.9 && r.height >= window.innerHeight * 0.85;
+        }
+        function anyOpen() {
+            for (const el of document.body.children) if (covers(el)) return true;
+            return false;
+        }
+        function lock() {
+            if (lockY !== null) return;
+            lockY = window.scrollY || 0;
+            const b = document.body.style;
+            b.position = 'fixed'; b.top = (-lockY) + 'px'; b.left = '0'; b.right = '0'; b.width = '100%';
+        }
+        function unlock() {
+            if (lockY === null) return;
+            const y = lockY; lockY = null;
+            const b = document.body.style;
+            b.position = ''; b.top = ''; b.left = ''; b.right = ''; b.width = '';
+            window.scrollTo(0, y);
+        }
+        function check() { raf = 0; if (anyOpen()) lock(); else unlock(); }
+        function soon() { if (!raf) raf = requestAnimationFrame(check); }
+        new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden', 'open'] });
+        document.addEventListener('transitionend', soon, true);
+        window.addEventListener('resize', soon);
+        window.gScrollLockCheck = soon;   // 필요하면 직접 불러도 된다
+        soon();
+    })();
+    </script>
 </body>
 
 </html>
